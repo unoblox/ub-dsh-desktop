@@ -14,14 +14,16 @@ window.__ModuleLoader__.load({
     const INFO_ROUTE = '/api/desktop-unoblox.info'
     const STYLE_ID = 'dsh-desktop-unoblox-info-style'
     const STYLE = `
-      .dshUbxInfo{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-width:0;max-width:100%;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
+      /* Take only the room the stock dock items leave (basis 0), never theirs. */
+      .dshUbxInfo{position:relative;flex:1 1 0%;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:2px 10px;min-width:0;max-width:100%;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
       .dshUbxInfoItem{display:inline-flex;align-items:baseline;gap:4px;min-width:0;white-space:nowrap}
       .dshUbxInfoValue{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
       .dshUbxInfoModel{max-width:220px;overflow:hidden;text-overflow:ellipsis}
       .dshUbxInfoButton{border:0;background:transparent;padding:0 2px;font:inherit;color:var(--dsw-alias-label-secondary);text-decoration:underline;text-underline-offset:2px;cursor:pointer;border-radius:4px;transition:color .15s ease}
       .dshUbxInfoButton:hover{color:var(--dsw-alias-label-primary)}
       .dshUbxInfoButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-      .dshUbxInfoDetails{flex-basis:100%;margin:2px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px;white-space:normal;color:var(--dsw-alias-label-tertiary)}
+      /* Details float above the strip so opening them never grows the dock. */
+      .dshUbxInfoDetails{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-height:min(320px,50vh);overflow-y:auto;margin:0;padding:10px 12px;list-style:none;display:flex;flex-direction:column;gap:4px;white-space:normal;color:var(--dsw-alias-label-secondary);background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-1));backdrop-filter:var(--dsw-menu-backdrop-filter);-webkit-backdrop-filter:var(--dsw-menu-backdrop-filter);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:var(--dsw-elevation-panel)}
       @media (prefers-reduced-motion:reduce){.dshUbxInfoButton{transition:none}}
     `
 
@@ -176,6 +178,27 @@ window.__ModuleLoader__.load({
     function UnobloxInfoStrip({ state, t, onRetry }) {
       const [open, setOpen] = useState(false)
       const detailsId = useId()
+      const rootRef = useRef(null)
+      const toggleRef = useRef(null)
+      // A non-modal popover: Esc closes it and returns focus to the toggle; a
+      // pointer press outside the strip closes it.
+      useEffect(() => {
+        if (!open || typeof document === 'undefined') return undefined
+        const onKey = (event) => {
+          if (event.key !== 'Escape') return
+          setOpen(false)
+          toggleRef.current?.focus()
+        }
+        const onPointer = (event) => {
+          if (rootRef.current !== null && !rootRef.current.contains(event.target)) setOpen(false)
+        }
+        document.addEventListener('keydown', onKey)
+        document.addEventListener('pointerdown', onPointer)
+        return () => {
+          document.removeEventListener('keydown', onKey)
+          document.removeEventListener('pointerdown', onPointer)
+        }
+      }, [open])
       const view = state.view
       if (view === undefined) {
         if (state.phase === 'loading') return h('div', { className: 'dshUbxInfo', 'data-unoblox-info': '' }, h('span', { role: 'status' }, t('loading')))
@@ -218,17 +241,17 @@ window.__ModuleLoader__.load({
       if (view.routing?.reason !== undefined) details.push(t('routing', { reason: view.routing.reason }))
       if (details.length > 0) {
         items.push(h('button', {
-          key: 'toggle', type: 'button', className: 'dshUbxInfoButton', 'aria-expanded': open, 'aria-controls': detailsId, onClick: () => setOpen((value) => !value)
+          key: 'toggle', ref: toggleRef, type: 'button', className: 'dshUbxInfoButton', 'aria-expanded': open, 'aria-controls': detailsId, onClick: () => setOpen((value) => !value)
         }, t(open ? 'hideDetails' : 'details')))
       }
       if (state.phase === 'error') {
         items.push(h('span', { key: 'error', role: 'status', className: 'dshUbxInfoItem', title: state.error }, t('unavailable')),
           h('button', { key: 'retry', type: 'button', className: 'dshUbxInfoButton', onClick: onRetry }, t('retry')))
       }
-      return h('div', { className: 'dshUbxInfo', role: 'group', 'aria-label': t('label'), 'data-unoblox-info': '' },
+      return h('div', { ref: rootRef, className: 'dshUbxInfo', role: 'group', 'aria-label': t('label'), 'data-unoblox-info': '' },
         ...items,
         open && details.length > 0
-          ? h('ul', { id: detailsId, className: 'dshUbxInfoDetails' }, details.map((line, index) => h('li', { key: index }, line)))
+          ? h('ul', { id: detailsId, className: 'dshUbxInfoDetails', 'aria-label': t('details') }, details.map((line, index) => h('li', { key: index }, line)))
           : null)
     }
 

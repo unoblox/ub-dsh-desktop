@@ -61,7 +61,7 @@ The patched `@deepseek-ai/dsh-client-ui-settings-models` hides the Models page's
 
 The key (`ub-gw-…`) is never written to configuration. It is stored in the Harness credential store under `UNOBLOX_API_KEY`:
 
-- New installs: the first-run dialog (`packages/dsh-desktop-onboarding/client.js`) has an Unoblox API-key field.
+- New installs: the first-run dialog (`packages/dsh-desktop-onboarding/client.js`) has an Unoblox API-key field. The dialog also shows on any launch while no key is stored. Unoblox is the only provider, so this covers upgrades from DSH Desktop, development builds and a removed key. It reads only whether the key is configured, never its value.
 - Everyone else: enter the key on the Unoblox row in Settings → Models. With the overlay in place, that card writes no settings and only stores the credential.
 
 ## Changing the endpoint or models

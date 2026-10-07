@@ -34,6 +34,17 @@ Output goes to `dist-dev/`. The `package:dev:*` scripts use `electron-builder.de
 - **Sandbox on Ubuntu 24.04:** AppArmor restricts unprivileged user namespaces, which Chromium's sandbox uses. If the AppImage exits at once with a sandbox error, that is the cause. A signed `.deb` with an AppArmor profile is the long-term fix; `--no-sandbox` works as a stopgap.
 - **No `.deb` yet:** a `.deb` needs a maintainer name and email. `package.json` still names upstream's author, so the target is off until a maintainer is chosen. Add `"maintainer": "Name <email>"` under `build.linux` and a `deb` entry to `build.linux.target`.
 
+## Verified on Linux x64 (2026-10-07, Ubuntu 24.04 container, Xvfb)
+
+- `npm run build` and `electron-builder --linux --config electron-builder.dev.cjs` pass, including every after-pack gate: ASAR unpack, packaged PPT runtime, Office Python smoke, and LibreOffice (WASM) conversion.
+- `scripts/smoke-packaged-linux.mjs` passes against `linux-unpacked` and the extracted AppImage. It checks the real `web` profile (not Safe Mode), Harness ready in about 5 s, token login, bootstrap registration, workspace and session creation, and the Unoblox info route.
+- A first-run journey in the real Electron window (driven over CDP, temporary HOME, key not in the environment):
+  1. The first-run dialog shows, with a password-type key field.
+  2. "Connect and continue" stores the key in the credential store.
+  3. A chat turn and a `web_search` turn complete through Unoblox.
+  4. The strip under the composer shows the live search price, the balance, the estimated charge and the routed model.
+- Not verified here: macOS and Windows installers (they need native runners), AppImage under real FUSE and the desktop's AppArmor policy, and Wayland sessions.
+
 ## Not done by these builds
 
 - **Signing.** macOS builds are unsigned and not notarized, so Gatekeeper blocks the first open (right-click → Open, or System Settings → Privacy & Security → Open Anyway). Windows builds are unsigned, so SmartScreen shows "Windows protected your PC" (More info → Run anyway). Signed releases need the publisher's certificates; see `release.yml` and `docs/release-runbook.md`.

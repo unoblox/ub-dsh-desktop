@@ -77,7 +77,10 @@ module.exports = async function verifyPackagedPptRuntime(context) {
   // macOS runs Node work through its Helper, as the Desktop does.
   const executable = process.platform === 'win32'
     ? path.join(context.appOutDir, product + '.exe')
-    : path.join(macContents, 'Frameworks', product + ' Helper.app', 'Contents', 'MacOS', product + ' Helper')
+    : process.platform === 'linux'
+      // Linux names the binary after build.linux.executableName.
+      ? path.join(context.appOutDir, context.packager.executableName)
+      : path.join(macContents, 'Frameworks', product + ' Helper.app', 'Contents', 'MacOS', product + ' Helper')
   if (!require('node:fs').existsSync(executable)) throw new Error('Cannot locate the packaged Electron executable')
   await execFileAsync(executable, [__filename, '--verify-runtime', appRoot], {
     cwd: path.dirname(appRoot),

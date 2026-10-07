@@ -1,0 +1,32 @@
+diff --git a/node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js b/node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js
+index e16d873..6ca7338 100755
+--- a/node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js
++++ b/node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js
+@@ -1297,7 +1297,10 @@ const ENGINE_PREFIX = "@deepseek-ai/libreoffice-kit";
+ * @returns true when at least one resolution directory holds the package.
+ */
+ function installedPackageExists(name) {
+-	return (require.resolve.paths(name) ?? []).some((directory) => lstatSync(join(directory, name), { throwIfNoEntry: false }) !== void 0);
++	// Electron's app.asar fs returns null, not undefined, for a missing entry
++	// with throwIfNoEntry: false; treat both as absent so packaged Linux falls
++	// back to the WASM engine instead of reporting an incomplete native one.
++	return (require.resolve.paths(name) ?? []).some((directory) => lstatSync(join(directory, name), { throwIfNoEntry: false }) != null);
+ }
+ /**
+ * Return the optional package target for the current process ABI.
+diff --git a/node_modules/@deepseek-ai/libreoffice-kit/lib/index.js b/node_modules/@deepseek-ai/libreoffice-kit/lib/index.js
+index 70c51cb..6fb9f94 100644
+--- a/node_modules/@deepseek-ai/libreoffice-kit/lib/index.js
++++ b/node_modules/@deepseek-ai/libreoffice-kit/lib/index.js
+@@ -1295,7 +1295,10 @@ const ENGINE_PREFIX = "@deepseek-ai/libreoffice-kit";
+ * @returns true when at least one resolution directory holds the package.
+ */
+ function installedPackageExists(name) {
+-	return (require.resolve.paths(name) ?? []).some((directory) => lstatSync(join(directory, name), { throwIfNoEntry: false }) !== void 0);
++	// Electron's app.asar fs returns null, not undefined, for a missing entry
++	// with throwIfNoEntry: false; treat both as absent so packaged Linux falls
++	// back to the WASM engine instead of reporting an incomplete native one.
++	return (require.resolve.paths(name) ?? []).some((directory) => lstatSync(join(directory, name), { throwIfNoEntry: false }) != null);
+ }
+ /**
+ * Return the optional package target for the current process ABI.

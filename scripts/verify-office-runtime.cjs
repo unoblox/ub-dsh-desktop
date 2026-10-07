@@ -40,7 +40,10 @@ async function afterPack(context) {
   const resources = process.platform === 'darwin' ? path.join(contents, 'Resources') : path.join(context.appOutDir, 'resources')
   const executable = process.platform === 'darwin'
     ? path.join(contents, 'Frameworks', `${product} Helper.app`, 'Contents', 'MacOS', `${product} Helper`)
-    : path.join(context.appOutDir, `${product}.exe`)
+    : process.platform === 'linux'
+      // Linux names the binary after build.linux.executableName.
+      ? path.join(context.appOutDir, context.packager.executableName)
+      : path.join(context.appOutDir, `${product}.exe`)
   await verifyOfficeRuntime(resources, executable)
 }
 module.exports = { verifyOfficeRuntime, afterPack }

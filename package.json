@@ -37,6 +37,8 @@
     "package:dev:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build && electron-builder --mac --arm64 --publish never --config electron-builder.dev.cjs",
     "package:dev:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build && electron-builder --mac --x64 --publish never --config electron-builder.dev.cjs",
     "package:dev:win": "node scripts/verify-target.mjs win32 x64 && npm run build && node scripts/electron-builder-windows.mjs --win --x64 --publish never --config electron-builder.dev.cjs",
+    "package:linux": "node scripts/verify-target.mjs linux x64 && npm run build && electron-builder --linux --x64 --publish never",
+    "package:dev:linux": "node scripts/verify-target.mjs linux x64 && npm run build && electron-builder --linux --x64 --publish never --config electron-builder.dev.cjs",
     "package:mac": "npm run build && electron-builder --mac --publish never",
     "package:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build && electron-builder --mac --arm64 --publish never",
     "package:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build && electron-builder --mac --x64 --publish never",
@@ -478,6 +480,20 @@
       "target": [
         "dmg",
         "zip"
+      ]
+    },
+    "linux": {
+      "icon": "build/app-icon.png",
+      "category": "Development",
+      "executableName": "dsh-desktop",
+      "synopsis": "Desktop AI agent workbench on the Unoblox gateway",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "dmg": {

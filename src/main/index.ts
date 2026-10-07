@@ -188,6 +188,7 @@ import { parseWindowsMenuRequest, windowsMenuTemplate, type EditingKey } from '.
 import { shouldKeepRunningInBackground } from './close-to-tray'
 import {
   MAIN_WINDOW_RECOVERY_RELOAD_COOLDOWN_MS,
+  isMainWindowLoadFailure,
   shouldReloadAfterMainWindowRendererLoss
 } from './main-window-recovery'
 
@@ -465,7 +466,7 @@ function installMainWindowRendererRecovery(window: BrowserWindow): void {
     reloadMainWindowAfterRendererLoss(window)
   })
   webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    if (!isMainFrame) return
+    if (!isMainFrame || !isMainWindowLoadFailure(errorCode)) return
     clearProfileBootConfirmation()
     // The harness web server is local; a failure to reach it is almost
     // always the renderer dropping, not a real network error. Surface the

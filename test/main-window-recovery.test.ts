@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAIN_WINDOW_RECOVERY_MAX_RELOADS,
   MAIN_WINDOW_RECOVERY_RELOAD_COOLDOWN_MS,
+  isMainWindowLoadFailure,
   shouldReloadAfterMainWindowRendererLoss
 } from '../src/main/main-window-recovery'
 
@@ -74,5 +75,17 @@ describe('main window renderer recovery', () => {
         maxReloads: 2
       })
     ).toBe(false)
+  })
+})
+
+describe('main window load failures', () => {
+  it('ignores a load superseded by a newer navigation (ERR_ABORTED)', () => {
+    expect(isMainWindowLoadFailure(-3)).toBe(false)
+  })
+
+  it('treats connection and other load errors as failures', () => {
+    expect(isMainWindowLoadFailure(-102)).toBe(true) // ERR_CONNECTION_REFUSED
+    expect(isMainWindowLoadFailure(-2)).toBe(true) // ERR_FAILED
+    expect(isMainWindowLoadFailure(-105)).toBe(true) // ERR_NAME_NOT_RESOLVED
   })
 })

@@ -23,3 +23,18 @@ export function shouldReloadAfterMainWindowRendererLoss(options: {
   if (options.lastReloadAt === 0) return true
   return options.now - options.lastReloadAt >= cooldown
 }
+
+/** Chromium's net::ERR_ABORTED. */
+const ERR_ABORTED = -3
+
+/**
+ * Whether a main-frame `did-fail-load` means the page is actually lost.
+ * ERR_ABORTED only says a newer navigation replaced this one (the user
+ * pressed reload, or the page navigated itself while loading); the newer
+ * load reports its own outcome. Treating it as renderer loss reloaded the
+ * window, which aborted again and, once throttled, sent a working app to
+ * the startup-recovery page.
+ */
+export function isMainWindowLoadFailure(errorCode: number): boolean {
+  return errorCode !== ERR_ABORTED
+}

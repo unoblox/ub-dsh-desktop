@@ -7,9 +7,15 @@ window.__ModuleLoader__.load({
 
     const React = require('react')
     const { useCallback, useEffect, useRef, useState } = React
-    const { Button, Modal, IconGlobeOutline14 } = require('@deepseek-ai/dsh-client-ui-primitives')
+    // Harness 0.2 renamed the 14px globe icon to IconGlobeOutlineRegular (sized
+    // by prop). Rendering an undefined component threw and took the whole
+    // first-run dialog down, so an icon missing from a later build is skipped.
+    const { Button, Modal, IconGlobeOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
 
     const NS = 'desktop-onboarding'
+    // Loader entry id of the host half in build/dsh-desktop.patch.yml; Harness
+    // names each plugin's settings namespace after it.
+    const SETTINGS_ENTRY_ID = 'dsh-desktop-onboarding'
     // Retained as the acknowledgement payload for settings compatibility.
     // Eligibility is install-scoped; changing this value never re-prompts.
     const WIZARD_VERSION = '2026-09-21.1'
@@ -165,7 +171,7 @@ window.__ModuleLoader__.load({
       const paragraphs = t('declarationBody').split('\n\n')
       const links = [
         { label: 'GitHub', href: 'https://github.com/dataelement/dsh-desktop', icon: GitHubMark },
-        { label: t('officialSite'), href: t('officialSiteUrl'), icon: IconGlobeOutline14 }
+        { label: t('officialSite'), href: t('officialSiteUrl'), icon: IconGlobeOutlineRegular }
       ]
       return React.createElement(
         'div',
@@ -185,7 +191,7 @@ window.__ModuleLoader__.load({
               React.createElement(
                 'span',
                 { className: 'dshDeskOnbLinkIcon', 'aria-hidden': 'true' },
-                React.createElement(link.icon, { size: 14 })
+                typeof link.icon === 'function' || typeof link.icon === 'object' ? React.createElement(link.icon, { size: 14 }) : null
               ),
               React.createElement('span', null, link.label)
             )
@@ -250,9 +256,43 @@ window.__ModuleLoader__.load({
     // so the user leaves through one of the two explicit actions.
     const ignoreImplicitDismiss = () => {}
 
-    function onboardingDecision(value) {
+    /**
+     * Show the notice to a new, unacknowledged install, and to any install
+     * without a stored Unoblox key: Unoblox is the only model provider, so
+     * without a key nothing works. That also covers installs classified as
+     * existing (development builds, upgrades from DSH Desktop) and a key
+     * removed later. Dismissing it is per launch; it returns until a key is set.
+     * @param value - the wizard settings section.
+     * @param keyState - 'configured' | 'missing' | 'unknown' (default).
+     */
+    function onboardingDecision(value, keyState = 'unknown') {
+      if (keyState === 'missing') return 'show'
       const acknowledged = typeof value?.wizardVersion === 'string' && value.wizardVersion.length > 0
       return value?.eligible === true && !acknowledged ? 'show' : 'complete'
+    }
+
+    // Long enough for a slow Host, short enough not to hold boot hostage.
+    const KEY_STATE_TIMEOUT_MS = 5000
+
+    /**
+     * Whether the credential store holds the Unoblox key. Never reads the
+     * value; any failure is 'unknown', which defers to install eligibility.
+     */
+    async function unobloxKeyState(credentials) {
+      if (credentials === undefined || typeof credentials.describe !== 'function') return 'unknown'
+      try {
+        const response = await Promise.race([
+          credentials.describe([UNOBLOX_KEY_REF]),
+          new Promise((resolve) => setTimeout(() => resolve(undefined), KEY_STATE_TIMEOUT_MS))
+        ])
+        const entry = response?.ok === true ? response.value?.[UNOBLOX_KEY_REF] : undefined
+        if (entry?.configured === true) return 'configured'
+        if (entry?.configured === false || (response?.ok === true && entry === undefined)) return 'missing'
+        return 'unknown'
+      } catch {
+        // A failing describe must not block boot; eligibility still decides.
+        return 'unknown'
+      }
     }
 
     // ---------- the first-run notice ----------
@@ -284,13 +324,25 @@ window.__ModuleLoader__.load({
         })
       }, [complete, wizardScope])
 
+      const [keyState, setKeyState] = useState('pending')
       useEffect(() => {
+        let current = true
+        unobloxKeyState(credentials).then((state) => {
+          if (current) setKeyState(state)
+        })
+        return () => { current = false }
+      }, [credentials])
+
+      useEffect(() => {
+        // Decide once both the Host section and the key state are known, so a
+        // configured user never sees a flash of the dialog.
+        if (keyState === 'pending') return undefined
         const read = () => {
           const snap = wizardScope.getSnapshot()
           // Wait for the Host section so returning users never see a flash.
           if (snap.mode !== 'memory' && snap.status === 'loading') return
           const value = snap.value ?? {}
-          setDecision(onboardingDecision(value))
+          setDecision(onboardingDecision(value, keyState))
         }
         let unsubscribe
         try {
@@ -300,7 +352,7 @@ window.__ModuleLoader__.load({
           // Scope errors are non-fatal: a failing scope must not block boot.
         }
         return () => { if (unsubscribe) unsubscribe() }
-      }, [wizardScope])
+      }, [wizardScope, keyState])
 
       // Ineligible installs and every prior acknowledgement skip straight on.
       useEffect(() => {
@@ -401,18 +453,22 @@ window.__ModuleLoader__.load({
     // ---------- composition ----------
 
     function apply(ctx) {
-      ctx.inject(['slots', 'locale', 'settingsScope', 'remote', 'remote.credentials'], (scope) => {
+      ctx.inject(['slots', 'locale', 'configForms'], (scope) => {
         installStyles()
         const t = scope.locale.bind(NS)
 
-        const wizardScope = scope.settingsScope.bind({
-          namespace: NS,
-          decode: (value) => (typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {})
-        })
+        // Harness 0.2 removed `settingsScope`; per-entry settings now come from
+        // `configForms.get(<loader entry id>)` with the same snapshot/subscribe/
+        // set face. Waiting on the removed service left the notice unmounted.
+        const wizardScope = scope.configForms.get(SETTINGS_ENTRY_ID)
 
         scope.locale.register(NS, { zh, en })
 
-        const controller = { scope: wizardScope, credentials: scope.remote?.credentials }
+        // Remote namespaces are provisioned from the module-level `inject`
+        // declaration below (as dsh-client-ui-settings-models does); a runtime
+        // ctx.inject(['remote.credentials']) never resolves, which left this
+        // whole notice unmounted.
+        const controller = { scope: wizardScope, credentials: ctx.remote?.credentials }
 
         // The stock welcome-notice / official-DeepSeek onboarding entries are
         // removed upstream by the settings-models patch (the desktop notice owns
@@ -426,11 +482,12 @@ window.__ModuleLoader__.load({
       })
     }
 
-    const inject = []
+    const inject = ['remote', 'remote.credentials']
 
     exports.apply = apply
     exports.inject = inject
     exports.onboardingDecision = onboardingDecision
+    exports.unobloxKeyState = unobloxKeyState
     exports.storeUnobloxKey = storeUnobloxKey
     return module.exports
   }

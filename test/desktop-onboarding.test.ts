@@ -26,9 +26,8 @@ interface CtxHarness {
     register: (ns: string, dicts: Record<string, Record<string, string>>) => void
     bind: (ns: string) => (key: string) => string
   }
-  settingsScope: {
-    bind: (spec: { namespace: string }) => unknown
-    describe: () => unknown
+  configForms: {
+    get: (entryId: string) => unknown
   }
   remote: {
     llm: {
@@ -97,7 +96,7 @@ function createPrimitiveStub() {
     IconCloseOutline16: passthrough,
     IconCheckOutline16: passthrough,
     IconSparkle16: passthrough,
-    IconGlobeOutline14: passthrough,
+    IconGlobeOutlineRegular: passthrough,
     IconFolderClose16: passthrough,
     IconShieldOutline16: passthrough,
     IconCordisPluginOutline14: passthrough
@@ -114,7 +113,8 @@ function loadPlugin() {
     factory: (require: (id: string) => unknown) => {
       apply: (ctx: CtxHarness) => void
       inject: string[]
-      onboardingDecision: (value: unknown) => 'show' | 'complete'
+      onboardingDecision: (value: unknown, keyState?: string) => 'show' | 'complete'
+      unobloxKeyState: (credentials: unknown) => Promise<'configured' | 'missing' | 'unknown'>
       storeUnobloxKey: (
         credentials: unknown,
         t: (key: string) => string,
@@ -129,6 +129,7 @@ function loadPlugin() {
     head: { appendChild: (node: { id?: string; textContent?: string }) => appended.push(node) }
   }
   vm.runInNewContext(source, {
+    setTimeout,
     document,
     navigator: { language: 'en-US' },
     window: {
@@ -174,15 +175,20 @@ function createCtx(overrides: Partial<CtxHarness> = {}): { ctx: CtxHarness; regi
   }
   const noopEffect = () => () => undefined
   const ctx: CtxHarness = {
-    inject: (_deps, callback) => callback(ctx),
+    // Like Cordis, never run the callback for a service nobody provides: a
+    // stale service name must fail here, not silently in the app.
+    inject: (deps, callback) => {
+      const missing = deps.filter((dep) => !(dep in ctx))
+      if (missing.length > 0) throw new Error(`unprovided services: ${missing.join(', ')}`)
+      return callback(ctx)
+    },
     effect: noopEffect,
     locale: {
       register: () => undefined,
       bind: () => (key: string) => key
     },
-    settingsScope: {
-      bind: () => ({ getSnapshot: () => ({ mode: 'memory', value: {} }), subscribe: () => () => undefined, set: async () => undefined }),
-      describe: () => ({ ensure: async () => undefined, getSnapshot: () => ({ view: undefined }) })
+    configForms: {
+      get: () => ({ getSnapshot: () => ({ mode: 'memory', value: {} }), subscribe: () => () => undefined, set: async () => undefined })
     },
     remote: {
       llm: { listProviders: async () => ({ ok: true, value: [] }), listConfigurableProviders: async () => ({ ok: true, value: [] }) },
@@ -217,7 +223,7 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(source).toContain('https://github.com/dataelement/dsh-desktop\'')
     expect(source).not.toContain('dsh-desktop/issues')
     expect(source).toContain('GITHUB_MARK_PATH')
-    expect(source).toContain('IconGlobeOutline14')
+    expect(source).toContain('IconGlobeOutlineRegular')
   })
 
   it('registers the desktop notice as the only onboarding step', () => {
@@ -225,7 +231,8 @@ describe('DSH Desktop onboarding wizard', () => {
     const { ctx, registrations } = createCtx()
     plugin.apply(ctx)
 
-    expect(plugin.inject).toEqual([])
+    // Remote namespaces must be declared statically to be provisioned.
+    expect(plugin.inject).toEqual(['remote', 'remote.credentials'])
     const onboardingRegistrations = registrations.filter(({ config }) => config.name === 'settings.onboarding')
     expect(onboardingRegistrations).toHaveLength(1)
     const [onboardingRegistration] = onboardingRegistrations
@@ -238,6 +245,26 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(appended).toHaveLength(1)
     const [styleTag] = appended
     expect(styleTag?.id).toBe('dsh-desktop-onboarding-style')
+  })
+
+  it('only uses primitives the installed Harness exports', () => {
+    const source = readFileSync(path.join(projectRoot, 'packages', 'dsh-desktop-onboarding', 'client.js'), 'utf8')
+    const match = /const \{([^}]+)\} = require\('@deepseek-ai\/dsh-client-ui-primitives'\)/u.exec(source)
+    expect(match).not.toBeNull()
+    // The browser bundle cannot load in Node; read its export list instead.
+    const bundle = readFileSync(path.join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh-client-ui-primitives', 'lib', 'index.js'), 'utf8')
+    const exported = new Set([...bundle.matchAll(/export \{([^}]*)\}/gu)].flatMap((block) => block[1]!.split(',').map((part) => part.trim().split(/\s+as\s+/u).pop()!)))
+    for (const name of match![1]!.split(',').map((part) => part.trim())) {
+      expect(exported.has(name), name).toBe(true)
+    }
+  })
+
+  it('reads its settings through configForms under the loader entry id', () => {
+    const { plugin } = loadPlugin()
+    const get = vi.fn(() => ({ getSnapshot: () => ({ mode: 'memory', value: {} }), subscribe: () => () => undefined, set: async () => undefined }))
+    const { ctx } = createCtx({ configForms: { get } })
+    plugin.apply(ctx)
+    expect(get).toHaveBeenCalledWith('dsh-desktop-onboarding')
   })
 
   it('registers both Chinese and English dictionaries on the desktop-onboarding namespace', () => {
@@ -269,6 +296,27 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(plugin.onboardingDecision({ eligible: true })).toBe('show')
     expect(plugin.onboardingDecision({ eligible: false })).toBe('complete')
     expect(plugin.onboardingDecision({})).toBe('complete')
+  })
+
+  it('shows whenever no Unoblox key is stored, even for acknowledged or existing installs', () => {
+    const { plugin } = loadPlugin()
+    expect(plugin.onboardingDecision({ eligible: false }, 'missing')).toBe('show')
+    expect(plugin.onboardingDecision({ eligible: true, wizardVersion: 'v' }, 'missing')).toBe('show')
+    expect(plugin.onboardingDecision({ eligible: false }, 'configured')).toBe('complete')
+    expect(plugin.onboardingDecision({ eligible: true }, 'configured')).toBe('show')
+    expect(plugin.onboardingDecision({ eligible: false }, 'unknown')).toBe('complete')
+  })
+
+  it('reads only whether the Unoblox key is configured', async () => {
+    const { plugin } = loadPlugin()
+    const describe = vi.fn(async (refs: string[]) => ({ ok: true, value: { [refs[0]!]: { configured: true, writable: true } } }))
+    expect(await plugin.unobloxKeyState({ describe })).toBe('configured')
+    expect(describe).toHaveBeenCalledWith(['UNOBLOX_API_KEY'])
+    expect(await plugin.unobloxKeyState({ describe: async () => ({ ok: true, value: { UNOBLOX_API_KEY: { configured: false, writable: true } } }) })).toBe('missing')
+    expect(await plugin.unobloxKeyState({ describe: async () => ({ ok: true, value: {} }) })).toBe('missing')
+    expect(await plugin.unobloxKeyState({ describe: async () => ({ ok: false, error: { message: 'x' } }) })).toBe('unknown')
+    expect(await plugin.unobloxKeyState({ describe: async () => { throw new Error('offline') } })).toBe('unknown')
+    expect(await plugin.unobloxKeyState(undefined)).toBe('unknown')
   })
 
   it('treats every non-empty wizard version as acknowledgement', () => {

@@ -15,6 +15,43 @@
 - id: ui-settings-account
   disabled: true
 
+# Same provider lock as dsh-desktop.patch.yml: Unoblox is the only model route,
+# so recovery does not resurface DeepSeek. Keep the two copies identical.
+- id: llm-pi-ai
+  config:
+    providers:
+      unoblox:
+        displayName: Unoblox
+        apiKeyEnv: UNOBLOX_API_KEY
+        api: openai-completions
+        baseURL: https://api.unoblox.ai/v1
+        models:
+          - id: unoblox/auto
+            name: Unoblox Auto
+
+- id: llm-deepseek
+  disabled: true
+
+- id: llm-deepseek-account
+  disabled: true
+
+- id: agent-default-model
+  config:
+    provider: unoblox
+    model: unoblox/auto
+
+- id: web-search-deepseek
+  disabled: true
+
+- id: web
+  config:
+    fetchProvider: http
+
+- id: tool-web
+  config:
+    search: false
+    fetch: true
+
 - insert:
     - id: dsh-desktop-client-ui
       name: dsh-desktop-client-ui

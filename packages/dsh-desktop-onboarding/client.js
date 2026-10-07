@@ -15,9 +15,9 @@ window.__ModuleLoader__.load({
     const WIZARD_VERSION = '2026-09-21.1'
     // Settings section the "configure a model" action opens.
     const MODELS_SECTION_ID = 'models'
-    // Credential reference the host-seeded `unoblox` llm-pi-ai route names as
-    // its apiKeyEnv (see ./unoblox-provider.js). The key itself only ever goes
-    // to the Harness credential store, never into profile configuration.
+    // Credential reference the `unoblox` llm-pi-ai route in
+    // build/dsh-desktop.patch.yml names as its apiKeyEnv. The key itself only
+    // ever goes to the Harness credential store, never into configuration.
     const UNOBLOX_KEY_REF = 'UNOBLOX_API_KEY'
     const UNOBLOX_KEYS_URL = 'https://unoblox.ai/docs/quickstart'
 
@@ -226,7 +226,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // Store the key under the reference the seeded route resolves per request.
+    // Store the key under the reference the Unoblox route resolves per request.
     // Returns a failure message, or undefined once the key is stored.
     async function storeUnobloxKey(credentials, t, draft) {
       const key = draft.trim()

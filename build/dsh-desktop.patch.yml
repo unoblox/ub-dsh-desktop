@@ -22,6 +22,55 @@
 - id: ui-settings-account
   disabled: true
 
+# Unoblox is the only model provider. Its gateway speaks the OpenAI Chat
+# Completions API (https://unoblox.ai/docs/quickstart), so it is one
+# hand-declared llm-pi-ai route rather than a new adapter.
+#
+# This file is a CLI overlay: it outranks the profile and replaces each
+# entry's config wholesale, so the provider set below hides any route a profile
+# declared, and the settings service refuses Models-page writes that would add
+# another. The key never appears here: `UNOBLOX_API_KEY` names a credential the
+# first-run dialog or Settings -> Models stores in the Harness credential store.
+- id: llm-pi-ai
+  config:
+    providers:
+      unoblox:
+        displayName: Unoblox
+        apiKeyEnv: UNOBLOX_API_KEY
+        api: openai-completions
+        baseURL: https://api.unoblox.ai/v1
+        models:
+          # The Unoblox router picks the best-value model that can serve the
+          # request and fails over across upstream providers.
+          - id: unoblox/auto
+            name: Unoblox Auto
+
+# The official DeepSeek API-key and account routes.
+- id: llm-deepseek
+  disabled: true
+
+- id: llm-deepseek-account
+  disabled: true
+
+- id: agent-default-model
+  config:
+    provider: unoblox
+    model: unoblox/auto
+
+# Web search called DeepSeek directly with a DeepSeek key. Without that route the
+# tool would stay visible and always fail, so search is off; web_fetch remains.
+- id: web-search-deepseek
+  disabled: true
+
+- id: web
+  config:
+    fetchProvider: http
+
+- id: tool-web
+  config:
+    search: false
+    fetch: true
+
 - insert:
     - id: dsh-desktop-client-ui
       name: dsh-desktop-client-ui

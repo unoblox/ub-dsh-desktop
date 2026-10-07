@@ -7,12 +7,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { patchPath, projectRoot } from './patch-path'
 // @ts-expect-error Local host plugins are authored as ESM JavaScript.
 import { Config as HostConfig, apply as applyHost } from '../packages/dsh-desktop-onboarding/index.js'
-import {
-  UNOBLOX_SEED_VERSION,
-  seedUnobloxProvider,
-  unobloxProviderProfile
-  // @ts-expect-error Local host plugins are authored as ESM JavaScript.
-} from '../packages/dsh-desktop-onboarding/unoblox-provider.js'
 
 interface Registration {
   config: {
@@ -392,148 +386,15 @@ describe('DSH Desktop onboarding host eligibility', () => {
     }
   })
 
-  it('publishes the onboarding fields through the Harness 0.1.7 Config schema', () => {
+  it('publishes both onboarding fields through the Harness 0.1.7 Config schema', () => {
     const json = HostConfig.toJSON() as {
       uid: number
       refs: Record<string, { dict?: Record<string, number>; meta?: Record<string, unknown> }>
     }
     const root = json.refs[String(json.uid)]
-    expect(Object.keys(root?.dict ?? {}).sort()).toEqual(['eligible', 'providerSeed', 'wizardVersion'])
+    expect(Object.keys(root?.dict ?? {}).sort()).toEqual(['eligible', 'wizardVersion'])
     expect(json.refs[String(root?.dict?.eligible)]?.meta?.volatile).toBe(true)
     expect(json.refs[String(root?.dict?.wizardVersion)]?.meta?.volatile).toBe(true)
-    expect(json.refs[String(root?.dict?.providerSeed)]?.meta?.volatile).toBe(true)
-  })
-})
-
-describe('Unoblox provider seeding', () => {
-  interface Descriptor { ns: string; revision: number; value: Record<string, unknown> }
-
-  function createSettings(descriptors: Descriptor[]) {
-    const mutate = vi.fn(async (_ns: string, _ops: unknown[], _revision?: number) => undefined)
-    return { mutate, settings: { describe: () => descriptors, mutate } }
-  }
-
-  function createDefaultModel(provider: string) {
-    const saveSelection = vi.fn(async (_next: unknown) => undefined)
-    return { saveSelection, service: { currentSelection: () => ({ provider, model: 'x' }), saveSelection } }
-  }
-
-  it('adds the OpenAI-compatible route, moves the stock default, and records the seed', async () => {
-    const { settings, mutate } = createSettings([
-      { ns: 'llm-pi-ai', revision: 4, value: { providers: { openai: { apiKeyEnv: 'OPENAI_API_KEY' } } } }
-    ])
-    const defaults = createDefaultModel('deepseek-official')
-
-    const outcome = await seedUnobloxProvider({
-      settings,
-      agentDefaultModel: defaults.service,
-      selfNs: 'dsh-desktop-onboarding',
-      seeded: undefined
-    })
-
-    expect(outcome).toBe('seeded')
-    expect(mutate).toHaveBeenNthCalledWith(1, 'llm-pi-ai', [{
-      op: 'set',
-      path: ['providers', 'unoblox'],
-      value: {
-        displayName: 'Unoblox',
-        apiKeyEnv: 'UNOBLOX_API_KEY',
-        api: 'openai-completions',
-        baseURL: 'https://api.unoblox.ai/v1',
-        models: [{ id: 'unoblox/auto', name: 'Unoblox Auto' }]
-      }
-    }], 4)
-    expect(defaults.saveSelection).toHaveBeenCalledWith({ provider: 'unoblox', model: 'unoblox/auto' })
-    expect(mutate).toHaveBeenLastCalledWith('dsh-desktop-onboarding', [
-      { op: 'set', path: ['providerSeed'], value: UNOBLOX_SEED_VERSION }
-    ])
-  })
-
-  it('never stores a secret in the seeded profile', () => {
-    expect(JSON.stringify(unobloxProviderProfile())).not.toMatch(/ub-gw-/u)
-  })
-
-  it('does nothing once seeded, so a deleted route stays deleted', async () => {
-    const { settings, mutate } = createSettings([{ ns: 'llm-pi-ai', revision: 1, value: { providers: {} } }])
-    const defaults = createDefaultModel('deepseek-official')
-    const outcome = await seedUnobloxProvider({
-      settings,
-      agentDefaultModel: defaults.service,
-      selfNs: 'dsh-desktop-onboarding',
-      seeded: UNOBLOX_SEED_VERSION
-    })
-    expect(outcome).toBe('already-seeded')
-    expect(mutate).not.toHaveBeenCalled()
-    expect(defaults.saveSelection).not.toHaveBeenCalled()
-  })
-
-  it('keeps an existing unoblox route and a user-chosen default model', async () => {
-    const { settings, mutate } = createSettings([
-      { ns: 'llm-pi-ai', revision: 2, value: { providers: { unoblox: { baseURL: 'https://custom.example/v1' } } } }
-    ])
-    const defaults = createDefaultModel('openai')
-    const outcome = await seedUnobloxProvider({
-      settings,
-      agentDefaultModel: defaults.service,
-      selfNs: 'dsh-desktop-onboarding',
-      seeded: undefined
-    })
-    expect(outcome).toBe('seeded')
-    expect(mutate).toHaveBeenCalledTimes(1)
-    expect(mutate.mock.calls[0]?.[0]).toBe('dsh-desktop-onboarding')
-    expect(defaults.saveSelection).not.toHaveBeenCalled()
-  })
-
-  it('leaves the marker unset when pi-ai is not active so a later launch retries', async () => {
-    const { settings, mutate } = createSettings([])
-    const outcome = await seedUnobloxProvider({
-      settings,
-      agentDefaultModel: undefined,
-      selfNs: 'dsh-desktop-onboarding',
-      seeded: undefined
-    })
-    expect(outcome).toBe('adapter-absent')
-    expect(mutate).not.toHaveBeenCalled()
-  })
-
-  it('seeds from the host plugin once the Loader has settled every entry', async () => {
-    let settle: () => void = () => undefined
-    const settled = new Promise<void>((resolve) => { settle = resolve })
-    const mutate = vi.fn(async () => undefined)
-    const saveSelection = vi.fn(async () => undefined)
-    const ctx = {
-      fiber: { uid: 1 },
-      inject: (_deps: string[], callback: (ctx: unknown) => void) => callback({
-        effect: (effect: () => unknown) => effect(),
-        root: { loader: { await: () => settled } },
-        get: (name: string) => name === 'agentDefaultModel'
-          ? { currentSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-flash' }), saveSelection }
-          : undefined,
-        settings: {
-          configure: () => () => undefined,
-          describe: () => [{ ns: 'llm-pi-ai', revision: 0, value: {} }],
-          mutate
-        }
-      })
-    }
-    applyHost(ctx, { eligible: false })
-    expect(mutate).not.toHaveBeenCalled()
-
-    settle()
-    await vi.waitFor(() => expect(mutate).toHaveBeenCalledTimes(2))
-    expect(mutate.mock.calls.map((call) => (call as unknown[])[0])).toEqual(['llm-pi-ai', 'dsh-desktop-onboarding'])
-    expect(saveSelection).toHaveBeenCalledWith({ provider: 'unoblox', model: 'unoblox/auto' })
-  })
-
-  it('does not record the seed when the route write is refused', async () => {
-    const mutate = vi.fn(async () => { throw new Error('refused') })
-    await expect(seedUnobloxProvider({
-      settings: { describe: () => [{ ns: 'llm-pi-ai', revision: 0, value: {} }], mutate },
-      agentDefaultModel: undefined,
-      selfNs: 'dsh-desktop-onboarding',
-      seeded: undefined
-    })).rejects.toThrow('refused')
-    expect(mutate).toHaveBeenCalledTimes(1)
   })
 })
 

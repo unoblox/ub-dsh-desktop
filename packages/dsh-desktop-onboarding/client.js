@@ -15,6 +15,11 @@ window.__ModuleLoader__.load({
     const WIZARD_VERSION = '2026-09-21.1'
     // Settings section the "configure a model" action opens.
     const MODELS_SECTION_ID = 'models'
+    // Credential reference the host-seeded `unoblox` llm-pi-ai route names as
+    // its apiKeyEnv (see ./unoblox-provider.js). The key itself only ever goes
+    // to the Harness credential store, never into profile configuration.
+    const UNOBLOX_KEY_REF = 'UNOBLOX_API_KEY'
+    const UNOBLOX_KEYS_URL = 'https://unoblox.ai/docs/quickstart'
 
     // Settings owned by the notice. The host half (index.js) registered the
     // schema; the value object the mirror hands back has exactly this shape.
@@ -50,6 +55,15 @@ window.__ModuleLoader__.load({
       @media (prefers-reduced-motion:reduce){.dshDeskOnbLinkChip{transition:none}}
       .dshDeskOnbHint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}
       .dshDeskOnbActions{flex:none;display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+      .dshDeskOnbKey{flex:none;display:flex;flex-direction:column;gap:6px;margin-top:16px}
+      .dshDeskOnbKeyLabel{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary);line-height:20px}
+      .dshDeskOnbKeyInput{box-sizing:border-box;width:100%;height:36px;padding:0 11px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}
+      .dshDeskOnbKeyInput:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
+      .dshDeskOnbKeyInput::placeholder{color:var(--dsw-alias-label-dimmed)}
+      .dshDeskOnbKeyInput:disabled{opacity:.6}
+      .dshDeskOnbKeyHint{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
+      .dshDeskOnbKeyHint a{color:var(--dsw-alias-brand-primary)}
+      .dshDeskOnbKeyError{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-danger,var(--dsw-alias-label-primary))}
       @media (width<=560px){.dshDeskOnbContent{padding:20px}}
     `
 
@@ -75,7 +89,15 @@ window.__ModuleLoader__.load({
       officialSiteUrl: 'https://www.dshdesktop.com/',
       desktopIntroFeedback: 'Found a bug or have a suggestion? Open an issue on GitHub, or reach us through the official site.',
       configureModel: 'Configure a model',
-      later: 'Maybe later'
+      later: 'Maybe later',
+      unobloxKeyLabel: 'Connect Unoblox',
+      unobloxKeyPlaceholder: 'ub-gw-…',
+      unobloxKeyHint: 'Paste a workspace API key from the Unoblox developer portal (API Keys). Requests draw from your prepaid balance.',
+      unobloxKeyLink: 'Get an API key',
+      unobloxConnect: 'Connect and continue',
+      unobloxConnecting: 'Connecting…',
+      unobloxKeyRequired: 'Enter your Unoblox API key to continue.',
+      unobloxKeyFailed: 'The API key could not be saved: {message}'
     }
 
     const zh = {
@@ -89,7 +111,15 @@ window.__ModuleLoader__.load({
       officialSiteUrl: 'https://dshdesktop.com/zh/',
       desktopIntroFeedback: '遇到问题或有功能建议？欢迎在 GitHub 提交 Issue，或在官网联系我们。',
       configureModel: '去配置模型',
-      later: '稍后再说'
+      later: '稍后再说',
+      unobloxKeyLabel: '接入 Unoblox',
+      unobloxKeyPlaceholder: 'ub-gw-…',
+      unobloxKeyHint: '粘贴在 Unoblox 开发者门户（API Keys）创建的工作区 API Key。请求按 token 从预付余额中扣费。',
+      unobloxKeyLink: '获取 API Key',
+      unobloxConnect: '接入并继续',
+      unobloxConnecting: '接入中…',
+      unobloxKeyRequired: '请输入 Unoblox API Key 后继续。',
+      unobloxKeyFailed: 'API Key 保存失败：{message}'
     }
 
     // ---------- components ----------
@@ -163,6 +193,56 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // Unoblox API-key entry. Presentational: the parent owns the draft, busy
+    // state, and the failure message.
+    function UnobloxKeyField({ t, value, busy, failure, onChange, onSubmit }) {
+      return React.createElement(
+        'div',
+        { className: 'dshDeskOnbKey' },
+        React.createElement('label', { className: 'dshDeskOnbKeyLabel', htmlFor: 'dshDeskOnbUnobloxKey' }, t('unobloxKeyLabel')),
+        React.createElement('input', {
+          id: 'dshDeskOnbUnobloxKey',
+          className: 'dshDeskOnbKeyInput',
+          type: 'password',
+          autoComplete: 'off',
+          spellCheck: false,
+          value,
+          disabled: busy,
+          placeholder: t('unobloxKeyPlaceholder'),
+          'aria-invalid': failure !== undefined,
+          'aria-describedby': 'dshDeskOnbUnobloxKeyHint',
+          onChange: (event) => onChange(event.target.value),
+          onKeyDown: (event) => {
+            if (event.key === 'Enter') onSubmit()
+          }
+        }),
+        React.createElement(
+          'p',
+          { id: 'dshDeskOnbUnobloxKeyHint', className: 'dshDeskOnbKeyHint' },
+          t('unobloxKeyHint') + ' ',
+          React.createElement('a', { href: UNOBLOX_KEYS_URL, target: '_blank', rel: 'noreferrer' }, t('unobloxKeyLink'))
+        ),
+        React.createElement('p', { className: 'dshDeskOnbKeyError', 'aria-live': 'polite' }, failure ?? '')
+      )
+    }
+
+    // Store the key under the reference the seeded route resolves per request.
+    // Returns a failure message, or undefined once the key is stored.
+    async function storeUnobloxKey(credentials, t, draft) {
+      const key = draft.trim()
+      if (key.length === 0) return t('unobloxKeyRequired')
+      if (credentials === undefined || typeof credentials.set !== 'function') {
+        return t('unobloxKeyFailed').replace('{message}', 'credential store unavailable')
+      }
+      try {
+        const response = await credentials.set(UNOBLOX_KEY_REF, key)
+        if (response?.ok === true) return undefined
+        return t('unobloxKeyFailed').replace('{message}', response?.error?.message ?? 'unknown error')
+      } catch (error) {
+        return t('unobloxKeyFailed').replace('{message}', error instanceof Error ? error.message : String(error))
+      }
+    }
+
     // The notice is blocking: implicit dismissal (Escape, backdrop) is ignored
     // so the user leaves through one of the two explicit actions.
     const ignoreImplicitDismiss = () => {}
@@ -177,7 +257,11 @@ window.__ModuleLoader__.load({
     function DesktopOnboardingNotice(props) {
       const { complete, openSection, t } = props
       const wizardScope = props.controller.scope
+      const credentials = props.controller.credentials
       const [decision, setDecision] = useState('loading')
+      const [keyDraft, setKeyDraft] = useState('')
+      const [keyBusy, setKeyBusy] = useState(false)
+      const [keyFailure, setKeyFailure] = useState(undefined)
       const titleRef = useRef(null)
       const finishedRef = useRef(false)
 
@@ -241,6 +325,20 @@ window.__ModuleLoader__.load({
 
       if (!visible) return null
 
+      const connect = () => {
+        if (keyBusy) return
+        setKeyBusy(true)
+        setKeyFailure(undefined)
+        storeUnobloxKey(credentials, t, keyDraft).then((failure) => {
+          if (failure === undefined) {
+            finish()
+            return
+          }
+          setKeyFailure(failure)
+          setKeyBusy(false)
+        })
+      }
+
       return React.createElement(
         Modal,
         {
@@ -260,23 +358,37 @@ window.__ModuleLoader__.load({
             t('step0Title')
           ),
           React.createElement(NoticeBody, { t }),
+          React.createElement(UnobloxKeyField, {
+            t,
+            value: keyDraft,
+            busy: keyBusy,
+            failure: keyFailure,
+            onChange: setKeyDraft,
+            onSubmit: connect
+          }),
           React.createElement(
             'div',
             { className: 'dshDeskOnbActions' },
             React.createElement(
               Button,
-              { variant: 'outline', onClick: () => finish() },
+              { variant: 'outline', disabled: keyBusy, onClick: () => finish() },
               t('later')
             ),
             React.createElement(
               Button,
               {
-                variant: 'primary',
+                variant: 'outline',
+                disabled: keyBusy,
                 onClick: () => finish(() => {
                   if (typeof openSection === 'function') openSection(MODELS_SECTION_ID)
                 })
               },
               t('configureModel')
+            ),
+            React.createElement(
+              Button,
+              { variant: 'primary', disabled: keyBusy, onClick: connect },
+              t(keyBusy ? 'unobloxConnecting' : 'unobloxConnect')
             )
           )
         )
@@ -286,7 +398,7 @@ window.__ModuleLoader__.load({
     // ---------- composition ----------
 
     function apply(ctx) {
-      ctx.inject(['slots', 'locale', 'settingsScope'], (scope) => {
+      ctx.inject(['slots', 'locale', 'settingsScope', 'remote', 'remote.credentials'], (scope) => {
         installStyles()
         const t = scope.locale.bind(NS)
 
@@ -297,7 +409,7 @@ window.__ModuleLoader__.load({
 
         scope.locale.register(NS, { zh, en })
 
-        const controller = { scope: wizardScope }
+        const controller = { scope: wizardScope, credentials: scope.remote?.credentials }
 
         // The stock welcome-notice / official-DeepSeek onboarding entries are
         // removed upstream by the settings-models patch (the desktop notice owns
@@ -316,6 +428,7 @@ window.__ModuleLoader__.load({
     exports.apply = apply
     exports.inject = inject
     exports.onboardingDecision = onboardingDecision
+    exports.storeUnobloxKey = storeUnobloxKey
     return module.exports
   }
 })

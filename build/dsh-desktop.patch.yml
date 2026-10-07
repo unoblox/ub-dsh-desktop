@@ -57,19 +57,28 @@
     provider: unoblox
     model: unoblox/auto
 
-# Web search called DeepSeek directly with a DeepSeek key. Without that route the
-# tool would stay visible and always fail, so search is off; web_fetch remains.
+# Web search runs through Unoblox (POST /v1/search, Perplexity Search API) with
+# the same stored UNOBLOX_API_KEY as chat. Only the query text is sent: to
+# Unoblox and on to Perplexity (United States). The stock DeepSeek backend
+# called DeepSeek directly with a DeepSeek key, so it stays off. web_fetch runs
+# locally and is not billed by Unoblox.
 - id: web-search-deepseek
   disabled: true
 
+- insert:
+    - id: dsh-desktop-unoblox-search
+      name: dsh-desktop-unoblox-search
+
 - id: web
   config:
+    searchProvider: unoblox
     fetchProvider: http
 
 - id: tool-web
   config:
-    search: false
+    search: true
     fetch: true
+    searchTimeoutMs: 30000
 
 - insert:
     - id: dsh-desktop-client-ui

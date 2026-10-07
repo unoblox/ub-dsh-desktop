@@ -73,11 +73,9 @@ describe.each(DESKTOP_PATCHES)('Unoblox provider lock in %s', (desktopPatch) => 
     expect(entry(entries, 'agent-default-model').config).toEqual({ provider: 'unoblox', model: 'unoblox/auto' })
   })
 
-  it('turns off DeepSeek-backed web search while keeping web fetch', () => {
+  it('never routes web search to DeepSeek', () => {
     const { entries } = compose(desktopPatch)
     expect(entry(entries, 'web-search-deepseek').disabled).toBe(true)
-    expect(entry(entries, 'web').config).toEqual({ fetchProvider: 'http' })
-    expect(entry(entries, 'tool-web').config).toEqual({ search: false, fetch: true })
   })
 
   it('targets only rows the base bundle defines', () => {
@@ -90,6 +88,22 @@ describe.each(DESKTOP_PATCHES)('Unoblox provider lock in %s', (desktopPatch) => 
   it('keeps the API key out of configuration', async () => {
     const text = await readFile(path.join(projectRoot, 'build', desktopPatch), 'utf8')
     expect(text).not.toMatch(/ub-gw-/u)
+  })
+})
+
+describe('Unoblox web search wiring', () => {
+  it('searches through Unoblox in the normal profile', () => {
+    const { entries } = compose('dsh-desktop.patch.yml')
+    expect(entry(entries, 'dsh-desktop-unoblox-search').name).toBe('dsh-desktop-unoblox-search')
+    expect(entry(entries, 'web').config).toEqual({ searchProvider: 'unoblox', fetchProvider: 'http' })
+    expect(entry(entries, 'tool-web').config).toEqual({ search: true, fetch: true, searchTimeoutMs: 30000 })
+  })
+
+  it('keeps search off in Safe Mode, which must not load optional product plugins', () => {
+    const { entries } = compose('dsh-desktop-safe.patch.yml')
+    expect(entries.some((candidate) => candidate.id === 'dsh-desktop-unoblox-search')).toBe(false)
+    expect(entry(entries, 'web').config).toEqual({ fetchProvider: 'http' })
+    expect(entry(entries, 'tool-web').config).toEqual({ search: false, fetch: true })
   })
 })
 

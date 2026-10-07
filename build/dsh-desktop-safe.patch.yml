@@ -16,7 +16,9 @@
   disabled: true
 
 # Same provider lock as dsh-desktop.patch.yml: Unoblox is the only model route,
-# so recovery does not resurface DeepSeek. Keep the two copies identical.
+# so recovery does not resurface DeepSeek. Keep the model rows identical to the
+# normal patch. Web search stays off here: the Unoblox search plugin is an
+# optional product plugin, which recovery must not load.
 - id: llm-pi-ai
   config:
     providers:

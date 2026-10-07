@@ -92,7 +92,8 @@ window.__ModuleLoader__.load({
       later: 'Maybe later',
       unobloxKeyLabel: 'Connect Unoblox',
       unobloxKeyPlaceholder: 'ub-gw-…',
-      unobloxKeyHint: 'Paste a workspace API key from the Unoblox developer portal (API Keys). Requests draw from your prepaid balance.',
+      unobloxKeyHint: 'Paste a workspace API key from the Unoblox developer portal (API Keys). Requests draw from your prepaid ₹ balance.',
+      unobloxSearchPrivacy: 'Web search sends only the search query text to Unoblox, which runs it on Perplexity (United States). Nothing else from the session is sent, and Unoblox does not store queries. Each successful search is billed to your ₹ balance.',
       unobloxKeyLink: 'Get an API key',
       unobloxConnect: 'Connect and continue',
       unobloxConnecting: 'Connecting…',
@@ -114,7 +115,8 @@ window.__ModuleLoader__.load({
       later: '稍后再说',
       unobloxKeyLabel: '接入 Unoblox',
       unobloxKeyPlaceholder: 'ub-gw-…',
-      unobloxKeyHint: '粘贴在 Unoblox 开发者门户（API Keys）创建的工作区 API Key。请求按 token 从预付余额中扣费。',
+      unobloxKeyHint: '粘贴在 Unoblox 开发者门户（API Keys）创建的工作区 API Key。请求按 token 从预付 ₹ 余额中扣费。',
+      unobloxSearchPrivacy: '网页搜索仅将搜索词发送给 Unoblox，并由其交给 Perplexity（美国）执行。会话中的其他内容不会被发送，Unoblox 不保存搜索词。每次成功的搜索从 ₹ 余额中扣费。',
       unobloxKeyLink: '获取 API Key',
       unobloxConnect: '接入并继续',
       unobloxConnecting: '接入中…',
@@ -222,6 +224,7 @@ window.__ModuleLoader__.load({
           t('unobloxKeyHint') + ' ',
           React.createElement('a', { href: UNOBLOX_KEYS_URL, target: '_blank', rel: 'noreferrer' }, t('unobloxKeyLink'))
         ),
+        React.createElement('p', { className: 'dshDeskOnbKeyHint' }, t('unobloxSearchPrivacy')),
         React.createElement('p', { className: 'dshDeskOnbKeyError', 'aria-live': 'polite' }, failure ?? '')
       )
     }

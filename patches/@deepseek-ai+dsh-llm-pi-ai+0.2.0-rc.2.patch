@@ -1,8 +1,8 @@
 diff --git a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
-index 1692082..8f41310 100644
+index 0c74b3a..bcff67a 100644
 --- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
-@@ -1374,8 +1374,9 @@ function mapUsage(usage) {
+@@ -1378,8 +1378,9 @@ function mapUsage(usage) {
  	};
  }
  function classifyPiAiError(message) {
@@ -13,7 +13,7 @@ index 1692082..8f41310 100644
  	if (/\b429\b|rate.?limit/i.test(message)) return "RATE_LIMIT";
  	if (/\b413\b|failed to buffer the request body:\s*length limit exceeded|payload too large|request body too large/i.test(message)) return "INVALID_REQUEST";
  	if (/\b400\b|invalid.?request/i.test(message)) return "INVALID_REQUEST";
-@@ -1450,6 +1451,14 @@ function mapStopReason(message, contextWindow) {
+@@ -1454,6 +1455,14 @@ function mapStopReason(message, contextWindow) {
  		}
  	}
  }
@@ -28,7 +28,7 @@ index 1692082..8f41310 100644
  /**
  * Translate the pi-ai event stream into StreamChunks. pi-ai never throws
  * mid-stream — failures arrive as `error` events, which become error/aborted
-@@ -1464,6 +1473,7 @@ function mapStopReason(message, contextWindow) {
+@@ -1468,6 +1477,7 @@ function mapStopReason(message, contextWindow) {
  */
  async function* toStreamChunks(events, contextWindow, callerSignal, requestedModel) {
  	const toolIds = /* @__PURE__ */ new Map();
@@ -36,7 +36,7 @@ index 1692082..8f41310 100644
  	for await (const event of events) switch (event.type) {
  		case "start": break;
  		case "text_start":
-@@ -1480,16 +1490,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
+@@ -1484,16 +1494,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
  				text: event.delta
  			};
  			break;
@@ -61,7 +61,7 @@ index 1692082..8f41310 100644
  		case "thinking_start":
  			yield {
  				type: "block-start",
-@@ -1504,16 +1517,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
+@@ -1508,16 +1521,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
  				text: event.delta
  			};
  			break;
@@ -86,7 +86,7 @@ index 1692082..8f41310 100644
  		case "toolcall_start": {
  			const partial = event.partial.content[event.contentIndex];
  			const id = partial?.type === "toolCall" ? partial.id : "";
-@@ -1540,29 +1556,34 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
+@@ -1544,29 +1560,34 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
  			};
  			break;
  		}
@@ -132,7 +132,23 @@ index 1692082..8f41310 100644
  		case "error":
  			yield {
  				type: "usage",
-@@ -1730,8 +1751,11 @@ function reasoningInfo(model, defaultLevel) {
+@@ -1670,6 +1691,15 @@ var __disposeResources = (function(SuppressedError) {
+ 	var e = new Error(message);
+ 	return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+ });
++/**
++* Response headers safe to hand to in-process observers: every header except
++* cookies, as a frozen plain record. Header names arrive lowercase from fetch.
++*/
++function observableResponseHeaders(headers) {
++	const record = {};
++	for (const [name, value] of Object.entries(headers ?? {})) if (typeof value === "string" && name.toLowerCase() !== "set-cookie") record[name.toLowerCase()] = value;
++	return Object.freeze(record);
++}
+ /** Copy profile stream knobs into pi-ai's common option vocabulary. */
+ function profileOptions(profile, reasoning, apiKey) {
+ 	const enabledReasoning = reasoning === "off" ? void 0 : reasoning;
+@@ -1734,8 +1764,11 @@ function reasoningInfo(model, defaultLevel) {
  	} };
  }
  /** Merge deployment headers while removing case-insensitive attribution collisions. */
@@ -146,12 +162,78 @@ index 1692082..8f41310 100644
  	const reserved = new Set(Object.keys(attribution).map((name) => name.toLowerCase()));
  	return {
  		...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
-@@ -1880,7 +1904,7 @@ var PiAiAdapter = class extends LlmAdapter {
+@@ -1884,7 +1917,14 @@ var PiAiAdapter = class extends LlmAdapter {
  					...options.maxTokens === void 0 ? {} : { maxTokens: options.maxTokens },
  					...options.sessionId === void 0 ? {} : { sessionId: String(options.sessionId) },
  					signal: watchdog.signal,
 -					headers: requestHeaders(profile.headers)
-+					headers: requestHeaders(profile.headers, options.sessionId)
++					headers: requestHeaders(profile.headers, options.sessionId),
++					...this.config.onResponse === void 0 ? {} : { onResponse: (response) => this.config.onResponse({
++						provider: options.provider,
++						model: options.model,
++						...options.sessionId === void 0 ? {} : { sessionId: String(options.sessionId) },
++						status: response.status,
++						headers: observableResponseHeaders(response.headers)
++					}) }
  				}), model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]();
  				let exhausted = false;
  				try {
+@@ -2580,6 +2620,17 @@ function apply(ctx, config) {
+ 		resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, (hostPath) => ctx.get("fs")?.processPathFromHostPath(hostPath), ref),
+ 		onReplayDegrade: ({ provider, model, reason }) => {
+ 			ctx.logger.warn(`llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}"; sending that message as provider-neutral content (${reason})`);
++		},
++		// Publish each successful response's status and headers (no body, no
++		// cookies) as `llm-pi-ai/response`, so a host plugin can show what a
++		// gateway reports per call (balance, routed model). Observers run
++		// before the stream is read; their failure must never fail the call.
++		onResponse: (response) => {
++			try {
++				ctx.emit("llm-pi-ai/response", response);
++			} catch (error) {
++				ctx.logger.warn(`llm-pi-ai: a response observer for route "${response.provider}/${response.model}" failed: ${error instanceof Error ? error.message : String(error)}`);
++			}
+ 		}
+ 	});
+ 	ctx.inject(["authorization"], (authorized) => {
+diff --git a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/adapter.d.ts b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/adapter.d.ts
+index 89e62a5..ad21304 100644
+--- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/adapter.d.ts
++++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/adapter.d.ts
+@@ -65,6 +65,23 @@ export interface PiAiAdapterOptions {
+         model: string;
+         reason: string;
+     }) => void;
++    /**
++     * Observe one successful provider response before its stream is read:
++     * status and headers only (cookies removed). `apply` publishes it as the
++     * `llm-pi-ai/response` event. Thrown errors fail the call, so observers
++     * must not throw.
++     */
++    onResponse?: (response: PiAiResponseObservation) => void;
++}
++/** One successful provider response as `onResponse` and `llm-pi-ai/response` see it. */
++export interface PiAiResponseObservation {
++    readonly provider: string;
++    readonly model: string;
++    /** The Harness session that issued the call, when the caller named one. */
++    readonly sessionId?: string;
++    readonly status: number;
++    /** Lowercase header names; `set-cookie` is never included. */
++    readonly headers: Readonly<Record<string, string>>;
+ }
+ /** The two auth injectables a pi-ai collection is built with. */
+ export interface PiAiAuthInjection {
+diff --git a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/index.d.ts b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/index.d.ts
+index ebd5ad1..e19cd93 100644
+--- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/index.d.ts
++++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/types/index.d.ts
+@@ -1,7 +1,7 @@
+ import type { Context } from '@deepseek-ai/cordis';
+ import { Config } from './config.ts';
+ export { PiAiAdapter } from './adapter.ts';
+-export type { PiAiAdapterOptions } from './adapter.ts';
++export type { PiAiAdapterOptions, PiAiResponseObservation } from './adapter.ts';
+ export { Config } from './config.ts';
+ export type { Options, PiAiCompatProfile, PiAiModality, PiAiModelOverride, PiAiModelProfile, PiAiProviderProfile, PiAiReasoningEfforts, PiAiThinkingFormat, ResolvedPiAiProviderProfile, } from './config.ts';
+ export { recordKeyFor } from './auth.ts';

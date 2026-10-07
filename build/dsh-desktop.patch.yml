@@ -69,6 +69,14 @@
     - id: dsh-desktop-unoblox-search
       name: dsh-desktop-unoblox-search
 
+# The strip under the composer shows what Unoblox reports: the public search
+# price, and the balance, charge and routed model from the latest chat
+# response (published by the dsh-llm-pi-ai patch as `llm-pi-ai/response`).
+# The key stays host-side; the strip only learns whether one is stored.
+- insert:
+    - id: dsh-desktop-unoblox-info
+      name: dsh-desktop-unoblox-info
+
 - id: web
   config:
     searchProvider: unoblox

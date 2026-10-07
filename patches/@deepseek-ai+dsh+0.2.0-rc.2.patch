@@ -13,10 +13,10 @@ index 491719e..0f21a3d 100755
  			break;
  		}
 diff --git a/node_modules/@deepseek-ai/dsh/package.json b/node_modules/@deepseek-ai/dsh/package.json
-index 4f16dfb..a821e87 100644
+index 4f16dfb..5775e55 100644
 --- a/node_modules/@deepseek-ai/dsh/package.json
 +++ b/node_modules/@deepseek-ai/dsh/package.json
-@@ -101,7 +101,20 @@
+@@ -101,7 +101,21 @@
      "@deepseek-ai/dsh-agent-preset": "0.2.0-rc.2",
      "@deepseek-ai/dsh-atomic-write": "0.2.0-rc.2",
      "@deepseek-ai/dsh-experimental-voice-input-bundle": "0.2.0-rc.2",
@@ -34,7 +34,8 @@ index 4f16dfb..a821e87 100644
 +    "dsh-desktop-onboarding": "0.1.0",
 +    "dsh-desktop-workbenches": "0.1.0",
 +    "dsh-desktop-office": "0.1.0",
-+    "dsh-desktop-unoblox-search": "0.1.0"
++    "dsh-desktop-unoblox-search": "0.1.0",
++    "dsh-desktop-unoblox-info": "0.1.0"
    },
    "devDependencies": {
      "@agentclientprotocol/sdk": "1.4.0",

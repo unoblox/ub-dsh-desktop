@@ -94,12 +94,19 @@ child.on('exit', (code, signal) => {
   output.push(`[exit code=${String(code)} signal=${String(signal)}]`)
 })
 
-function findLog() {
-  for (const name of ['dsh-desktop-dev', 'dsh-desktop']) {
-    const path = join(appDataDirectory(home), name, 'logs', 'harness.log')
-    if (existsSync(path)) return path
+/**
+ * The app writes harness.log to `app.getPath('logs')`: `<userData>/logs` on
+ * Linux and Windows, `~/Library/Logs/<app name>` on macOS.
+ */
+function logCandidates() {
+  if (process.platform === 'darwin') {
+    return ['Unoblox Dev', 'Unoblox'].map((name) => join(homedir(), 'Library', 'Logs', name, 'harness.log'))
   }
-  return undefined
+  return ['dsh-desktop-dev', 'dsh-desktop'].map((name) => join(appDataDirectory(home), name, 'logs', 'harness.log'))
+}
+
+function findLog() {
+  return logCandidates().find((path) => existsSync(path))
 }
 
 try {
@@ -162,10 +169,7 @@ try {
   console.error(output.join('').split('\n').slice(-60).join('\n'))
   const log = findLog()
   if (log !== undefined) console.error(readFileSync(log, 'utf8').split('\n').slice(-80).join('\n'))
-  else {
-    const appData = appDataDirectory(home)
-    console.error(`no harness.log under ${appData}: ${existsSync(appData) ? readdirSync(appData).join(', ') : 'missing'}`)
-  }
+  else console.error(`no harness.log at ${logCandidates().join(' or ')}`)
 } finally {
   if (!exited && process.platform === 'win32') {
     // Signals reach only the main process on Windows; end the Harness child too.

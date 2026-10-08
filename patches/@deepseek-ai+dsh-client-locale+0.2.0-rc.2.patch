@@ -1,0 +1,25 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-locale/lib/client.js b/node_modules/@deepseek-ai/dsh-client-locale/lib/client.js
+index 88c929a..d43dd9c 100644
+--- a/node_modules/@deepseek-ai/dsh-client-locale/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-locale/lib/client.js
+@@ -919,7 +919,9 @@ window.__ModuleLoader__.load({
+ 		/** Accepted BCP 47-style language ids. */
+ 		const LOCALE_ID_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u;
+ 		/** Locale identifiers shipped by the browser client. */
+-		const LOCALE_IDS = ["zh", "en"];
++		// DSH Desktop patch: Unoblox is English-only, so only English is offered,
++		// detected or restored (a stored "zh" preference falls back to English).
++		const LOCALE_IDS = ["en"];
+ 		/** Durable locale schema; also the wire envelope the browser scope validates against. */
+ 		const LocaleSettingsFields = { [LOCALE_PREFERENCE_FIELD]: Schema.string().pattern(LOCALE_ID_PATTERN).required(false) };
+ 		Schema.object(LocaleSettingsFields);
+@@ -1550,7 +1552,8 @@ window.__ModuleLoader__.load({
+ 					locale.setLocale(id);
+ 				} };
+ 			};
+-			ctx.slots.inject("settings.general.item", () => ctx.slots.register({
++			// DSH Desktop patch: no language row when there is nothing to choose.
++			if (BUILT_IN_LOCALES.length > 1) ctx.slots.inject("settings.general.item", () => ctx.slots.register({
+ 				name: "settings.general.item",
+ 				id: "language",
+ 				order: 0,

@@ -117,7 +117,8 @@ export function mountWindowsMenuBar(options: MenuBarOptions): { dispose(): void 
   shadow.append(style, bar)
 
   const relabel = (): void => {
-    const lang = document.documentElement.lang || navigator.language
+    // The page language, which the English-only locale patch pins to English.
+    const lang = document.documentElement.lang || 'en'
     const zh = lang.toLowerCase().startsWith('zh')
     bar.setAttribute('aria-label', zh ? '应用菜单' : 'Application menu')
     const [application, edit] = buttons

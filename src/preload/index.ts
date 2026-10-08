@@ -32,7 +32,8 @@ setupDesktopStoragePersistence()
 const ROOT_ID = 'dsh-desktop-update-root'
 const MOBILE_BUTTON_ID = 'dsh-desktop-mobile-button'
 const SAFE_MODE_BANNER_ID = 'dsh-desktop-safe-mode-banner'
-const locale: UpdateLocale = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+// Unoblox is English-only (see src/main/application-locale.ts).
+const locale: UpdateLocale = 'en'
 
 let host: HTMLDivElement | undefined
 let content: HTMLDivElement | undefined

@@ -1,25 +1,29 @@
 diff --git a/node_modules/@deepseek-ai/dsh-client-ui-conversation/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-conversation/lib/client.js
-index 7f3f791..147b7d7 100644
+index 7f3f791..565b70f 100644
 --- a/node_modules/@deepseek-ai/dsh-client-ui-conversation/lib/client.js
 +++ b/node_modules/@deepseek-ai/dsh-client-ui-conversation/lib/client.js
-@@ -14533,7 +14533,7 @@ window.__ModuleLoader__.load({
+@@ -14533,8 +14533,8 @@ window.__ModuleLoader__.load({
  			"settings.enter.description": "智能体运行时 Enter 键和发送按钮的行为；Cmd/Ctrl+Enter 使用另一行为",
  			"settings.enter.queue": "排队发送",
  			"settings.enter.steer": "插话发送",
 -			"hero.headline": "探索未至之境",
+-			"hero.preview": "预览版",
 +			"hero.headline": "Make it happen.",
- 			"hero.preview": "预览版",
++			"hero.preview": "Beta",
  			"hero.chooseWorkspace": "选择工作区",
  			"session.hierarchy": "会话层级",
-@@ -14905,7 +14905,7 @@ window.__ModuleLoader__.load({
+ 			"todo.title": "任务",
+@@ -14905,8 +14905,8 @@ window.__ModuleLoader__.load({
  			"settings.enter.description": "What Enter and the Send button do while the agent is running; Cmd/Ctrl+Enter uses the other behavior",
  			"settings.enter.queue": "Queue",
  			"settings.enter.steer": "Steer",
 -			"hero.headline": "Into the Unknown",
+-			"hero.preview": "Preview",
 +			"hero.headline": "Make it happen.",
- 			"hero.preview": "Preview",
++			"hero.preview": "Beta",
  			"hero.chooseWorkspace": "Choose workspace",
  			"session.hierarchy": "Session hierarchy",
+ 			"todo.title": "To-dos",
 @@ -15795,12 +15795,13 @@ window.__ModuleLoader__.load({
  		//#endregion
  		//#region \0dsh-css:/home/runner/work/deepseek-harness/deepseek-harness/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css.mjs

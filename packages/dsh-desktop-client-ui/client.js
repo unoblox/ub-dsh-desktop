@@ -43,7 +43,7 @@ window.__ModuleLoader__.load({
         'span',
         {
           'data-unoblox-wordmark': '',
-          style: { fontSize: 18, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1, whiteSpace: 'nowrap', color: 'currentColor' }
+          style: { fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1, whiteSpace: 'nowrap', color: 'currentColor' }
         },
         'unoblox',
         React.createElement('span', { style: { color: BRAND_GOLD }, 'aria-hidden': 'true' }, '.')
@@ -154,6 +154,10 @@ window.__ModuleLoader__.load({
           html[data-platform=darwin] [data-ds-dark-theme] [class*="_sidebarCol"] {
             background:var(--dsw-specific-sidebar-fill);
           }
+          /* The expanded sidebar header shows the "unoblox." wordmark alone:
+             the glyph beside it repeated the same "u.". The collapsed rail
+             keeps the glyph (same slot, outside the identity row). */
+          [class*="_brandIdentity"] > [class*="_brandMark"] { display:none; }
         `
         document.head.appendChild(style)
         return () => style.remove()

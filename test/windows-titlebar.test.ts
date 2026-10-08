@@ -47,6 +47,14 @@ describe('Windows caption menus', () => {
     expect(new Set(run)).toEqual(new Set(desktopMenuCommands.filter((command) => !editing.has(command))))
   })
 
+  it('shows Keep Phone Connected as a checkbox with its current state', () => {
+    const { actions } = record()
+    const item = (keepPhoneConnected: boolean) => windowsMenuTemplate('application', 'en', 1, actions, { keepPhoneConnected })
+      .find((entry) => entry.label === 'Keep Phone Connected')
+    expect(item(false)).toMatchObject({ type: 'checkbox', checked: false })
+    expect(item(true)).toMatchObject({ type: 'checkbox', checked: true })
+  })
+
   it('sends editing shortcuts as key events so editor-owned history receives them', () => {
     const { run, keys, actions } = record()
     clickAll(windowsMenuTemplate('edit', 'en', 1, actions))

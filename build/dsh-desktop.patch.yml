@@ -153,17 +153,21 @@
     - id: dsh-desktop-client-ui
       name: dsh-desktop-client-ui
 
+    # Off for the Unoblox beta: its panel is Chinese-only and lists the
+    # upstream community catalog. Kept as a row so it can return with a
+    # Unoblox catalog and English copy.
     - id: dsh-desktop-workbenches
       name: dsh-desktop-workbenches
+      disabled: true
       config:
         root: !!js dshHomePath('desktop-workbenches')
 
     - id: dsh-desktop-onboarding
       name: dsh-desktop-onboarding
 
-    # DSH Desktop owns the fixed-target dsh-market installer and its lightweight
-    # settings entry. After dshmarket is installed and Harness restarts, the
-    # community plugin replaces the placeholder with its complete market UI.
+    # Provides the Desktop profile, pnpm and plugin-package services that
+    # plugin installs use. Unoblox does not offer its dsh-market install
+    # entry (MARKET_OFFERED in the package).
     - id: dsh-desktop-market-installer
       name: dsh-desktop-market-installer
 

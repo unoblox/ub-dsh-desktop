@@ -30,6 +30,11 @@ export const MARKET_PROFILE = 'web'
 export const STATUS_PATH = '/dsh-desktop/market-installer/status'
 export const INSTALL_PATH = '/dsh-desktop/market-installer/install'
 export const UNINSTALL_PATH = '/dsh-desktop/market-installer/uninstall'
+// Unoblox does not offer the third-party dsh-market: what it does once
+// installed is outside Unoblox's privacy policy (docs/privacy.md). The
+// install route refuses, and the client no longer shows the install section.
+// Uninstall and an already composed market's management tab keep working.
+export const MARKET_OFFERED = false
 
 const OPERATION_TIMEOUT_MS = 15 * 60 * 1000
 const MAX_LOG_BYTES = 32 * 1024
@@ -1117,6 +1122,10 @@ export async function apply(ctx) {
         }
         if (!isTrustedRequest(req, true)) {
           sendJson(res, 403, { error: 'Request rejected.' })
+          return
+        }
+        if (!MARKET_OFFERED) {
+          sendJson(res, 404, { error: 'Unoblox does not offer the community plugin market.' })
           return
         }
         if (operationPromise) {

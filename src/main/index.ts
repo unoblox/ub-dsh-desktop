@@ -69,6 +69,7 @@ import {
 import { ensureStoreDirPinned, inspectStoreConsistency } from './state/profile-store'
 import { LanMobileBridge } from './mobile/lan-mobile-bridge'
 import { createFilePairingPinStore, pairingPinStorePath } from './mobile/pairing-pin-store'
+import { MobileBridgeDemand, mobileBridgePreferencePath, readKeepPhoneConnected, writeKeepPhoneConnected } from './mobile/mobile-bridge-demand'
 import {
   detectPluginRecovery,
   PLUGIN_RECOVERY_EVIDENCE_TIMEOUT_MS
@@ -228,6 +229,7 @@ let runtime: HarnessRuntime
 let desktopStorageManager: DesktopStorageManager | undefined
 let windowStateManager: WindowStateManager | undefined
 let mobileBridge: LanMobileBridge
+let mobileBridgeDemand: MobileBridgeDemand
 let repairAgentService: RepairAgentService | undefined
 /** A repair prompt from the Recovery page, started by the Safe Mode page load. */
 let pendingRepairPrompt: string | undefined
@@ -1358,7 +1360,7 @@ async function enterMigrationSafeRecovery(
     : '[desktop] safe mode: normal Profile maintenance is blocked until recovery succeeds')
   await migratePersonaPrefixesBeforeStart(dshHome)
   await runtime.start(launchDirectory, SAFE_MODE_PROFILE)
-  if (runtime.snapshot().phase === 'ready') void mobileBridge.start().catch(showUnexpectedError)
+  if (runtime.snapshot().phase === 'ready') resumeMobileBridge()
   // The native manager remains usable even if shared settings prevent the
   // recovery Harness from starting; it does not depend on its Web UI.
   const notice = repairable
@@ -1523,9 +1525,7 @@ function launchSafeHarness(): Promise<void> {
     desktopStorageManager?.switchProfile(join(dshHome, 'profiles', SAFE_MODE_PROFILE))
     await migratePersonaPrefixesBeforeStart(dshHome)
     await runtime.start(launchDirectory, SAFE_MODE_PROFILE)
-    if (runtime.snapshot().phase === 'ready') {
-      void mobileBridge.start().catch(showUnexpectedError)
-    }
+    if (runtime.snapshot().phase === 'ready') resumeMobileBridge()
   })().finally(() => {
     harnessLaunchOperation = undefined
   })
@@ -1752,7 +1752,7 @@ function registerHarnessHandlers(): void {
     const template = windowsMenuTemplate(request.name, harnessLocale(), zoomFactor, {
       run: (command) => void executeDesktopMenuCommand(command).catch(showUnexpectedError),
       sendEditingKey: (key) => sendEditingKey(window, key)
-    })
+    }, { keepPhoneConnected: mobileBridgeDemand.keepConnected })
     // The page reports CSS pixels; the popup is placed in window DIPs.
     return new Promise<void>((resolve) => {
       Menu.buildFromTemplate(template).popup({
@@ -1869,6 +1869,9 @@ async function executeDesktopMenuCommand(command: DesktopMenuCommand): Promise<n
   switch (command) {
     case 'connect-phone':
       await showMobilePairing()
+      break
+    case 'toggle-keep-phone-connected':
+      setKeepPhoneConnected(!mobileBridgeDemand.keepConnected)
       break
     case 'restart-harness':
       await restartHarness()
@@ -2928,7 +2931,7 @@ async function showSafeModeManager(initial?: {
           continue
         }
         pendingSafeModeNotice = undefined
-        void mobileBridge.start().catch(showUnexpectedError)
+        resumeMobileBridge()
         return
       }
 
@@ -3112,6 +3115,12 @@ function installMenu(): void {
           accelerator: 'CmdOrCtrl+Shift+M',
           click: () => void showMobilePairing().catch(showUnexpectedError)
         },
+        {
+          label: isChinese ? '保持手机连接' : 'Keep Phone Connected',
+          type: 'checkbox',
+          checked: mobileBridgeDemand.keepConnected,
+          click: (item) => setKeepPhoneConnected(item.checked)
+        },
         { type: 'separator' },
         {
           label: isChinese ? '重启' : 'Restart',
@@ -3185,6 +3194,31 @@ function broadcastMobileStatus(connected: boolean): void {
   }
 }
 
+/**
+ * Start the phone bridge after launch or a Harness restart only when the user
+ * wants it: "Keep Phone Connected" is on, or they paired a phone this session.
+ */
+function resumeMobileBridge(): void {
+  if (mobileBridgeDemand.wanted()) void mobileBridge.start().catch(showUnexpectedError)
+}
+
+function stopMobileBridgeUnlessWanted(): void {
+  if (!mobileBridgeDemand.wanted()) void mobileBridge.stop().catch(showUnexpectedError)
+}
+
+function setKeepPhoneConnected(keepConnected: boolean): void {
+  if (!writeKeepPhoneConnected(mobileBridgePreferencePath(app.getPath('userData')), keepConnected)) {
+    console.warn('[mobile] could not save the Keep Phone Connected preference; it applies to this session only')
+  }
+  const run = mobileBridgeDemand.setKeepConnected(keepConnected, {
+    pairingWindowOpen: mobileWindow !== undefined && !mobileWindow.isDestroyed(),
+    phoneConnected: mobileBridge.snapshot().connected
+  })
+  if (run && runtime.snapshot().phase === 'ready') resumeMobileBridge()
+  else stopMobileBridgeUnlessWanted()
+  installMenu()
+}
+
 async function showMobilePairing(): Promise<void> {
   if (runtime.snapshot().phase !== 'ready') {
     const options: MessageBoxOptions = {
@@ -3197,8 +3231,10 @@ async function showMobilePairing(): Promise<void> {
     return
   }
 
+  mobileBridgeDemand.pairingOpened()
   let snapshot = await mobileBridge.start()
   if (!snapshot.desktopUrl) {
+    mobileBridgeDemand.pairingClosed(false)
     await mobileBridge.stop()
     const options: MessageBoxOptions = {
       type: 'warning',
@@ -3211,6 +3247,22 @@ async function showMobilePairing(): Promise<void> {
   }
 
   if (!snapshot.pairingUrl && !snapshot.tunnelActive && !snapshot.connected) {
+    // No local network address to pair over. The internet route goes through
+    // a third-party tunnel (Cloudflare, else Pinggy), so it needs the user's
+    // explicit go-ahead (docs/privacy.md: no silent network traffic).
+    const options: MessageBoxOptions = {
+      type: 'question',
+      message: 'No local network found',
+      detail: 'Your phone can still connect over the internet. This sends the connection through a third-party tunnel (Cloudflare, or Pinggy if Cloudflare is unavailable), open while pairing is open or a phone is connected.',
+      buttons: ['Connect over the Internet', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1
+    }
+    const { response } = await (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options))
+    if (response !== 0) {
+      if (mobileBridgeDemand.pairingClosed(false)) stopMobileBridgeUnlessWanted()
+      return
+    }
     snapshot = await mobileBridge.toggleTunnel(true)
   }
 
@@ -3235,6 +3287,9 @@ async function showMobilePairing(): Promise<void> {
   secureWindow(mobileWindow)
   mobileWindow.on('closed', () => {
     mobileWindow = undefined
+    // Without a paired phone (or Keep Phone Connected) the bridge closes its
+    // port with the window.
+    if (mobileBridgeDemand.pairingClosed(mobileBridge.snapshot().connected)) stopMobileBridgeUnlessWanted()
   })
   if (!snapshot.desktopUrl) return
   const desktopUrl = mobileBridge.createDesktopUrl()
@@ -3316,6 +3371,7 @@ async function bootstrap(): Promise<void> {
     }
   })
   registerHarnessHandlers()
+  mobileBridgeDemand = new MobileBridgeDemand(readKeepPhoneConnected(mobileBridgePreferencePath(app.getPath('userData'))))
   mobileBridge = new LanMobileBridge({
     harnessUrl: () => runtime.snapshot().url,
     harnessAuthToken: () => runtime.snapshot().authToken,
@@ -3335,7 +3391,7 @@ async function bootstrap(): Promise<void> {
     onConnectedChange: (connected) => broadcastMobileStatus(connected),
     pairingPinStore: createFilePairingPinStore(pairingPinStorePath(app.getPath('userData')))
   })
-  if (!startInSafeMode) void mobileBridge.start().catch(showUnexpectedError)
+  if (!startInSafeMode) resumeMobileBridge()
   repairAgentService = new RepairAgentService({
     harnessUrl: () => runtime.snapshot().url,
     harnessAuthToken: () => runtime.snapshot().authToken,
@@ -3530,7 +3586,7 @@ async function bootstrap(): Promise<void> {
         }).catch(showUnexpectedError)
         return { ok: false, blocked: true }
       }
-      void mobileBridge.start().catch(showUnexpectedError)
+      resumeMobileBridge()
       return { ok: true }
     }
     const compatibility = await inspectProfileCompatibility(
@@ -3568,7 +3624,7 @@ async function bootstrap(): Promise<void> {
     }
     resolveSafeModeAction({ type: 'agent' })
     await launchHarness()
-    void mobileBridge.start().catch(showUnexpectedError)
+    resumeMobileBridge()
     return { ok: true }
   })
   installMenu()

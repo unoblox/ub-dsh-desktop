@@ -28,16 +28,19 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 | Update checks, which sent the installation ID, version and platform | `dshdesktop.com` | Off: `UNOBLOX_UPDATE_FEED_CONFIGURED = false` in `src/main/update/update-policy.ts`. No check, version listing or download runs. Users update by installing the latest Unoblox release. |
 | Crash reports, consent-gated but sent with the installation ID | `dshdesktop.com/crash` | The desktop service has no network: crashes are kept locally for the app's own recovery prompts, and nothing is uploaded or offered for upload. |
 | Spell-check dictionary download on Linux and Windows | Google (`redirector.gvt1.com`) | Chromium's spellchecker is off on Linux and Windows, with an empty dictionary list set as each session is created (switching it off alone still downloads the dictionary). macOS keeps its system spellchecker, which stays local. |
-| Workbench market catalog fetched at every launch | `market.dshdesktop.com` | Fetched only when the user opens the market, presses refresh / check for updates, or installs from it. Startup serves the copy saved by the last refresh. |
+| Workbench market catalog fetched at every launch | `market.dshdesktop.com` | The workbench panel is off for the beta (its copy is Chinese-only and it lists the upstream catalog). If it returns, the catalog is fetched only when the user opens the market, refreshes, or installs from it. |
 | npm registry ping when the plugin-install dialog opens | `registry.npmjs.org`, `registry.npmmirror.com` | `registryProbeEnabled: false`. |
 | Plugin version lookups when a plugin breaks startup or Safe Mode opens | `registry.npmmirror.com`, `registry.npmjs.org` | Not done. Recovery offers its local actions (Safe Mode, removing the plugin). |
+| Settings › Market offered to install the third-party dsh-market plugin | npm, then whatever the plugin does | Not offered: the entry is gone and the host refuses the install (`MARKET_OFFERED = false`). |
+| Phone bridge listened on the local network from launch | — (inbound port) | Opens its port only when the user clicks Connect Phone, and closes it with the pairing window unless a phone paired. **Harness › Keep Phone Connected** (off by default) starts it with the app. |
+| Connect Phone without a local network went straight to an internet tunnel | Cloudflare / Pinggy | Asks first. |
 
 ## What still uses the network, only on the user's request
 
 - **Agent tools.** `web_fetch` loads a web page the agent chose for the user's task, and shell commands the agent runs (after the user's approval policy allows them) can reach whatever the command reaches. These are actions the user asked the agent to take.
-- **Installing plugins or workbenches** the user picks: npm and GitHub. The optional dsh-market add-on is a third-party community plugin, and what it does once installed is outside this policy.
+- **Installing plugins** the user picks in the plugin dialog: npm and GitHub. A plugin's own behaviour after install is the plugin author's, so only install plugins you trust.
 - **Image generation**, if the user configures an OpenAI or Volcengine key in its settings.
-- **Phone pairing over the internet**, if the user turns on the tunnel (Cloudflare or Pinggy).
+- **Phone pairing over the internet**, if the user picks Internet mode on the pairing page or agrees when no local network is found (Cloudflare or Pinggy).
 - **Links** the user clicks (docs and the website), which open in the system browser.
 
 ## Kept on the machine
@@ -46,8 +49,8 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 - Conversations, workspaces and settings: under the app's user-data folder.
 - Local diagnostics: the harness log and crash records, used only by the app's own recovery screens.
 
-The phone bridge listens on the local network from launch (PIN-protected, inbound only, no advertising), so a phone on the same Wi-Fi can pair. It sends nothing out by itself.
+The phone bridge listens on the local network only while the user is pairing, while a phone paired this session, or when Keep Phone Connected is on (PIN-protected, inbound only, no advertising). It sends nothing out by itself.
 
 ## Keeping it this way
 
-`test/network-privacy.test.ts` composes the real upstream bundles with each Desktop patch and asserts every row above stays disabled. It also checks the Harness environment flag, the spell-check guard and the no-fetch-at-startup catalog. `test/update-disabled.test.ts` asserts that no update path calls the network. When upgrading Harness, check new upstream rows against the two rules above.
+`test/network-privacy.test.ts` composes the real upstream bundles with each Desktop patch and asserts every row above stays disabled. It also checks the Harness environment flag, the spell-check guard and the no-fetch-at-startup catalog. `test/update-disabled.test.ts` asserts that no update path calls the network, `test/mobile-bridge-demand.test.ts` covers when the phone bridge runs, and `test/market-installer.test.js` checks the market install is refused. When upgrading Harness, check new upstream rows against the two rules above.

@@ -1,11 +1,12 @@
 import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ensureStoreDirPinned, inspectStoreConsistency } from '../src/main/state/profile-store'
 import { readDesired } from '../packages/dsh-desktop-market-installer/generations/registry.mjs'
 import {
   INSTALL_PATH,
+  MARKET_OFFERED,
   MARKET_PACKAGE,
   RECOMMENDED_MARKET_VERSION,
   STATUS_PATH,
@@ -21,7 +22,8 @@ import {
   readMarketInstallation,
   resolvePnpmEntry,
   stagePnpmRunner,
-  updateProfileNpmrc
+  updateProfileNpmrc,
+  apply
 } from '../packages/dsh-desktop-market-installer/index.js'
 
 describe('desktop plugin market installer', () => {
@@ -426,5 +428,41 @@ describe('desktop plugin market installer', () => {
       isTrustedRequest(request({ forwarded: 'for=127.0.0.1' }), false)
     ).toBe(false)
     expect(isTrustedRequest(request({}, '192.168.1.5'))).toBe(false)
+  })
+
+  it('refuses to install the third-party market (Unoblox does not offer it)', async () => {
+    expect(MARKET_OFFERED).toBe(false)
+    const home = await mkdtemp(join(tmpdir(), 'dsh-market-offer-'))
+    vi.stubEnv('DSH_HOME', home)
+    // apply() identifies the running Harness from argv[1] (its bin.js).
+    const argv = process.argv
+    process.argv = [argv[0], join(home, 'bin.js')]
+    try {
+      const routes = new Map()
+      const effect = (setup) => { setup() }
+      const webCtx = {
+        effect,
+        logger: { warn: () => {} },
+        webServer: { register: (route) => { routes.set(route.path, route.handler); return () => {} } }
+      }
+      await apply({
+        provide: () => {},
+        effect: () => {},
+        logger: { warn: () => {} },
+        inject: (_names, callback) => callback(webCtx)
+      })
+      const response = { status: 0, body: '', writeHead(status) { this.status = status }, end(body) { this.body = body } }
+      await routes.get(INSTALL_PATH)({
+        method: 'POST',
+        headers: { origin: 'http://127.0.0.1:51923', host: '127.0.0.1:51923' },
+        socket: { remoteAddress: '127.0.0.1' }
+      }, response)
+      expect(response.status).toBe(404)
+      expect(JSON.parse(response.body).error).toMatch(/does not offer/)
+      expect((await readMarketInstallation(home)).dependency).toBeUndefined()
+    } finally {
+      process.argv = argv
+      vi.unstubAllEnvs()
+    }
   })
 })

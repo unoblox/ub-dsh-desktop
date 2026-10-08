@@ -23,9 +23,9 @@ Output goes to `dist-dev/`. The `package:dev:*` scripts use `electron-builder.de
 
 - uses its own app id, name and user data, so it never collides with a release install;
 - publishes nothing;
-- leaves the auto-update manager off. That matters for this fork: the release config's update feed (`dshdesktop.com`) belongs to upstream DSH Desktop. A release-config build would offer upstream's build, which has no Unoblox, as an "update".
+- leaves the auto-update manager off. Release builds have updates off too (`UNOBLOX_UPDATE_FEED_CONFIGURED` in `src/main/update/update-policy.ts`, and no `publish` feed in `package.json`) until Unoblox runs its own update server.
 
-`.github/workflows/build-installers.yml` (manual dispatch) builds all four installers on native GitHub runners and keeps them as workflow artifacts. GitHub Actions is currently disabled on this repository; enable it (Settings → Actions) before dispatching. The Linux job also runs `scripts/smoke-packaged-linux.mjs` against the packaged app under Xvfb.
+`.github/workflows/build-installers.yml` (manual dispatch; the `target` input picks all platforms or one) builds all four installers on native GitHub runners and keeps them as workflow artifacts for 14 days. A dispatch from a branch other than the default one goes through the API or `gh workflow run build-installers.yml --ref <branch>`, because the Actions page offers only workflows that exist on the default branch. The Linux job also runs `scripts/smoke-packaged-linux.mjs` against the packaged app under Xvfb.
 
 ## Linux specifics
 
@@ -53,4 +53,4 @@ Output goes to `dist-dev/`. The `package:dev:*` scripts use `electron-builder.de
   - the `dsh-desktop` user-data folder;
   - package, environment and protocol names.
 
-  Still upstream's and needing their own values for a release: the Windows signing `publisherName`, the update feed and the crash-report endpoint `https://dshdesktop.com/crash`. Crash reports are only sent after the user agrees in a dialog.
+  The Windows publisher name now comes from the signing certificate (upstream's company name is gone). There is no update feed, and crash reports are never uploaded (see `docs/privacy.md`). `release.yml` is still upstream's release pipeline (their signing machine, ModelScope uploads and Feishu notices) and needs rewriting before a signed Unoblox release.

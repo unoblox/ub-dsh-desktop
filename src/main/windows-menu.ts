@@ -37,12 +37,14 @@ export function parseWindowsMenuRequest(name: unknown, x: unknown, y: unknown): 
  * Build one caption menu. The application menu carries every Desktop command
  * the former dropdown offered; the edit menu mirrors upstream.
  * @param zoomFactor - current page zoom, shown on the reset item.
+ * @param state - checkbox states shown in the application menu.
  */
 export function windowsMenuTemplate(
   name: WindowsMenuName,
   locale: 'zh' | 'en',
   zoomFactor: number,
-  actions: WindowsMenuActions
+  actions: WindowsMenuActions,
+  state: { keepPhoneConnected: boolean } = { keepPhoneConnected: false }
 ): MenuItemConstructorOptions[] {
   const zh = locale === 'zh'
   const command = (
@@ -82,6 +84,11 @@ export function windowsMenuTemplate(
 
   return [
     command('connect-phone', '连接手机…', 'Connect Phone…', 'Ctrl+Shift+M'),
+    {
+      ...command('toggle-keep-phone-connected', '保持手机连接', 'Keep Phone Connected'),
+      type: 'checkbox',
+      checked: state.keepPhoneConnected
+    },
     command('restart-harness', '重启', 'Restart', 'Ctrl+Shift+R'),
     command('safe-mode', '以安全模式重启…', 'Restart as Safe Mode…'),
     command('show-harness-log', '显示 Harness 日志', 'Show Harness Log'),

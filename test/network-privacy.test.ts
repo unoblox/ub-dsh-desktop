@@ -35,13 +35,23 @@ describe.each(['dsh-desktop.patch.yml', 'dsh-desktop-safe.patch.yml'])('no telem
     for (const id of SILENCED) {
       const entry = entries.find((candidate) => candidate.id === id)
       expect(entry, id).toBeDefined()
-      expect(entry!.disabled, id).toBe(true)
+      expect(entry?.disabled, id).toBe(true)
     }
   })
 
   it('stops the plugin manager pinging npm registries', () => {
     const entry = compose(patch).find((candidate) => candidate.id === 'ui-plugin-manager')
     expect(entry?.config).toEqual({ registryProbeEnabled: false })
+  })
+})
+
+describe('beta scope', () => {
+  it('turns off the workbench panel but keeps the plugin-install services', () => {
+    const entries = compose('dsh-desktop.patch.yml')
+    expect(entries.find((entry) => entry.id === 'dsh-desktop-workbenches')?.disabled).toBe(true)
+    const installer = entries.find((entry) => entry.id === 'dsh-desktop-market-installer')
+    expect(installer).toBeDefined()
+    expect(installer?.disabled).not.toBe(true)
   })
 })
 

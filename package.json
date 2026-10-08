@@ -464,12 +464,7 @@
         "to": "office-cli.mjs"
       }
     ],
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://dshdesktop.com/updates/latest/"
-      }
-    ],
+    "publish": null,
     "detectUpdateChannel": false,
     "artifactName": "dsh-desktop-${os}-${arch}.${ext}",
     "mac": {
@@ -503,7 +498,6 @@
       "icon": "build/icon.ico",
       "verifyUpdateCodeSignature": true,
       "signtoolOptions": {
-        "publisherName": "Beijing Shuju Xiangsu Intelligence Technology Co., Ltd.",
         "signingHashAlgorithms": [
           "sha256"
         ]

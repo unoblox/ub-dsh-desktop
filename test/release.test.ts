@@ -255,14 +255,14 @@ describe('GitHub release contract', () => {
     expect(packageJson.build.detectUpdateChannel).toBe(false)
   })
 
-  it('publishes update metadata for installed desktop builds', async () => {
+  it('ships no update feed until Unoblox has one, keeping the release workflow assets', async () => {
     const packageJson = JSON.parse(
       await readFile(path.join(projectRoot, 'package.json'), 'utf8')
     ) as {
       dependencies: Record<string, string>
       build: {
-        publish: Array<{ provider: string; url?: string; owner?: string; repo?: string }>
-        win: { verifyUpdateCodeSignature: boolean; signtoolOptions: { publisherName: string } }
+        publish: unknown
+        win: { verifyUpdateCodeSignature: boolean; signtoolOptions: { publisherName?: string } }
       }
     }
     const workflow = await readFile(
@@ -271,11 +271,12 @@ describe('GitHub release contract', () => {
     )
 
     expect(packageJson.dependencies['electron-updater']).toBeTruthy()
-    expect(packageJson.build.publish).toEqual([
-      { provider: 'generic', url: 'https://dshdesktop.com/updates/latest/' }
-    ])
+    // Unoblox has no update server yet (UNOBLOX_UPDATE_FEED_CONFIGURED), so
+    // installers carry no feed, and the Windows publisher comes from the
+    // signing certificate rather than upstream's company name.
+    expect(packageJson.build.publish).toBeNull()
     expect(packageJson.build.win.verifyUpdateCodeSignature).toBe(true)
-    expect(packageJson.build.win.signtoolOptions.publisherName).toBe('Beijing Shuju Xiangsu Intelligence Technology Co., Ltd.')
+    expect(packageJson.build.win.signtoolOptions.publisherName).toBeUndefined()
     for (const asset of [
       'latest-mac-arm64.yml',
       'latest-mac-x64.yml',

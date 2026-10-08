@@ -769,18 +769,8 @@ window.__ModuleLoader__.load({
         )
         return
       }
-      ctx.slots.inject('settings.section', () =>
-        ctx.slots.register(
-          {
-            name: 'settings.section',
-            id: 'market',
-            order: 40,
-            label: () => t('nav'),
-            inject: () => ({ t })
-          },
-          MarketInstallerSection
-        )
-      )
+      // Unoblox does not offer installing the third-party dsh-market (see
+      // MARKET_OFFERED in index.js), so there is no Settings › Market section.
     }
 
     exports.apply = apply

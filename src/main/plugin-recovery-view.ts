@@ -208,7 +208,7 @@ export function buildPluginRecoveryViewModel(options: {
   if (locale === 'zh') {
     return {
       locale,
-      brand: 'DSH Desktop',
+      brand: 'Unoblox',
       badge: '启动修复',
       heading: canUninstall
         ? multiple ? `发现 ${plugins.length} 个导致启动失败的插件` : '发现导致启动失败的插件'
@@ -253,7 +253,7 @@ export function buildPluginRecoveryViewModel(options: {
       launchDirectoryLabel: '启动目录',
       launchDirectory: snapshot.launchDirectory,
       rawError: snapshot.message,
-      quitLabel: '退出 DSH Desktop',
+      quitLabel: '退出 Unoblox',
       safeModeLabel: '进入安全模式',
       canUninstall,
       safeModeOnly
@@ -262,7 +262,7 @@ export function buildPluginRecoveryViewModel(options: {
 
   return {
     locale,
-    brand: 'DSH Desktop',
+    brand: 'Unoblox',
     badge: 'Startup recovery',
     heading: canUninstall
       ? multiple ? `${plugins.length} plugins are preventing startup` : 'A plugin is preventing startup'
@@ -307,7 +307,7 @@ export function buildPluginRecoveryViewModel(options: {
     launchDirectoryLabel: 'Launch directory',
     launchDirectory: snapshot.launchDirectory,
     rawError: snapshot.message,
-    quitLabel: 'Quit DSH Desktop',
+    quitLabel: 'Quit Unoblox',
     safeModeLabel: 'Enter Safe Mode',
     canUninstall,
     safeModeOnly

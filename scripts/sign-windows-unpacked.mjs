@@ -62,7 +62,7 @@ export function buildJsignArgs({
   pinFile,
   targetFile,
   tsaUrl = 'http://timestamp.digicert.com',
-  name = 'DSH Desktop',
+  name = 'Unoblox',
   url = 'https://www.dshdesktop.com'
 }) {
   return [

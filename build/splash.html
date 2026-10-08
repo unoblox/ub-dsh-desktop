@@ -28,7 +28,7 @@
       }
       html[data-platform="windows"] main { padding-top: 70px; }
       .markFrame { display: grid; place-items: center; }
-      .mark { grid-area: 1 / 1; width: 196px; height: auto; image-rendering: pixelated; }
+      .mark { grid-area: 1 / 1; width: 196px; height: auto; }
       .markDark { display: none; }
       .title { margin: 0; font-size: 23px; font-weight: 650; letter-spacing: -0.02em; }
       .status { margin: -4px 0 0; color: #777a80; font-size: 13px; }
@@ -61,12 +61,12 @@
         <img class="mark markLight" src="dsh-loader.gif" alt="" />
         <img class="mark markDark" src="dsh-loader-dark.gif" alt="" />
       </div>
-      <h1 class="title" id="title">Starting DSH Desktop</h1>
+      <h1 class="title" id="title">Starting Unoblox</h1>
       <p class="status" id="status">First launch may take a moment.</p>
     </main>
     <script>
       if (navigator.language.toLowerCase().startsWith('zh')) {
-        document.getElementById('title').textContent = '正在启动 DSH Desktop'
+        document.getElementById('title').textContent = '正在启动 Unoblox'
         document.getElementById('status').textContent = '首次启动可能需要一点时间。'
       }
     </script>

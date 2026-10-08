@@ -1,0 +1,14 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js
+index e90615e..b908e61 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js
+@@ -295,7 +295,8 @@ window.__ModuleLoader__.load({
+ 			const onRightbarDrag = (0, react.useCallback)((dx) => {
+ 				actions.setRightbar(rightbarBase.current - dx);
+ 			}, [actions]);
+-			const productTitle = "DeepSeek Harness";
++			// DSH Desktop patch: the installed product is Unoblox.
++			const productTitle = "Unoblox";
+ 			const rightbarMax = cols.rightbar === 0 ? 0 : clampWidth(rightbarPreference, 300, viewport * RIGHTBAR_MAX_RATIO);
+ 			const sidebar = (0, react.useMemo)(() => renderSlot("sidebar", {
+ 				collapsed: sidebarCollapsed,

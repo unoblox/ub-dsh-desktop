@@ -48,4 +48,9 @@ Output goes to `dist-dev/`. The `package:dev:*` scripts use `electron-builder.de
 ## Not done by these builds
 
 - **Signing.** macOS builds are unsigned and not notarized, so Gatekeeper blocks the first open (right-click → Open, or System Settings → Privacy & Security → Open Anyway). Windows builds are unsigned, so SmartScreen shows "Windows protected your PC" (More info → Run anyway). Signed releases need the publisher's certificates; see `release.yml` and `docs/release-runbook.md`.
-- **Release identity.** The release config still carries upstream's identity: app id `io.dsh.desktop`, product name "DSH Desktop", Windows `publisherName`, the update feed and the crash-report endpoint `https://dshdesktop.com/crash`. Crash reports are only sent after the user agrees in a dialog. A release of this fork needs its own values for all of these.
+- **Release identity.** The product is branded Unoblox: product name "Unoblox" ("Unoblox Dev" for development builds), icons generated from `build/brand/unoblox-mark.svg` by `scripts/generate-brand-assets.mjs`, the window and page titles, the sidebar wordmark, the splash and the first-run dialog. These internal identifiers deliberately stay as they were, so existing installs keep their data:
+  - app id `io.dsh.desktop`;
+  - the `dsh-desktop` user-data folder;
+  - package, environment and protocol names.
+
+  Still upstream's and needing their own values for a release: the Windows signing `publisherName`, the update feed and the crash-report endpoint `https://dshdesktop.com/crash`. Crash reports are only sent after the user agrees in a dialog.

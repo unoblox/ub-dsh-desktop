@@ -58,7 +58,7 @@ child.on('exit', (code, signal) => {
 })
 
 function findLog() {
-  for (const name of ['dsh-desktop-dev', 'dsh-desktop', 'DSH Desktop Dev', 'DSH Desktop']) {
+  for (const name of ['dsh-desktop-dev', 'dsh-desktop']) {
     const path = join(config, name, 'logs', 'harness.log')
     if (existsSync(path)) return path
   }

@@ -364,7 +364,7 @@ export function buildSafeModeViewModel(options: {
   if (options.locale === 'zh') {
     return {
       locale: 'zh',
-      brand: 'DSH Desktop',
+      brand: 'Unoblox',
       badge: '安全模式',
       heading: '',
       summary: '安全模式暂时跳过第三方插件。停用有问题的插件后重启；插件和数据都会保留。',
@@ -391,7 +391,7 @@ export function buildSafeModeViewModel(options: {
       restartLabel: '退出安全模式并重启',
       restartBusyLabel: '正在重启…',
       restartConfirm: safeModeExitConfirmation(blockingGroups, 'zh'),
-      quitLabel: '退出 DSH Desktop',
+      quitLabel: '退出 Unoblox',
       notice: options.notice,
       noticeSummary: summarizeLongNotice(options.notice, 'zh'),
       noticeTone: options.noticeTone,
@@ -406,7 +406,7 @@ export function buildSafeModeViewModel(options: {
 
   return {
     locale: 'en',
-    brand: 'DSH Desktop',
+    brand: 'Unoblox',
     badge: 'Safe Mode',
     heading: '',
     summary: 'Safe Mode temporarily skips third-party plugins. Disable the faulty plugin and restart; your plugins and data stay intact.',
@@ -433,7 +433,7 @@ export function buildSafeModeViewModel(options: {
     restartLabel: 'Exit Safe Mode and restart',
     restartBusyLabel: 'Restarting…',
     restartConfirm: safeModeExitConfirmation(blockingGroups, 'en'),
-    quitLabel: 'Quit DSH Desktop',
+    quitLabel: 'Quit Unoblox',
     notice: options.notice,
     noticeSummary: summarizeLongNotice(options.notice, 'en'),
     noticeTone: options.noticeTone,

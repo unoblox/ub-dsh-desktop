@@ -37,7 +37,7 @@ export function buildDisclaimedUtilityProcessSpec(
       env: definedEnvironment(spawnOptions.env),
       execArgv: [internalLoaderFlag],
       stdio: 'pipe',
-      serviceName: 'DSH Harness',
+      serviceName: 'Unoblox Harness',
       // Harness loads user-installed plugins and can launch third-party tools.
       // Keep their TCC requests out of DSH Desktop's responsibility chain in production.
       disclaim: utilityProcessOptions?.disclaim ?? true

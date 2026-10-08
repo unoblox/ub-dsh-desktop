@@ -19,6 +19,22 @@ const darkDestination = path.join(destinationDirectory, 'dsh-desktop-logo-dark.p
 const indexPath = path.join(destinationDirectory, 'index.html')
 const manifestPath = path.join(destinationDirectory, 'manifest.webmanifest')
 
+/** Product name shown in the page title and web manifest. */
+const PRODUCT_NAME = 'Unoblox'
+
+/**
+ * Replace the static page title (upstream ships "DeepSeek Harness"). The
+ * runtime title comes from dsh-client-ui-layout, patched to the same name.
+ * @param contents - index.html source.
+ * @param file - path shown in the failure message.
+ * @returns index.html with the Unoblox title.
+ */
+function replaceTitle(contents, file) {
+  const titles = contents.match(/<title>[^<]*<\/title>/gu) ?? []
+  if (titles.length !== 1) throw new Error(`Could not update Unoblox branding in ${file}: expected one <title>, found ${String(titles.length)}`)
+  return contents.replace(titles[0], `<title>${PRODUCT_NAME}</title>`)
+}
+
 /**
  * Swap the Harness favicon link for the desktop's own.
  *
@@ -38,7 +54,7 @@ function replaceIconLink(contents, file) {
     && matches.some((link) => link.includes('media="(prefers-color-scheme: light)"'))
   if (matches.length !== 1 && !themedLinks) {
     throw new Error(
-      `Could not update DSH Desktop branding in ${file}: expected one icon link or a light/dark pair, found ${String(matches.length)}`
+      `Could not update Unoblox branding in ${file}: expected one icon link or a light/dark pair, found ${String(matches.length)}`
     )
   }
   return themedLinks
@@ -62,11 +78,14 @@ function replaceManifestIcon(contents, file) {
   const target = icons.find((icon) => icon?.src === '/dsh-desktop-logo.png')
     ?? icons.find((icon) => typeof icon?.src === 'string' && icon.src.endsWith('favicon.svg'))
   if (target === undefined) {
-    throw new Error(`Could not update DSH Desktop branding in ${file}: no icon entry to replace`)
+    throw new Error(`Could not update Unoblox branding in ${file}: no icon entry to replace`)
   }
   target.src = '/dsh-desktop-logo.png'
-  target.sizes = '1254x1254'
+  target.sizes = '1024x1024'
   target.type = 'image/png'
+  // The installed app is Unoblox; the manifest still named upstream.
+  manifest.name = PRODUCT_NAME
+  manifest.short_name = PRODUCT_NAME
   return `${JSON.stringify(manifest, null, 2)}\n`
 }
 
@@ -76,7 +95,7 @@ await copyFile(lightSource, lightDestination)
 await copyFile(darkSource, darkDestination)
 
 const index = await readFile(indexPath, 'utf8')
-await writeFile(indexPath, replaceIconLink(index, path.relative(projectRoot, indexPath)))
+await writeFile(indexPath, replaceTitle(replaceIconLink(index, path.relative(projectRoot, indexPath)), path.relative(projectRoot, indexPath)))
 
 const manifest = await readFile(manifestPath, 'utf8')
 await writeFile(
@@ -84,7 +103,7 @@ await writeFile(
   replaceManifestIcon(manifest, path.relative(projectRoot, manifestPath))
 )
 
-console.log(`Installed DSH Desktop brand assets: ${[
+console.log(`Installed Unoblox brand assets: ${[
   destination,
   lightDestination,
   darkDestination

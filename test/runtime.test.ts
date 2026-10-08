@@ -284,19 +284,19 @@ describe('Harness launch contract', () => {
       { PATH: '/usr/bin', ELECTRON_RUN_AS_NODE: '1' }
     )
     const nodeArguments = buildNodeArguments(
-      '/Applications/DSH Desktop.app/Contents/Resources/harness-node-entry.mjs',
-      '/Applications/DSH Desktop.app/Contents/Resources/app/node_modules/@deepseek-ai/dsh/lib/bin.js',
+      '/Applications/Unoblox.app/Contents/Resources/harness-node-entry.mjs',
+      '/Applications/Unoblox.app/Contents/Resources/app/node_modules/@deepseek-ai/dsh/lib/bin.js',
       43127,
-      '/Applications/DSH Desktop.app/Contents/Resources/dsh-desktop.patch.yml'
+      '/Applications/Unoblox.app/Contents/Resources/dsh-desktop.patch.yml'
     )
 
     expect(buildDisclaimedUtilityProcessSpec(nodeArguments, spawnOptions)).toEqual({
-      modulePath: '/Applications/DSH Desktop.app/Contents/Resources/harness-node-entry.mjs',
+      modulePath: '/Applications/Unoblox.app/Contents/Resources/harness-node-entry.mjs',
       args: [
-        '/Applications/DSH Desktop.app/Contents/Resources/app/node_modules/@deepseek-ai/dsh/lib/bin.js',
+        '/Applications/Unoblox.app/Contents/Resources/app/node_modules/@deepseek-ai/dsh/lib/bin.js',
         'web',
         '--patch',
-        '/Applications/DSH Desktop.app/Contents/Resources/dsh-desktop.patch.yml',
+        '/Applications/Unoblox.app/Contents/Resources/dsh-desktop.patch.yml',
         '--no-open',
         '--host',
         '127.0.0.1',
@@ -316,7 +316,7 @@ describe('Harness launch contract', () => {
         },
         execArgv: ['--expose-internals'],
         stdio: 'pipe',
-        serviceName: 'DSH Harness',
+        serviceName: 'Unoblox Harness',
         disclaim: true
       }
     })

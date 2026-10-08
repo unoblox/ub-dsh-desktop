@@ -481,7 +481,7 @@ export class HarnessRuntime {
       ? this.options.dshSafePatchPath
       : this.options.dshPatchPath
     if (!existsSync(sourcePatchPath)) {
-      this.setState('failed', `DSH Desktop patch was not found: ${sourcePatchPath}`)
+      this.setState('failed', `Unoblox patch was not found: ${sourcePatchPath}`)
       return
     }
     await mkdir(this.options.dshHome, { recursive: true })
@@ -531,7 +531,7 @@ export class HarnessRuntime {
       )
     }
     this.writeLog(`[desktop] endpoint ${url}`)
-    this.setState('starting', 'Starting DeepSeek Harness…')
+    this.setState('starting', 'Starting Unoblox…')
 
     const shellEnvironment = await prewarmShellEnvironment()
     let launchEnvironment: Record<string, string> = {}

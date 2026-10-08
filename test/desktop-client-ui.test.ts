@@ -51,8 +51,6 @@ describe('DSH Desktop client slot occupants', () => {
       type,
       props: { ...props, children }
     })
-    const BrandWordmark = vi.fn()
-    const FishLogo = vi.fn()
     const plugin = definition!.factory((id) => {
       if (id === 'react') {
         return {
@@ -62,7 +60,7 @@ describe('DSH Desktop client slot occupants', () => {
         }
       }
       if (id === '@deepseek-ai/dsh-client-ui-primitives') {
-        return { BrandWordmark, FishLogo }
+        return { MenuItemButton: vi.fn() }
       }
       throw new Error(`Unexpected client dependency: ${id}`)
     })
@@ -102,26 +100,35 @@ describe('DSH Desktop client slot occupants', () => {
     disposeStyle?.()
     expect(removeStyle).toHaveBeenCalledOnce()
 
+    type Node = { type: unknown; props: Record<string, unknown> }
+    const render = (node: Node): Node => typeof node.type === 'function' ? render((node.type as (props: unknown) => Node)(node.props)) : node
+    const children = (node: Node) => node.props.children as Array<Node | string>
+
+    // Unoblox wordmark: real text with the gold full stop, like unoblox.ai.
     const sidebarName = registrations.find(
       ({ config }) => config.name === 'sidebar.brand.name'
-    )!.component({}) as { type: unknown; props: Record<string, unknown> }
-    expect(sidebarName.type).toBe(BrandWordmark)
-    expect(sidebarName.props.includeMark).toBe(false)
+    )!.component({}) as Node
+    expect(sidebarName.type).toBe('span')
+    const [word, stop] = children(sidebarName)
+    expect(word).toBe('unoblox')
+    expect((stop as Node).props.children).toEqual(['.'])
+    expect(((stop as Node).props.style as { color: string }).color).toBe('#D9A64A')
 
-    const sidebarMark = registrations.find(
+    // Unoblox glyph: "u" in currentColor (follows the theme), gold dot.
+    const sidebarMark = render(registrations.find(
       ({ config }) => config.name === 'sidebar.brand.mark'
-    )!.component({ size: 24 }) as { type: unknown; props: Record<string, unknown> }
+    )!.component({ size: 24 }) as Node)
     expect(sidebarMark.type).toBe('svg')
-    expect(sidebarMark.props.height).toBe(17)
-    const [markPath] = sidebarMark.props.children as Array<{ type: unknown; props: Record<string, unknown> }>
-    if (!markPath) throw new Error('Expected the sidebar brand SVG path')
-    expect(markPath.type).toBe('path')
-    expect(markPath.props.fill).toBe('currentColor')
+    expect(sidebarMark.props['aria-hidden']).toBe('true')
+    const [stroke, dot] = children(sidebarMark) as Node[]
+    expect(stroke?.props.stroke).toBe('currentColor')
+    expect(dot?.props.fill).toBe('#D9A64A')
 
-    const heroMark = registrations.find(
+    const heroMark = render(registrations.find(
       ({ config }) => config.name === 'conversation.hero.brand.mark'
-    )!.component({ size: 48 }) as { type: unknown; props: Record<string, unknown> }
-    expect(heroMark.type).toBe(FishLogo)
-    expect(heroMark.props.size).toBe(48)
+    )!.component({ size: 48, className: 'fish' }) as Node)
+    expect(heroMark.type).toBe('svg')
+    expect(heroMark.props.width).toBe(48)
+    expect(heroMark.props.className).toBe('fish')
   })
 })

@@ -7,7 +7,7 @@ export const SAFE_MODE_BUNDLES = [
   '@deepseek-ai/dsh-web-app'
 ] as const
 
-const SAFE_MODE_PATCH = `# Managed by DSH Desktop Safe Mode.
+const SAFE_MODE_PATCH = `# Managed by Unoblox Safe Mode.
 # Third-party bundles and the normal web profile's patch layer are intentionally omitted.
 []
 `

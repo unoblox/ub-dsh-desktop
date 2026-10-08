@@ -6,7 +6,10 @@
  *   node scripts/generate-brand-assets.mjs
  *
  * Writes build/icon.png and build/app-icon.png (1024 px), build/icon.icns
- * (PNG entries, 16–1024 px) and build/icon.ico (PNG entries, 16–256 px).
+ * (PNG entries, 16–1024 px), build/icon.ico (PNG entries, 16–256 px), the
+ * light/dark logos (build/logo-{light,dark}.png, 336x192, the "u." glyph on
+ * transparency) and the splash loaders (build/dsh-loader{,-dark}.gif: the
+ * glyph with a gently pulsing gold dot, on each splash theme's background).
  * The outputs are committed because electron-builder and the window code read
  * them directly; edit the SVG, rerun this, and commit both.
  */
@@ -72,4 +75,34 @@ await writeFile(join(root, 'build', 'icon.icns'), icns([
   ['ic11', rendered[32]], ['ic12', rendered[64]], ['ic13', rendered[256]], ['ic14', rendered[512]]
 ]))
 await writeFile(join(root, 'build', 'icon.ico'), ico([16, 24, 32, 48, 64, 128, 256].map((size) => [size, rendered[size]])))
-console.log('brand assets written: icon.png, app-icon.png, icon.icns, icon.ico')
+// The bare glyph (no tile) in the mark's 1024 coordinate space.
+const U_PATH = 'M253 321V475A163 163 0 0 0 579 475V321M579 321V686'
+const GOLD = '#D9A64A'
+function glyph({ width, height, scale, ink, background, dotScale = 1 }) {
+  // Glyph bounds in mark units: x 205..828, y 321..712; centre it.
+  const x = width / 2 - ((205 + 828) / 2) * scale
+  const y = height / 2 - ((321 + 712) / 2) * scale
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${
+    background === undefined ? '' : `<rect width="${width}" height="${height}" fill="${background}"/>`
+  }<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${scale})"><path d="${U_PATH}" fill="none" stroke="${ink}" stroke-width="96"/><circle cx="738" cy="622" r="${(90 * dotScale).toFixed(2)}" fill="${GOLD}"/></g></svg>`)
+}
+
+for (const [file, ink] of [['logo-light.png', '#0C0C0C'], ['logo-dark.png', '#F1E9DC']]) {
+  await writeFile(join(root, 'build', file), await sharp(glyph({ width: 336, height: 192, scale: 0.22, ink })).png({ compressionLevel: 9 }).toBuffer())
+}
+
+// Splash loaders: same file names and canvas as before, so splash.html is
+// unchanged apart from dropping its pixel-art scaling.
+const LOADER = { width: 640, height: 360, frames: 36, delay: 60 }
+for (const [file, ink, background] of [['dsh-loader.gif', '#0C0C0C', '#f8f8f6'], ['dsh-loader-dark.gif', '#F1E9DC', '#141416']]) {
+  const frames = await Promise.all(Array.from({ length: LOADER.frames }, (_, index) => {
+    // Breathe between 82% and 100% so the dot never touches the "u".
+    const dotScale = 0.91 + 0.09 * Math.sin((2 * Math.PI * index) / LOADER.frames)
+    return sharp(glyph({ width: LOADER.width, height: LOADER.height, scale: 0.42, ink, background, dotScale })).ensureAlpha().raw().toBuffer()
+  }))
+  await writeFile(join(root, 'build', file), await sharp(Buffer.concat(frames), {
+    raw: { width: LOADER.width, height: LOADER.height * LOADER.frames, channels: 4, pageHeight: LOADER.height }
+  }).gif({ delay: Array.from({ length: LOADER.frames }, () => LOADER.delay), loop: 0, effort: 10 }).toBuffer())
+}
+
+console.log('brand assets written: icon.png, app-icon.png, icon.icns, icon.ico, logo-light.png, logo-dark.png, dsh-loader.gif, dsh-loader-dark.gif')

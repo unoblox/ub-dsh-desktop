@@ -16,8 +16,8 @@ import {
 
 describe('Safe Mode', () => {
   it('is opt-in through an exact command-line switch', () => {
-    expect(shouldStartInSafeMode(['DSH Desktop', '--safe-mode'])).toBe(true)
-    expect(shouldStartInSafeMode(['DSH Desktop', '--safe-mode=false'])).toBe(false)
+    expect(shouldStartInSafeMode(['Unoblox', '--safe-mode'])).toBe(true)
+    expect(shouldStartInSafeMode(['Unoblox', '--safe-mode=false'])).toBe(false)
   })
 
   it('marks plugins as still being checked until the market check answers', () => {
@@ -95,7 +95,7 @@ describe('Safe Mode', () => {
       applyLabel: 'Disable selected plugins',
       agentLabel: 'Close',
       restartLabel: 'Exit Safe Mode and restart',
-      quitLabel: 'Quit DSH Desktop'
+      quitLabel: 'Quit Unoblox'
     })
   })
 

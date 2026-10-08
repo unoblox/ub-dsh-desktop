@@ -52,7 +52,7 @@ function installationClosure(home = dshHome()) {
 
 function bundledNodeAndPnpm() {
   const roots = [
-    join(homedir(), 'AppData', 'Local', 'Programs', 'DSH Desktop', 'resources', 'app', 'node_modules'),
+    join(homedir(), 'AppData', 'Local', 'Programs', 'Unoblox', 'resources', 'app', 'node_modules'),
     join(process.cwd(), 'node_modules')
   ]
   for (const root of roots) {
@@ -60,7 +60,7 @@ function bundledNodeAndPnpm() {
     const pnpm = join(root, 'pnpm', 'bin', 'pnpm.cjs')
     if (existsSync(pnpm)) return { node: existsSync(node) ? node : process.execPath, pnpm }
   }
-  throw new Error('No bundled pnpm found; run from the repo or install DSH Desktop.')
+  throw new Error('No bundled pnpm found; run from the repo or install Unoblox.')
 }
 
 function run(command, args, options) {
@@ -245,7 +245,7 @@ async function main() {
     // copy of react / cordis / a @deepseek-ai/* runtime package.
     const appClosure = join(
       homedir(),
-      'AppData', 'Local', 'Programs', 'DSH Desktop', 'resources', 'app', 'node_modules'
+      'AppData', 'Local', 'Programs', 'Unoblox', 'resources', 'app', 'node_modules'
     )
     for (const specifier of ['react', '@deepseek-ai/cordis', ...declaredPrivateSingletons]) {
       let resolved

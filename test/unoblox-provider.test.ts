@@ -13,7 +13,7 @@ const UNOBLOX_ROUTE = {
   api: 'openai-completions',
   baseURL: 'https://api.unoblox.ai/v1'
 }
-const AUTO_ONLY = [{ id: 'unoblox/auto', name: 'Unoblox Auto' }]
+const AUTO_ONLY = [{ id: 'unoblox/auto', name: 'Unoblox Auto · best value' }]
 
 /** Evaluate a `!!js` node the way cordis-plugin-loader does, against a given environment. */
 function evaluateJs(node: unknown, env: Record<string, string | undefined>): unknown {

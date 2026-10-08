@@ -44,7 +44,7 @@
         # GET /v1/models (src/main/unoblox/model-catalog.ts), falling back to
         # its cached copy. Missing or malformed, only Auto is offered: the
         # Unoblox router picks the best-value model and fails over.
-        models: !!js "(() => { try { const rows = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_MODELS || '[]'); if (Array.isArray(rows) && rows.length > 0) return rows } catch {} return [{ id: 'unoblox/auto', name: 'Unoblox Auto' }] })()"
+        models: !!js "(() => { try { const rows = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_MODELS || '[]'); if (Array.isArray(rows) && rows.length > 0) return rows } catch {} return [{ id: 'unoblox/auto', name: 'Unoblox Auto · best value' }] })()"
 
 # The official DeepSeek API-key and account routes.
 - id: llm-deepseek

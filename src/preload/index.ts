@@ -53,6 +53,8 @@ interface AboutInfo {
   desktopVersion: string
   harnessVersion: string
   locale: 'en' | 'zh'
+  /** False while Unoblox has no update feed: no version picker or check. */
+  updatesAvailable?: boolean
 }
 let aboutHost: HTMLElement | null = null
 let aboutShadow: ShadowRoot | null = null
@@ -915,6 +917,12 @@ function renderAbout(): void {
   body.appendChild(hint)
   card.appendChild(body)
 
+  // No update feed (update-policy.ts): show the versions without the version
+  // picker and update check.
+  if (info.updatesAvailable !== true) {
+    overlay.replaceChildren(card)
+    return
+  }
   // Actions row: [ 选择版本 ] [ 检查更新 ] side-by-side
   const actions = element('div', 'about-actions')
 

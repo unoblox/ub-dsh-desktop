@@ -125,6 +125,6 @@ describe('catalog resolution', () => {
   })
 
   it('hands the rows to the patch files as JSON', () => {
-    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"Unoblox Auto"}]' })
+    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"Unoblox Auto · best value"}]' })
   })
 })

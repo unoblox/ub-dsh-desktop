@@ -214,14 +214,15 @@ function createCtx(overrides: Partial<CtxHarness> = {}): { ctx: CtxHarness; regi
 }
 
 describe('DSH Desktop onboarding wizard', () => {
-  it('shows a single notice modal that links straight to the models settings', () => {
+  it('shows a single notice modal with one primary action and Not now', () => {
     const source = readFileSync(
       path.join(projectRoot, 'packages', 'dsh-desktop-onboarding', 'client.js'),
       'utf8'
     )
     expect(source).toContain("const WIZARD_ACK_FIELD = 'wizardVersion'")
-    expect(source).toContain("const MODELS_SECTION_ID = 'models'")
-    expect(source).toContain('openSection(MODELS_SECTION_ID)')
+    // "Configure a model" duplicated the key field (the Models page holds only
+    // the Unoblox row), so the dialog offers Connect and Not now.
+    expect(source).not.toContain('configureModel')
     expect(source).not.toContain('OnboardingSurface')
     expect(source).not.toContain('ModelsSection')
     // Unoblox branding: its own links and mark, none of upstream's.
@@ -293,9 +294,9 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(zh.step0Title).toBe('欢迎使用 Unoblox')
     expect(en.step0Title).toBe('Welcome to Unoblox')
     expect(en.brandName).toBe('Unoblox')
-    expect(zh.configureModel).toBe('去配置模型')
-    expect(en.configureModel).toBeTruthy()
-    expect(en.later).toBeTruthy()
+    expect(en.later).toBe('Not now')
+    expect(en.brandBy).toBe('Beta')
+    expect(en.unobloxKeyLater).toContain('Settings › Models')
   })
 
   it('shows only an eligible install with no acknowledgement', () => {

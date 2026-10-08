@@ -42,9 +42,16 @@ describe('Windows caption menus', () => {
 
   it('keeps every Desktop command in the application menu, including the View group', () => {
     const { run, actions } = record()
-    clickAll(windowsMenuTemplate('application', 'zh', 1, actions))
+    clickAll(windowsMenuTemplate('application', 'zh', 1, actions, { keepPhoneConnected: false, updatesAvailable: true }))
     const editing = new Set<DesktopMenuCommand>(['undo', 'redo', 'cut', 'copy', 'paste', 'select-all'])
     expect(new Set(run)).toEqual(new Set(desktopMenuCommands.filter((command) => !editing.has(command))))
+  })
+
+  it('offers no update check while Unoblox has no update feed', () => {
+    const { run, actions } = record()
+    clickAll(windowsMenuTemplate('application', 'en', 1, actions))
+    expect(run).not.toContain('check-for-updates')
+    expect(labels(windowsMenuTemplate('application', 'en', 1, actions))).not.toContain('Check for Updates…')
   })
 
   it('shows Keep Phone Connected as a checkbox with its current state', () => {

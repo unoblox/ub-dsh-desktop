@@ -1,5 +1,5 @@
 diff --git a/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
-index c5252c1..4ac3cf6 100644
+index c5252c1..7fdf0a0 100644
 --- a/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
 +++ b/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
 @@ -64,6 +64,38 @@ window.__ModuleLoader__.load({
@@ -770,7 +770,58 @@ index c5252c1..4ac3cf6 100644
  			});
  			const piAi = state.namespaces.get("llm-pi-ai");
  			const protocols = protocolChoices(piAi, schema);
-@@ -2346,7 +2728,7 @@ window.__ModuleLoader__.load({
+@@ -2169,20 +2551,23 @@ window.__ModuleLoader__.load({
+ 													className: ModelsSection_module_css_default["rowName"],
+ 													children: row.entry.displayName
+ 												}),
+-												row.entry.declared === true ? (0, react_jsx_runtime.jsx)("span", {
++												row.entry.declared === true && row.entry.provider !== "unoblox" ? (0, react_jsx_runtime.jsx)("span", {
+ 													className: ModelsSection_module_css_default["rowTag"],
+ 													children: t("customTag")
+ 												}) : null,
+-												credentialConfigured ? (0, react_jsx_runtime.jsx)("span", {
+-													className: `${ModelsSection_module_css_default["credentialDot"]} ${ModelsSection_module_css_default["credentialDotConfigured"]}`,
+-													role: "img",
+-													"aria-label": t("credentialConfigured"),
+-													title: t("credentialConfigured")
+-												}) : credentialMissing ? (0, react_jsx_runtime.jsx)("span", {
+-													className: `${ModelsSection_module_css_default["credentialDot"]} ${ModelsSection_module_css_default["credentialDotMissing"]}`,
+-													role: "img",
+-													"aria-label": t("credentialMissing"),
+-													title: t("credentialMissing")
++												credentialConfigured || credentialMissing ? (0, react_jsx_runtime.jsxs)("span", {
++													style: {
++														display: "inline-flex",
++														alignItems: "center",
++														gap: 6,
++														fontSize: 12,
++														lineHeight: "18px",
++														color: credentialConfigured ? "var(--dsw-alias-label-secondary)" : "var(--dsw-alias-state-error-primary)"
++													},
++													children: [(0, react_jsx_runtime.jsx)("span", {
++														className: `${ModelsSection_module_css_default["credentialDot"]} ${ModelsSection_module_css_default[credentialConfigured ? "credentialDotConfigured" : "credentialDotMissing"]}`,
++														"aria-hidden": "true"
++													}), t(credentialConfigured ? "credentialConfigured" : "credentialMissing")]
+ 												}) : null
+ 											]
+ 										}), (0, react_jsx_runtime.jsxs)("span", {
+@@ -2190,13 +2575,13 @@ window.__ModuleLoader__.load({
+ 											children: [(0, react_jsx_runtime.jsx)("button", {
+ 												type: "button",
+ 												className: ModelsSection_module_css_default["secondaryButton"],
+-												"aria-label": providerCopy(t("editProvider"), target),
++												"aria-label": credentialMissing ? t("addApiKey") : providerCopy(t("editProvider"), target),
+ 												onClick: () => {
+ 													setSavedTarget(void 0);
+ 													setAddOpen(false);
+ 													setEditing(open ? void 0 : target);
+ 												},
+-												children: t("edit")
++												children: credentialMissing ? t("addApiKey") : t("edit")
+ 											}), row.removable ? (0, react_jsx_runtime.jsx)("button", {
+ 												type: "button",
+ 												className: ModelsSection_module_css_default["dangerButton"],
+@@ -2346,7 +2731,7 @@ window.__ModuleLoader__.load({
  									})
  								}) : null
  							]
@@ -779,7 +830,7 @@ index c5252c1..4ac3cf6 100644
  							className: ModelsSection_module_css_default["addActions"],
  							children: (0, react_jsx_runtime.jsxs)("button", {
  								type: "button",
-@@ -2477,9 +2859,24 @@ window.__ModuleLoader__.load({
+@@ -2477,9 +2862,24 @@ window.__ModuleLoader__.load({
  		function assertNever$1(_value) {
  			throw new Error("unexpected DeepSeek onboarding state");
  		}
@@ -806,7 +857,7 @@ index c5252c1..4ac3cf6 100644
  		* @param props - settings-shell owner state and Models feature dependencies.
  		* @returns the onboarding modal or null when onboarding needs no intervention.
  		*/
-@@ -2488,6 +2885,16 @@ window.__ModuleLoader__.load({
+@@ -2488,6 +2888,16 @@ window.__ModuleLoader__.load({
  			const [apiKey, setApiKey] = (0, react.useState)(explicit);
  			const state = useModels((snapshot) => snapshot);
  			const readiness = onboardingReadiness(state);
@@ -823,7 +874,7 @@ index c5252c1..4ac3cf6 100644
  			(0, react.useEffect)(() => {
  				if ((automatic || explicit) && state.status === "idle") controller.load();
  			}, [
-@@ -2864,6 +3271,8 @@ window.__ModuleLoader__.load({
+@@ -2864,6 +3274,8 @@ window.__ModuleLoader__.load({
  			addCatalogExhausted: "Every catalog provider is already configured.",
  			addCustomUnavailable: "No API protocol is available to declare.",
  			provider: "Provider",
@@ -832,7 +883,15 @@ index c5252c1..4ac3cf6 100644
  			close: "Close",
  			cancel: "Cancel",
  			apply: "Apply",
-@@ -2901,6 +3310,14 @@ window.__ModuleLoader__.load({
+@@ -2871,6 +3283,7 @@ window.__ModuleLoader__.load({
+ 			savedProvider: "Saved {provider}.",
+ 			credentialConfigured: "API key configured",
+ 			credentialMissing: "API key missing",
++			addApiKey: "Add API key",
+ 			readOnly: "The settings document is read-only in this deployment.",
+ 			loadFailed: "Loading the provider directory failed",
+ 			conflict: "Someone else changed these settings while this card was open. Close it and reopen to edit the current values.",
+@@ -2901,6 +3314,14 @@ window.__ModuleLoader__.load({
  			modelInputTypes: "Input types",
  			modelInputText: "Text",
  			modelInputImage: "Image",
@@ -847,7 +906,7 @@ index c5252c1..4ac3cf6 100644
  			addModel: "Add model",
  			removeModel: "Delete model",
  			modelsEmpty: "No models will be shown in the selector. Unlisted IDs can still be sent directly.",
-@@ -2949,10 +3366,14 @@ window.__ModuleLoader__.load({
+@@ -2949,10 +3370,14 @@ window.__ModuleLoader__.load({
  			welcomeBody: "DeepSeek Harness 0.2 is still in preview, and many areas need continued improvement and refinement. We welcome feedback and suggestions from all developers and users. The new desktop app now targets a broad range of users, while developer-related advanced features can be enabled in the settings. DeepSeek Harness’s product features and plugin APIs are expected to continue rapid iteration and evolution, and will gradually stabilize over time.\n\nWe look forward to exploring the limits of intelligence together with users and developers around the world, building on open-source, reusable, and composable infrastructure. We welcome everyone to bring their ideas to life with DeepSeek Harness and participate in the community to enrich the plugin ecosystem.",
  			welcomeContinue: "Continue",
  			welcomeError: "The acknowledgement could not be saved. Please try again.",
@@ -865,7 +924,15 @@ index c5252c1..4ac3cf6 100644
  			onboardingSaving: "Saving…",
  			keyRequired: "Enter an API key to continue."
  		};
-@@ -3017,6 +3438,14 @@ window.__ModuleLoader__.load({
+@@ -2987,6 +3412,7 @@ window.__ModuleLoader__.load({
+ 			savedProvider: "已保存 {provider}。",
+ 			credentialConfigured: "API 密钥已配置",
+ 			credentialMissing: "API 密钥缺失",
++			addApiKey: "添加 API 密钥",
+ 			readOnly: "当前部署的设置文档为只读。",
+ 			loadFailed: "加载提供商目录失败",
+ 			conflict: "这张卡片打开期间，这些设置已被其他地方改动。请关闭后重新打开，在当前值上编辑。",
+@@ -3017,6 +3443,14 @@ window.__ModuleLoader__.load({
  			modelInputTypes: "输入类型",
  			modelInputText: "文本",
  			modelInputImage: "图片",
@@ -880,7 +947,7 @@ index c5252c1..4ac3cf6 100644
  			addModel: "添加模型",
  			removeModel: "删除模型",
  			modelsEmpty: "模型选择器中将不显示任何模型；目录外 ID 仍可直接发送。",
-@@ -3065,10 +3494,14 @@ window.__ModuleLoader__.load({
+@@ -3065,10 +3499,14 @@ window.__ModuleLoader__.load({
  			welcomeBody: "DeepSeek Harness 目前的 0.2 版本仍处于预览阶段，还有许多地方需要持续改进和打磨，希望听取广大开发者和用户的反馈建议。现在，新的桌面端面向广泛用户，开发者相关的进阶功能可在配置中开启使用。预计 DeepSeek Harness 的产品功能以及插件 API 都会继续快速迭代、持续演化，并逐渐趋于稳定。\n\n我们期待与全球用户和开发者一起，在开源、可复用、可组合的基础设施之上，共同探索智能上限。欢迎大家用 DeepSeek Harness 将想法变成现实，与社区一起丰富插件生态。",
  			welcomeContinue: "继续",
  			welcomeError: "暂时无法保存确认状态，请重试。",
@@ -898,7 +965,7 @@ index c5252c1..4ac3cf6 100644
  			onboardingSaving: "保存中…",
  			keyRequired: "请输入 API 密钥后继续。"
  		};
-@@ -4073,22 +4506,7 @@ window.__ModuleLoader__.load({
+@@ -4073,22 +4511,7 @@ window.__ModuleLoader__.load({
  					}
  				}
  			}, ModelsSection));

@@ -106,8 +106,7 @@ async function main(): Promise<void> {
           listScroll:list ? list.scrollHeight>list.clientHeight : false,
           buttonsVisible:[...document.querySelectorAll('.actions button:not([hidden])')].filter(b=>b.getBoundingClientRect().height).every(b=>{const r=b.getBoundingClientRect();return r.top>=cr.top-epsilon&&r.bottom<=cr.bottom+epsilon&&r.right<=vw+epsilon}),
           footerBottom:fr.bottom,
-          footerVisible:fr.bottom<=vh+epsilon,
-          wechatLabel:document.querySelector('#community-wechat').innerText }
+          footerVisible:fr.bottom<=vh+epsilon }
       })()`)
       const where = `${scenario} ${locale} ${theme} ${width}x${height} -> ${JSON.stringify(layout)}`
       assert.equal(layout.outerScroll, false, `page must not scroll as a whole: ${where}`)
@@ -133,20 +132,11 @@ async function main(): Promise<void> {
       const prefix = `${scenario}-${locale}-${theme}-${width}`
       await capture(contents, join(output, `${prefix}.png`))
       const before = contents.getURL()
-      await contents.executeJavaScript("document.getElementById('community-wechat').dispatchEvent(new PointerEvent('pointerenter'))")
-      await delay(60)
-      const popup = await contents.executeJavaScript(`(()=>{const p=document.getElementById('wechat-popover'),r=p.getBoundingClientRect(),img=document.getElementById('wechat-qr');return {open:p.matches(':popover-open'),image:img.complete&&img.naturalWidth===400,visible:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight}})()`)
-      assert.deepEqual(popup, { open: true, image: true, visible: true })
-      await capture(contents, join(output, `${prefix}-qr.png`))
-      contents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
-      contents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
-      await delay(60)
-      assert.equal(await contents.executeJavaScript("document.getElementById('wechat-popover').matches(':popover-open')"), false)
-      assert.equal(external.length, 0, 'WeChat must not open an external page')
+      assert.equal(external.length, 0, 'the page must not open anything on its own')
       await contents.executeJavaScript("document.getElementById('community-discord').click()")
       await delay(60)
       assert.equal(contents.getURL(), before)
-      assert.deepEqual(external.splice(0), ['https://discord.gg/7Xgf3qe3Qp'])
+      assert.deepEqual(external.splice(0), ['https://unoblox.ai/docs'])
       if (scenario === 'unidentified-plugin') {
         const action = await contents.executeJavaScript(`(() => {
           let action;

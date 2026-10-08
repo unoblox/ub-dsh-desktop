@@ -287,7 +287,7 @@ describe('info strip client', () => {
     expect(client.UnobloxInfoStrip({ view: undefined, t })).toBeNull()
     expect(client.UnobloxInfoStrip({ view: view({ key: 'set', billing: null, turn: null }), t })).toBeNull()
     const missing = client.UnobloxInfoStrip({ view: view({ key: 'missing', billing: null, turn: null }), t })
-    expect(pills(missing)).toEqual([{ text: 'No API key', description: 'Add your Unoblox API key in Settings → Models.' }])
+    expect(pills(missing)).toEqual([{ text: 'Add API key', description: 'No Unoblox API key yet. Click to open Settings › Models and add it.' }])
     // Balance known from another conversation, no reply here yet: balance only.
     expect(pills(client.UnobloxInfoStrip({ view: view({ ...routeBody, turn: null }), t })).map((pill) => pill.text)).toEqual(['₹250.50'])
   })

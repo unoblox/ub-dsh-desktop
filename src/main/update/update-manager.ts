@@ -103,7 +103,7 @@ export function startUpdateManager(options: { prepareToInstall: () => Promise<vo
   if (!supportsUpdates()) {
     transition({
       type: 'unsupported',
-      message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Updates are available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox release to update.'
+      message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Updates are available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox beta to update.'
     })
     return
   }
@@ -122,7 +122,7 @@ export async function checkForUpdates(manual = false): Promise<UpdateStatus> {
     transition(
       {
         type: 'unsupported',
-        message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Update checks are only available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox release to update.'
+        message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Update checks are only available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox beta to update.'
       },
       manual
     )

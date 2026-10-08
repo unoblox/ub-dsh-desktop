@@ -20,7 +20,6 @@ window.__ModuleLoader__.load({
     // Eligibility is install-scoped; changing this value never re-prompts.
     const WIZARD_VERSION = '2026-09-21.1'
     // Settings section the "configure a model" action opens.
-    const MODELS_SECTION_ID = 'models'
     // Credential reference the `unoblox` llm-pi-ai route in
     // build/dsh-desktop.patch.yml names as its apiKeyEnv. The key itself only
     // ever goes to the Harness credential store, never into configuration.
@@ -58,17 +57,18 @@ window.__ModuleLoader__.load({
       .dshDeskOnbLinkChip:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
       .dshDeskOnbLinkIcon{flex:none;display:inline-flex;color:var(--dsw-alias-label-secondary)}
       @media (prefers-reduced-motion:reduce){.dshDeskOnbLinkChip{transition:none}}
-      .dshDeskOnbHint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}
+      .dshDeskOnbHint{color:var(--dsw-alias-label-secondary);margin:0;font-size:12px;line-height:18px}
       .dshDeskOnbActions{flex:none;display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
       .dshDeskOnbKey{flex:none;display:flex;flex-direction:column;gap:6px;margin-top:16px}
       .dshDeskOnbKeyLabel{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary);line-height:20px}
       .dshDeskOnbKeyInput{box-sizing:border-box;width:100%;height:36px;padding:0 11px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}
       .dshDeskOnbKeyInput:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
+      .dshDeskOnbKeyInput:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
       .dshDeskOnbKeyInput::placeholder{color:var(--dsw-alias-label-dimmed)}
       .dshDeskOnbKeyInput:disabled{opacity:.6}
-      .dshDeskOnbKeyHint{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
+      .dshDeskOnbKeyHint{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
       .dshDeskOnbKeyHint a{color:var(--dsw-alias-brand-primary)}
-      .dshDeskOnbKeyError{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-danger,var(--dsw-alias-label-primary))}
+      .dshDeskOnbKeyError{margin:0;font-size:12px;line-height:18px;font-weight:500;color:var(--dsw-alias-state-error-primary)}
       @media (width<=560px){.dshDeskOnbContent{padding:20px}}
     `
 
@@ -85,7 +85,7 @@ window.__ModuleLoader__.load({
 
     const en = {
       brandName: 'Unoblox',
-      brandBy: 'desktop',
+      brandBy: 'Beta',
       step0Title: 'Welcome to Unoblox',
       declarationBody: 'Unoblox runs AI agents on your computer. In the workspace folders you choose, they can read and write files, run commands, search the web, and create documents, spreadsheets and slides. You stay in control: risky actions ask for your approval first.\n\nModels are served through the Unoblox gateway. Pick Unoblox Auto to let the router choose the best-value model for each request, or choose a specific model per conversation. Usage is billed to your prepaid ₹ balance.',
       desktopIntroTitle: 'About Unoblox',
@@ -95,8 +95,8 @@ window.__ModuleLoader__.load({
       docs: 'Docs',
       docsUrl: 'https://unoblox.ai/docs',
       desktopIntroFeedback: 'Questions or feedback? See the docs or reach us through unoblox.ai.',
-      configureModel: 'Configure a model',
-      later: 'Maybe later',
+      later: 'Not now',
+      unobloxKeyLater: 'You can add the key later in Settings › Models. Until then, Unoblox asks again each time it starts.',
       unobloxKeyLabel: 'Connect Unoblox',
       unobloxKeyPlaceholder: 'ub-gw-…',
       unobloxKeyHint: 'Paste a workspace API key from the Unoblox developer portal (API Keys). Requests draw from your prepaid ₹ balance.',
@@ -104,13 +104,13 @@ window.__ModuleLoader__.load({
       unobloxKeyLink: 'Get an API key',
       unobloxConnect: 'Connect and continue',
       unobloxConnecting: 'Connecting…',
-      unobloxKeyRequired: 'Enter your Unoblox API key to continue.',
+      unobloxKeyRequired: 'Enter your Unoblox API key to continue, or choose Not now.',
       unobloxKeyFailed: 'The API key could not be saved: {message}'
     }
 
     const zh = {
       brandName: 'Unoblox',
-      brandBy: '桌面版',
+      brandBy: '测试版',
       step0Title: '欢迎使用 Unoblox',
       declarationBody: 'Unoblox 在你的电脑上运行 AI 智能体。在你选择的工作区文件夹中，智能体可以读写文件、运行命令、搜索网页，并制作文档、表格和演示文稿。一切由你掌控：有风险的操作会先征求你的同意。\n\n模型通过 Unoblox 网关提供。选择 Unoblox Auto 可让路由为每个请求挑选性价比最高的模型，也可以为每个对话指定模型。用量从你的预付 ₹ 余额中扣费。',
       desktopIntroTitle: '关于 Unoblox',
@@ -120,8 +120,8 @@ window.__ModuleLoader__.load({
       docs: '文档',
       docsUrl: 'https://unoblox.ai/docs',
       desktopIntroFeedback: '有问题或建议？请查看文档，或通过 unoblox.ai 联系我们。',
-      configureModel: '去配置模型',
-      later: '稍后再说',
+      later: '暂不',
+      unobloxKeyLater: '也可以稍后在“设置 › 模型”中添加。在此之前，Unoblox 每次启动都会再次询问。',
       unobloxKeyLabel: '接入 Unoblox',
       unobloxKeyPlaceholder: 'ub-gw-…',
       unobloxKeyHint: '粘贴在 Unoblox 开发者门户（API Keys）创建的工作区 API Key。请求按 token 从预付 ₹ 余额中扣费。',
@@ -129,7 +129,7 @@ window.__ModuleLoader__.load({
       unobloxKeyLink: '获取 API Key',
       unobloxConnect: '接入并继续',
       unobloxConnecting: '接入中…',
-      unobloxKeyRequired: '请输入 Unoblox API Key 后继续。',
+      unobloxKeyRequired: '请输入 Unoblox API Key 后继续，或选择“暂不”。',
       unobloxKeyFailed: 'API Key 保存失败：{message}'
     }
 
@@ -199,13 +199,14 @@ window.__ModuleLoader__.load({
 
     // Unoblox API-key entry. Presentational: the parent owns the draft, busy
     // state, and the failure message.
-    function UnobloxKeyField({ t, value, busy, failure, onChange, onSubmit }) {
+    function UnobloxKeyField({ t, value, busy, failure, onChange, onSubmit, inputRef }) {
       return React.createElement(
         'div',
         { className: 'dshDeskOnbKey' },
         React.createElement('label', { className: 'dshDeskOnbKeyLabel', htmlFor: 'dshDeskOnbUnobloxKey' }, t('unobloxKeyLabel')),
         React.createElement('input', {
           id: 'dshDeskOnbUnobloxKey',
+          ref: inputRef,
           className: 'dshDeskOnbKeyInput',
           type: 'password',
           autoComplete: 'off',
@@ -226,8 +227,9 @@ window.__ModuleLoader__.load({
           t('unobloxKeyHint') + ' ',
           React.createElement('a', { href: UNOBLOX_KEYS_URL, target: '_blank', rel: 'noreferrer' }, t('unobloxKeyLink'))
         ),
+        React.createElement('p', { className: 'dshDeskOnbKeyHint' }, t('unobloxKeyLater')),
         React.createElement('p', { className: 'dshDeskOnbKeyHint' }, t('unobloxSearchPrivacy')),
-        React.createElement('p', { className: 'dshDeskOnbKeyError', 'aria-live': 'polite' }, failure ?? '')
+        React.createElement('p', { className: 'dshDeskOnbKeyError', role: 'alert', 'aria-live': 'polite' }, failure ?? '')
       )
     }
 
@@ -317,7 +319,7 @@ window.__ModuleLoader__.load({
     // ---------- the first-run notice ----------
 
     function DesktopOnboardingNotice(props) {
-      const { complete, openSection, t } = props
+      const { complete, t } = props
       const wizardScope = props.controller.scope
       const credentials = props.controller.credentials
       const [decision, setDecision] = useState('loading')
@@ -325,6 +327,7 @@ window.__ModuleLoader__.load({
       const [keyBusy, setKeyBusy] = useState(false)
       const [keyFailure, setKeyFailure] = useState(undefined)
       const titleRef = useRef(null)
+      const keyInputRef = useRef(null)
       const finishedRef = useRef(false)
 
       // Persist the acknowledgement, then hand the onboarding slot back. The
@@ -401,6 +404,13 @@ window.__ModuleLoader__.load({
 
       const connect = () => {
         if (keyBusy) return
+        // An empty field is answered at once, without the busy state that
+        // disables the input and would drop keyboard focus.
+        if (keyDraft.trim().length === 0) {
+          setKeyFailure(t('unobloxKeyRequired'))
+          keyInputRef.current?.focus()
+          return
+        }
         setKeyBusy(true)
         setKeyFailure(undefined)
         storeUnobloxKey(credentials, t, keyDraft).then((failure) => {
@@ -410,6 +420,8 @@ window.__ModuleLoader__.load({
           }
           setKeyFailure(failure)
           setKeyBusy(false)
+          // The input was disabled while saving; give focus back to it.
+          setTimeout(() => keyInputRef.current?.focus(), 0)
         })
       }
 
@@ -438,7 +450,8 @@ window.__ModuleLoader__.load({
             busy: keyBusy,
             failure: keyFailure,
             onChange: setKeyDraft,
-            onSubmit: connect
+            onSubmit: connect,
+            inputRef: keyInputRef
           }),
           React.createElement(
             'div',
@@ -447,17 +460,6 @@ window.__ModuleLoader__.load({
               Button,
               { variant: 'outline', disabled: keyBusy, onClick: () => finish() },
               t('later')
-            ),
-            React.createElement(
-              Button,
-              {
-                variant: 'outline',
-                disabled: keyBusy,
-                onClick: () => finish(() => {
-                  if (typeof openSection === 'function') openSection(MODELS_SECTION_ID)
-                })
-              },
-              t('configureModel')
             ),
             React.createElement(
               Button,

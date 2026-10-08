@@ -37,14 +37,14 @@ export function parseWindowsMenuRequest(name: unknown, x: unknown, y: unknown): 
  * Build one caption menu. The application menu carries every Desktop command
  * the former dropdown offered; the edit menu mirrors upstream.
  * @param zoomFactor - current page zoom, shown on the reset item.
- * @param state - checkbox states shown in the application menu.
+ * @param state - checkbox states and which commands the build offers.
  */
 export function windowsMenuTemplate(
   name: WindowsMenuName,
   locale: 'zh' | 'en',
   zoomFactor: number,
   actions: WindowsMenuActions,
-  state: { keepPhoneConnected: boolean } = { keepPhoneConnected: false }
+  state: { keepPhoneConnected: boolean; updatesAvailable?: boolean } = { keepPhoneConnected: false }
 ): MenuItemConstructorOptions[] {
   const zh = locale === 'zh'
   const command = (
@@ -112,7 +112,7 @@ export function windowsMenuTemplate(
       ]
     },
     { type: 'separator' },
-    command('check-for-updates', '检查更新…', 'Check for Updates…', 'Ctrl+U'),
+    ...(state.updatesAvailable === true ? [command('check-for-updates', '检查更新…', 'Check for Updates…', 'Ctrl+U')] : []),
     command('about', '关于 Unoblox', 'About Unoblox'),
     { type: 'separator' },
     command('quit', '退出', 'Exit')

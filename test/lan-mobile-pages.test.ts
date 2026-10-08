@@ -255,7 +255,7 @@ describe('LAN mobile page', () => {
     expect(desktop).toContain('id="copyTip"')
     expect(desktop).toContain('class="copy-icon"')
     expect(desktop).toContain('async function copyUrl()')
-    expect(desktop).toContain('Switching to WiFi connection mode')
+    expect(desktop).toContain('Switching to Wi-Fi')
     expect(desktop).toContain('class="mode-panel"')
     expect(desktop).toContain('class="tunnel-progress" aria-hidden="true"')
     expect(desktop).toContain('id="tunnelProgressValue" class="loading-value">0%</span>')
@@ -443,7 +443,7 @@ describe('LAN mobile page', () => {
     expect(elements.qrCode?.innerHTML).toBe('<svg id="lan"></svg>')
     expect(elements.qrLoading).toBe(loadingNode)
     expect(elements.qrLoading?.classList.contains('show')).toBe(false)
-    expect(elements.tunnelLoadingText?.textContent).toBe('Switching to WiFi connection mode')
+    expect(elements.tunnelLoadingText?.textContent).toBe('Switching to Wi-Fi')
     expect(toggleResults).toHaveLength(0)
   })
 
@@ -458,8 +458,8 @@ describe('LAN mobile page', () => {
     const phone = renderPairingPinPage('zh')
     expect(desktop).toContain('<html lang="zh-CN">')
     expect(desktop).toContain('连接移动设备')
-    expect(desktop).toContain('WiFi连接模式')
-    expect(desktop).toContain('互联网连接模式')
+    expect(desktop).toContain('Wi-Fi')
+    expect(desktop).toContain('互联网')
     expect(desktop).toContain('移动设备与电脑需连接至同一 WiFi，同步实时性高')
     expect(desktop).toContain('正在创建全球网络链接')
     expect(desktop).toContain('扫码即可连接')
@@ -516,10 +516,10 @@ describe('LAN mobile page', () => {
     expect(desktop).toContain('Your phone is currently connected to Unoblox.')
     expect(desktop).toContain('.manage-connected .connection-hint,.manage-connected .done{display:none}')
     expect(desktop).toContain(
-      'onclick="switchMode(false)" disabled>WiFi Connection Mode</button>'
+      'onclick="switchMode(false)" disabled>Wi-Fi</button>'
     )
     expect(desktop).toContain(
-      'onclick="switchMode(true)" disabled>Internet Connection Mode</button>'
+      'onclick="switchMode(true)" disabled>Internet</button>'
     )
     expect(desktop).toContain('.mode-btn:disabled{cursor:not-allowed;opacity:.5}')
     expect(desktop).toContain('id="fallbackLink" class="fallback-link hide"')

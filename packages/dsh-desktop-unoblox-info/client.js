@@ -25,6 +25,9 @@ window.__ModuleLoader__.load({
       .dshUbxInfoLabel{min-width:0;overflow:hidden;text-overflow:ellipsis}
       .dshUbxInfoBalance{flex:none}
       .dshUbxInfoModel .dshUbxInfoLabel{max-width:180px}
+      /* The missing key blocks every reply: error colour, clickable. */
+      .dshUbxInfoKey{flex:none;font:inherit;border:1px solid currentColor;background:none;cursor:pointer;color:var(--dsw-alias-state-error-primary)}
+      .dshUbxInfoKey:hover{background:var(--dsw-alias-interactive-bg-hover)}
     `
 
     const en = {
@@ -32,16 +35,16 @@ window.__ModuleLoader__.load({
       balance: 'Unoblox balance {amount}',
       model: 'Model {model}',
       modelRouted: 'Model {model}. {reason}',
-      keyMissing: 'No API key',
-      keyMissingHint: 'Add your Unoblox API key in Settings → Models.'
+      keyMissing: 'Add API key',
+      keyMissingHint: 'No Unoblox API key yet. Click to open Settings › Models and add it.'
     }
     const zh = {
       label: 'Unoblox',
       balance: 'Unoblox 余额 {amount}',
       model: '模型 {model}',
       modelRouted: '模型 {model}。{reason}',
-      keyMissing: '未设置 API 密钥',
-      keyMissingHint: '请在“设置 → 模型”中添加 Unoblox API 密钥。'
+      keyMissing: '添加 API 密钥',
+      keyMissingHint: '尚未设置 Unoblox API 密钥。点击打开“设置 › 模型”添加。'
     }
 
     // ---------- formatting (pure) ----------
@@ -142,7 +145,37 @@ window.__ModuleLoader__.load({
         }))
     }
 
-    function Pill({ icon, text, description, className }) {
+    /**
+     * Open Settings › Models. The settings shell keeps its open state private,
+     * so this does what a user would: the sidebar Settings button, then the
+     * Models row. Returns false when the button is not there (the tooltip
+     * still says where the key goes).
+     */
+    function openModelsSettings() {
+      const trigger = document.querySelector('button[class*="_trigger"][aria-haspopup="dialog"]')
+      if (trigger === null) return false
+      if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click()
+      let tries = 0
+      const pick = () => {
+        const row = Array.from(document.querySelectorAll('[class*="_navCell"]'))
+          .find((element) => element.textContent?.trim() === 'Models')
+        if (row !== undefined) row.click()
+        else if (++tries < 30) requestAnimationFrame(pick)
+      }
+      requestAnimationFrame(pick)
+      return true
+    }
+
+    function Pill({ icon, text, description, className, onActivate }) {
+      if (onActivate !== undefined) {
+        return h('button', {
+          type: 'button',
+          className: className === undefined ? 'dshUbxInfoPill' : `dshUbxInfoPill ${className}`,
+          title: description,
+          'aria-label': description,
+          onClick: onActivate
+        }, icon, h('span', { className: 'dshUbxInfoLabel' }, text))
+      }
       // Focusable so keyboard users reach the same detail the tooltip shows.
       return h('span', {
         className: className === undefined ? 'dshUbxInfoPill' : `dshUbxInfoPill ${className}`,
@@ -161,7 +194,7 @@ window.__ModuleLoader__.load({
       if (view === undefined) return null
       const pills = []
       if (view.key === 'missing') {
-        pills.push(h(Pill, { key: 'key', icon: h(IconWarningOutlineRegular, { size: 14 }), text: t('keyMissing'), description: t('keyMissingHint') }))
+        pills.push(h(Pill, { key: 'key', className: 'dshUbxInfoKey', icon: h(IconWarningOutlineRegular, { size: 14 }), text: t('keyMissing'), description: t('keyMissingHint'), onActivate: openModelsSettings }))
       }
       if (view.balanceInr !== undefined) {
         const amount = formatInr(view.balanceInr)

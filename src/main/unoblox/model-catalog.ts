@@ -27,7 +27,8 @@ export interface UnobloxModelRow {
   readonly input?: readonly ('text' | 'image')[]
 }
 
-export const UNOBLOX_AUTO_ROW: UnobloxModelRow = { id: 'unoblox/auto', name: 'Unoblox Auto' }
+// The picker shows names only, so the name says what Auto does.
+export const UNOBLOX_AUTO_ROW: UnobloxModelRow = { id: 'unoblox/auto', name: 'Unoblox Auto · best value' }
 
 // A listing far beyond today's 65 models is not a catalog a picker can use.
 const MAX_MODELS = 300

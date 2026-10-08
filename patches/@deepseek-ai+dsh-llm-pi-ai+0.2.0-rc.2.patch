@@ -1,5 +1,5 @@
 diff --git a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
-index 0c74b3a..bcff67a 100644
+index 0c74b3a..6dc4c77 100644
 --- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 @@ -1378,8 +1378,9 @@ function mapUsage(usage) {
@@ -178,7 +178,17 @@ index 0c74b3a..bcff67a 100644
  				}), model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]();
  				let exhausted = false;
  				try {
-@@ -2580,6 +2620,17 @@ function apply(ctx, config) {
+@@ -2566,6 +2606,9 @@ function apply(ctx, config) {
+ 		const credentials = ctx.get("credentials");
+ 		const hit = credentials !== void 0 ? (await credentials.resolve(ref))?.value : launchEnvironmentOf(ctx).get(ref)?.value;
+ 		if (hit !== void 0 && hit.length > 0) return assertUsableApiKey(hit, "llm-pi-ai", ref);
++		// Unoblox desktop: this text reaches the conversation as the turn's
++		// error, so say what the user can do rather than how the seam works.
++		if (ref === "UNOBLOX_API_KEY") throw new LlmError("Add your Unoblox API key to start: open Settings › Models, or paste it in the welcome dialog that opens when Unoblox starts.", "MISSING_CREDENTIAL");
+ 		throw new LlmError(`llm-pi-ai: no credential for provider route "${provider}"; its profile resolves ${ref}, which is not set — store ${ref} through the credentials service (the web Models page writes it) or export it, and remove apiKeyEnv only if this provider should authenticate from pi-ai's own environment discovery`, "MISSING_CREDENTIAL");
+ 	};
+ 	const auth = {
+@@ -2580,6 +2623,17 @@ function apply(ctx, config) {
  		resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, (hostPath) => ctx.get("fs")?.processPathFromHostPath(hostPath), ref),
  		onReplayDegrade: ({ provider, model, reason }) => {
  			ctx.logger.warn(`llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}"; sending that message as provider-neutral content (${reason})`);

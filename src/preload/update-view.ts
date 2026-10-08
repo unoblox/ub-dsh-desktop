@@ -73,8 +73,8 @@ export function updateHeadline(status: UpdateStatus, locale: UpdateLocale): Upda
       }
     case 'unsupported':
       return {
-        title: zh ? '此版本不支持自动更新' : 'Automatic updates unavailable',
-        description: zh ? '请从官网下载新版本。' : 'Download new versions from the website.'
+        title: zh ? '自动更新已关闭' : 'Automatic updates are off',
+        description: zh ? '安装最新的 Unoblox 测试版即可更新。' : 'Install the latest Unoblox beta to update.'
       }
     case 'error':
       return {

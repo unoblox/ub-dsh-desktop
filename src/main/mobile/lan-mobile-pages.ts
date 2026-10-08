@@ -249,7 +249,7 @@ export function renderMobileReconnectPage(
   const expired = options.expired === true
   const resumeUnavailable = options.resumeUnavailable === true
   const text = {
-    title: zh ? '重新连接 DSH' : 'Reconnect DSH',
+    title: zh ? '重新连接 Unoblox' : 'Reconnect to Unoblox',
     heading: zh ? '连接已断开' : 'Connection lost',
     action:
       connectionMode === 'tunnel' && !expired
@@ -305,14 +305,14 @@ export function renderDesktopPairingPage(options: {
     hint: zh ? '扫码即可连接。' : 'Scan the QR code to connect.',
     lanHint: zh
       ? '扫码即可连接。移动设备与电脑需连接至同一 WiFi，同步实时性高。'
-      : 'Scan to connect. Keep the phone and computer on the same WiFi.',
+      : 'Scan to connect. Keep the phone and computer on the same Wi-Fi.',
     tunnelHint: zh
       ? '移动设备通过互联网（如 4G/5G 或其他WiFi网络等）均可远程操控，同步实时性中等'
-      : 'Control remotely over the internet, including 4G/5G or other WiFi networks, with moderate real-time responsiveness.',
+      : 'Connect from anywhere over the internet (4G/5G or another Wi-Fi network), through a third-party tunnel. Slightly slower than Wi-Fi.',
     tunnelLoading: zh ? '正在创建全球网络链接' : 'Creating a global network link',
-    lanLoading: zh ? '正在切换至 WiFi 连接模式' : 'Switching to WiFi connection mode',
-    modeLan: zh ? 'WiFi连接模式' : 'WiFi Connection Mode',
-    modeTunnel: zh ? '互联网连接模式' : 'Internet Connection Mode',
+    lanLoading: zh ? '正在切换至 Wi-Fi 连接' : 'Switching to Wi-Fi',
+    modeLan: zh ? 'Wi-Fi' : 'Wi-Fi',
+    modeTunnel: zh ? '互联网' : 'Internet',
     manageHeading: zh ? '管理手机连接' : 'Manage phone connection',
     manageHint: zh ? '这台手机当前已连接到 Unoblox。' : 'Your phone is currently connected to Unoblox.',
     connected: zh ? '手机已连接' : 'Phone connected',
@@ -394,7 +394,7 @@ export function renderDesktopPairingPage(options: {
 export function renderPairingPinPage(locale: 'en' | 'zh'): string {
   const zh = locale === 'zh'
   const text = {
-    title: zh ? '连接 DSH' : 'Pairing DSH',
+    title: zh ? '连接 Unoblox' : 'Pair with Unoblox',
     heading: zh ? '输入连接密码' : 'Enter pairing password',
     hint: zh ? '在电脑「连接手机」窗口查看 6 位密码。' : 'Find the 6-digit password in Connect Phone on the computer.',
     submit: zh ? '连接' : 'Connect',
@@ -405,7 +405,7 @@ export function renderPairingPinPage(locale: 'en' | 'zh'): string {
     unavailable: zh ? '暂时无法连接桌面端，请先启动 Unoblox。' : 'Cannot reach the desktop. Start Unoblox and try again.',
     connecting: zh ? '正在连接…' : 'Connecting…'
   }
-  return `<!doctype html><html lang="${zh ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ffffff" media="(prefers-color-scheme:light)"><meta name="theme-color" content="#141416" media="(prefers-color-scheme:dark)"><title>${text.title}</title><style>:root{color-scheme:light;--bg:#fff;--card:#fff;--panel:#f7f8fa;--ink:#18191c;--muted:#81858c;--line:#e5e7eb;--brand:#4d6bfe}@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#141416;--card:#1d1d20;--panel:#202023;--ink:#f5f5f6;--muted:#95979d;--line:#303034;--brand:#6f86ff}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}.card{width:100%;max-width:340px;text-align:center}.logo{width:54px;height:54px;display:grid;place-items:center;margin:0 auto 22px;border:1px solid var(--line);border-radius:16px;background:var(--card)}.logo img{width:39px;height:22px;object-fit:contain}.logo .dark-logo{display:none}@media(prefers-color-scheme:dark){.logo .light-logo{display:none}.logo .dark-logo{display:block}}h1{font-size:24px;line-height:1.25;font-weight:600;margin:0 0 8px}p{margin:0;color:var(--muted)}input{width:100%;height:52px;margin-top:22px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);text-align:center;font:28px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.28em}button{width:100%;height:44px;margin-top:12px;border:1px solid var(--ink);border-radius:12px;background:var(--ink);color:var(--bg);font:inherit;font-weight:600;cursor:pointer}button.quiet{border-color:var(--line);background:transparent;color:var(--ink)}.note{min-height:20px;margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--panel);color:#e34d59;font-size:13px}button:disabled{opacity:.55;cursor:default}</style></head><body><div class="card"><div class="logo"><img class="light-logo" src="/brand-logo/light" alt="DSH"><img class="dark-logo" src="/brand-logo/dark" alt="DSH"></div><h1>${text.heading}</h1><p>${text.hint}</p><form onsubmit="return submitPin(event)"><input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\\d{6}" required><button id="submit" type="submit">${text.submit}</button></form><button class="quiet" type="button" onclick="showPinOnDesktop()">${text.showPin}</button><div id="status" class="note"></div></div><script>const T=${JSON.stringify(text)};
+  return `<!doctype html><html lang="${zh ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ffffff" media="(prefers-color-scheme:light)"><meta name="theme-color" content="#141416" media="(prefers-color-scheme:dark)"><title>${text.title}</title><style>:root{color-scheme:light;--bg:#fff;--card:#fff;--panel:#f7f8fa;--ink:#18191c;--muted:#81858c;--line:#e5e7eb;--brand:#4d6bfe}@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#141416;--card:#1d1d20;--panel:#202023;--ink:#f5f5f6;--muted:#95979d;--line:#303034;--brand:#6f86ff}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}.card{width:100%;max-width:340px;text-align:center}.logo{width:54px;height:54px;display:grid;place-items:center;margin:0 auto 22px;border:1px solid var(--line);border-radius:16px;background:var(--card)}.logo img{width:39px;height:22px;object-fit:contain}.logo .dark-logo{display:none}@media(prefers-color-scheme:dark){.logo .light-logo{display:none}.logo .dark-logo{display:block}}h1{font-size:24px;line-height:1.25;font-weight:600;margin:0 0 8px}p{margin:0;color:var(--muted)}input{width:100%;height:52px;margin-top:22px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);text-align:center;font:28px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.28em}button{width:100%;height:44px;margin-top:12px;border:1px solid var(--ink);border-radius:12px;background:var(--ink);color:var(--bg);font:inherit;font-weight:600;cursor:pointer}button.quiet{border-color:var(--line);background:transparent;color:var(--ink)}.note{min-height:20px;margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--panel);color:#e34d59;font-size:13px}button:disabled{opacity:.55;cursor:default}</style></head><body><div class="card"><div class="logo"><img class="light-logo" src="/brand-logo/light" alt="Unoblox"><img class="dark-logo" src="/brand-logo/dark" alt="Unoblox"></div><h1>${text.heading}</h1><p>${text.hint}</p><form onsubmit="return submitPin(event)"><input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\\d{6}" required><button id="submit" type="submit">${text.submit}</button></form><button class="quiet" type="button" onclick="showPinOnDesktop()">${text.showPin}</button><div id="status" class="note"></div></div><script>const T=${JSON.stringify(text)};
 async function submitPin(event){event.preventDefault();const pin=document.getElementById('pin').value.trim(),status=document.getElementById('status'),submit=document.getElementById('submit');submit.disabled=true;status.textContent=T.connecting;try{const r=await fetch('/pair/verify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pin})});const j=await r.json();if(r.status===429){const minutes=Math.max(1,Math.ceil(Number(j.retryAfter||r.headers.get('retry-after')||60)/60));status.textContent=T.rateLimited.replace('{n}',String(minutes));return false}if(j.ok){location.replace('/');return false}status.textContent=j.rescan||j.error==='expired'?T.expired:T.invalid}catch{status.textContent=T.unavailable}finally{submit.disabled=false}return false}
 async function showPinOnDesktop(){try{await fetch('/pair/retry',{method:'POST',headers:{'content-type':'application/json'},body:'{}'})}catch{}}</script></body></html>`
 }

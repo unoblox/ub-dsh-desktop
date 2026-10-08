@@ -3,6 +3,7 @@ import { applyMacosWindowBackdrop } from './macos-window-backdrop'
 import { checkBlockingPluginUpdates, selectPluginRecoveryTarget, PluginRecoveryEvidence, planPluginRecovery, runPluginRecoveryPlan, type PluginRecoveryCheck } from './plugin-recovery-market'
 import { RepairAgentService, type CrashEvidence } from './repair-agent'
 import { disableSpellcheckDownloads, noAutomaticRegistryLookup } from './network-privacy'
+import { UNOBLOX_UPDATE_FEED_CONFIGURED } from './update/update-policy'
 import { catalogEnvironment, catalogForLaunch, refreshUnobloxCatalog, type ResolvedCatalog } from './unoblox/model-catalog'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
@@ -1752,7 +1753,7 @@ function registerHarnessHandlers(): void {
     const template = windowsMenuTemplate(request.name, harnessLocale(), zoomFactor, {
       run: (command) => void executeDesktopMenuCommand(command).catch(showUnexpectedError),
       sendEditingKey: (key) => sendEditingKey(window, key)
-    }, { keepPhoneConnected: mobileBridgeDemand.keepConnected })
+    }, { keepPhoneConnected: mobileBridgeDemand.keepConnected, updatesAvailable: UNOBLOX_UPDATE_FEED_CONFIGURED })
     // The page reports CSS pixels; the popup is placed in window DIPs.
     return new Promise<void>((resolve) => {
       Menu.buildFromTemplate(template).popup({
@@ -1784,7 +1785,8 @@ function registerHarnessHandlers(): void {
       desktopVersion: app.getVersion(),
       harnessVersion:
         bundledHarnessVersion(bundledRuntimeRoot()) ?? (locale === 'zh' ? '未知' : 'Unknown'),
-      locale
+      locale,
+      updatesAvailable: UNOBLOX_UPDATE_FEED_CONFIGURED
     }
   })
 }
@@ -1819,7 +1821,8 @@ async function showAbout(window: BrowserWindow): Promise<void> {
     desktopVersion: app.getVersion(),
     harnessVersion:
       bundledHarnessVersion(bundledRuntimeRoot()) ?? (locale === 'zh' ? '未知' : 'Unknown'),
-    locale
+    locale,
+    updatesAvailable: UNOBLOX_UPDATE_FEED_CONFIGURED
   }
   if (window && !window.isDestroyed() && window.webContents && !window.webContents.isDestroyed()) {
     try {
@@ -1840,12 +1843,15 @@ async function showAbout(window: BrowserWindow): Promise<void> {
       bundledHarnessVersion(bundledRuntimeRoot()),
       locale
     ),
-    buttons: [checkForUpdatesLabel, locale === 'zh' ? '关闭' : 'Close'],
-    defaultId: 1,
-    cancelId: 1,
+    // Without an update feed there is nothing to check (update-policy.ts).
+    buttons: UNOBLOX_UPDATE_FEED_CONFIGURED
+      ? [checkForUpdatesLabel, locale === 'zh' ? '关闭' : 'Close']
+      : [locale === 'zh' ? '关闭' : 'Close'],
+    defaultId: UNOBLOX_UPDATE_FEED_CONFIGURED ? 1 : 0,
+    cancelId: UNOBLOX_UPDATE_FEED_CONFIGURED ? 1 : 0,
     noLink: true
   })
-  if (result.response === 0) await checkForUpdates(true)
+  if (UNOBLOX_UPDATE_FEED_CONFIGURED && result.response === 0) await checkForUpdates(true)
 }
 
 /**
@@ -3092,11 +3098,13 @@ function installMenu(): void {
                 }
               }
             },
-            {
-              label: checkForUpdatesLabel,
-              accelerator: 'CmdOrCtrl+U',
-              click: () => void checkForUpdates(true).catch(showUnexpectedError)
-            },
+            ...(UNOBLOX_UPDATE_FEED_CONFIGURED
+              ? [{
+                label: checkForUpdatesLabel,
+                accelerator: 'CmdOrCtrl+U',
+                click: () => void checkForUpdates(true).catch(showUnexpectedError)
+              }]
+              : []),
             { type: 'separator' as const },
             { role: 'hide' as const },
             { role: 'hideOthers' as const },
@@ -3135,7 +3143,7 @@ function installMenu(): void {
           label: isChinese ? '查看 Harness 日志' : 'Show Harness Log',
           click: () => shell.showItemInFolder(join(app.getPath('logs'), 'harness.log'))
         },
-        ...(process.platform === 'darwin'
+        ...(process.platform === 'darwin' || !UNOBLOX_UPDATE_FEED_CONFIGURED
           ? []
           : [
             { type: 'separator' as const },
@@ -3261,8 +3269,8 @@ async function showMobilePairing(): Promise<void> {
     const options: MessageBoxOptions = {
       type: 'question',
       message: 'No local network found',
-      detail: 'Your phone can still connect over the internet. This sends the connection through a third-party tunnel (Cloudflare, or Pinggy if Cloudflare is unavailable), open while pairing is open or a phone is connected.',
-      buttons: ['Connect over the Internet', 'Cancel'],
+      detail: 'Your phone can still connect over the internet, through a third-party tunnel (Cloudflare, or Pinggy if Cloudflare is unavailable). The tunnel stays open only while the pairing window is open or a phone is connected.',
+      buttons: ['Use Internet', 'Cancel'],
       defaultId: 0,
       cancelId: 1
     }

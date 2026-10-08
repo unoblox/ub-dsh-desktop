@@ -7,7 +7,7 @@ import { desktopResourceUrl, resolveDesktopResourceName } from '../src/main/desk
 describe('resolveDesktopResourceName', () => {
   it('names a page or asset in the desktop resources', () => {
     expect(resolveDesktopResourceName('dsh-desktop://desktop/safe-mode.html?state=%7B%7D')).toBe('safe-mode.html')
-    expect(resolveDesktopResourceName('dsh-desktop://desktop/community-wechat-qr.png')).toBe('community-wechat-qr.png')
+    expect(resolveDesktopResourceName('dsh-desktop://desktop/dsh-loader.gif')).toBe('dsh-loader.gif')
     expect(resolveDesktopResourceName('dsh-desktop://desktop/app-icon.png#x')).toBe('app-icon.png')
   })
 

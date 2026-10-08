@@ -266,6 +266,17 @@ export function terminateChildProcess(
   }, graceMs).unref?.()
 }
 
+/**
+ * cloudflared prints the trycloudflare URL before its first edge connection is
+ * up. Until then Cloudflare answers the URL with error 1033 ("unable to
+ * resolve" the tunnel), so the tunnel counts as online only after this line.
+ * Current builds log "Registered tunnel connection connIndex=0 …"; older ones
+ * logged "Connection <uuid> registered".
+ */
+export function reportsRegisteredConnection(text: string): boolean {
+  return /Registered tunnel connection|Connection [0-9a-f-]+ registered/i.test(text)
+}
+
 export async function startCloudflareQuickTunnel(options: {
   port: number
   binaryPath: string
@@ -289,12 +300,14 @@ export async function startCloudflareQuickTunnel(options: {
     }, timeoutMs)
 
     let capturedUrl: string | null = null
+    let registered = false
 
     const handleOutput = (chunk: Buffer | string) => {
       const text = chunk.toString()
       const extracted = extractTryCloudflareUrl(text)
-      if (extracted && !capturedUrl) {
-        capturedUrl = extracted
+      if (extracted && !capturedUrl) capturedUrl = extracted
+      if (reportsRegisteredConnection(text)) registered = true
+      if (capturedUrl && registered && !resolved) {
         log?.(`[cloudflared] Tunnel online: ${capturedUrl}`)
         resolved = true
         clearTimeout(timeoutTimer)

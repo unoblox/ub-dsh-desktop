@@ -60,6 +60,14 @@ function appDataDirectory(home) {
   return join(home, '.config')
 }
 
+// Only Linux gets the throwaway HOME (Electron follows XDG_CONFIG_HOME there).
+// Elsewhere the app keeps the real HOME, so its data folder is the one
+// appDataDirectory() names.
+function launchEnvironment(home) {
+  const env = { ...process.env, ELECTRON_ENABLE_LOGGING: '1' }
+  return process.platform === 'linux' ? { ...env, HOME: home, XDG_CONFIG_HOME: join(home, '.config') } : env
+}
+
 function fail(message) {
   console.error(`smoke: FAIL ${message}`)
   process.exitCode = 1
@@ -75,7 +83,7 @@ if (process.getuid?.() === 0) args.push('--no-sandbox')
 const output = []
 const child = spawn(executable, args, {
   cwd: home,
-  env: { ...process.env, HOME: home, XDG_CONFIG_HOME: config, ELECTRON_ENABLE_LOGGING: '1' },
+  env: launchEnvironment(home),
   stdio: ['ignore', 'pipe', 'pipe']
 })
 child.stdout.on('data', (chunk) => output.push(String(chunk)))
@@ -154,6 +162,10 @@ try {
   console.error(output.join('').split('\n').slice(-60).join('\n'))
   const log = findLog()
   if (log !== undefined) console.error(readFileSync(log, 'utf8').split('\n').slice(-80).join('\n'))
+  else {
+    const appData = appDataDirectory(home)
+    console.error(`no harness.log under ${appData}: ${existsSync(appData) ? readdirSync(appData).join(', ') : 'missing'}`)
+  }
 } finally {
   if (!exited && process.platform === 'win32') {
     // Signals reach only the main process on Windows; end the Harness child too.

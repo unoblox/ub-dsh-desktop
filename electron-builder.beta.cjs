@@ -36,6 +36,23 @@ module.exports = {
     identity: '-',
     hardenedRuntime: false
   },
+  linux: {
+    ...packageJson.build.linux,
+    // The .deb installs electron-builder's AppArmor profile and sets up the
+    // chrome-sandbox helper, which Ubuntu 24.04+ needs for Chromium's
+    // sandbox; the AppImage cannot. Both ship.
+    target: [
+      { target: 'AppImage', arch: ['x64'] },
+      { target: 'deb', arch: ['x64'] }
+    ],
+    maintainer: 'Unoblox <hello@unoblox.ai>',
+    vendor: 'Unoblox'
+  },
+  deb: {
+    // apt shows this name; the repository package name is dsh-desktop.
+    packageName: 'unoblox',
+    artifactName: 'Unoblox-Beta-${version}-linux-${arch}.${ext}'
+  },
   dmg: {
     ...packageJson.build.dmg,
     title: 'Unoblox Beta',

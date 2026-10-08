@@ -21,14 +21,21 @@ You only do steps 3 and 4 once. If macOS ever says the app is "damaged", the dow
 
 ## Linux (64-bit)
 
+**Ubuntu, Debian and derivatives (recommended):**
+
+1. Download `Unoblox-Beta-…-linux-amd64.deb`.
+2. Install it: double-click it to open Software Install, or run `sudo apt install ./Unoblox-Beta-*-linux-amd64.deb`.
+3. Open **Unoblox** from your applications menu.
+
+The package sets up Chromium's sandbox (including the AppArmor profile Ubuntu 24.04 and later need), so it starts without extra steps.
+
+**Other distributions (AppImage):**
+
 1. Download `Unoblox-Beta-…-linux-x86_64.AppImage`.
 2. Make it executable: right-click › Properties › Permissions › "Allow executing file as program", or run `chmod +x Unoblox-Beta-*.AppImage`.
 3. Double-click it.
 
-If nothing happens:
-
-- **Ubuntu 22.04 or later** needs FUSE 2 for AppImages: `sudo apt install libfuse2t64` (24.04 and later) or `sudo apt install libfuse2` (22.04).
-- **Ubuntu 24.04 or later** may stop Chromium's sandbox from starting. Run it once from a terminal to see the message; if it mentions the sandbox, start it with `./Unoblox-Beta-*.AppImage --no-sandbox`. A `.deb` package that sets the sandbox up properly is planned.
+If the AppImage does not start, it usually needs FUSE 2 (`sudo apt install libfuse2t64` on Ubuntu 24.04+, `libfuse2` on 22.04). On Ubuntu 24.04+ the AppImage also cannot use Chromium's sandbox; use the `.deb` there.
 
 ## Privacy
 

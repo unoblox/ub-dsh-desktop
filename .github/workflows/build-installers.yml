@@ -46,7 +46,7 @@ jobs:
               {"label": "Windows x64", "family": "windows", "runner": "windows-2022", "platform": "win32", "arch": "x64",
                "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "unpacked": "dist-beta/win-unpacked", "files": "dist-beta/*-setup.exe"},
               {"label": "Linux x64", "family": "linux", "runner": "ubuntu-24.04", "platform": "linux", "arch": "x64",
-               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "unpacked": "dist-beta/linux-unpacked", "files": "dist-beta/*.AppImage"}
+               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "unpacked": "/opt/Unoblox", "files": "dist-beta/*.AppImage\ndist-beta/*.deb"}
             ]
         run: echo "include=$(jq -c --arg t "$TARGET" '[.[] | select($t == "all" or .family == $t)]' <<< "$ROWS")" >> "$GITHUB_OUTPUT"
 
@@ -89,15 +89,14 @@ jobs:
           test -L "$mount/Applications"
           ls -la "$mount" "$mount/.background" || true
           hdiutil detach "$mount"
-      - name: Prepare the Linux sandbox helper
+      - name: Install the .deb (Linux)
         if: matrix.platform == 'linux'
+        # The smoke test runs the installed package, as users get it. On this
+        # Ubuntu 24.04 runner, Chromium's sandbox works only because the
+        # package installs its AppArmor profile, so this also checks that.
         run: |
-          sudo apt-get update && sudo apt-get install -y xvfb
-          # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's
-          # sandbox prefers, so it falls back to the SUID helper, which must be
-          # root-owned with mode 4755 (as a system package install sets it).
-          sudo chown root:root ${{ matrix.unpacked }}/chrome-sandbox
-          sudo chmod 4755 ${{ matrix.unpacked }}/chrome-sandbox
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./dist-beta/*.deb
       - name: Smoke test the packaged app
         shell: bash
         timeout-minutes: 5

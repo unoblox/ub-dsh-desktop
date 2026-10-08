@@ -361,6 +361,8 @@ describe('GitHub release contract', () => {
       publish: unknown
       directories: { output: string }
       mac: { identity: string; hardenedRuntime: boolean; target: string[] }
+      linux: { target: Array<{ target: string }>; maintainer: string }
+      deb: { packageName: string }
       dmg: { background: string; contents: Array<{ x: number; y: number; type: string; path?: string }> }
     }
     const layout = require('../build/brand/dmg-layout.json') as { app: { x: number; y: number }; applications: { x: number; y: number } }
@@ -373,6 +375,11 @@ describe('GitHub release contract', () => {
     expect(beta.directories.output).toBe('dist-beta')
     // Ad-hoc: a valid seal without a certificate (an unsigned build reads as "damaged").
     expect(beta.mac).toMatchObject({ identity: '-', hardenedRuntime: false, target: ['dmg'] })
+    // Ubuntu 24.04+ needs the .deb's AppArmor profile for Chromium's sandbox.
+    expect(beta.linux.target.map((entry) => entry.target)).toEqual(['AppImage', 'deb'])
+    expect(beta.linux.maintainer).toBe('Unoblox <hello@unoblox.ai>')
+    expect(beta.deb.packageName).toBe('unoblox')
+    expect(workflow).toContain('sudo apt-get install -y xvfb ./dist-beta/*.deb')
     expect(beta.dmg.background).toBe('build/dmg-background.png')
     expect(beta.dmg.contents).toEqual([
       { ...layout.app, type: 'file' },

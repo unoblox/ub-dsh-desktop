@@ -30,7 +30,7 @@ Every model call goes through the Unoblox gateway with one API key and one prepa
 | --- | --- |
 | macOS (Apple Silicon, M1 or later) | `Unoblox-Beta-<version>-mac-arm64.dmg` |
 | Windows 10/11 x64 | `Unoblox-Beta-<version>-windows-x64-setup.exe` (NSIS) |
-| Linux x64 | `Unoblox-Beta-<version>-linux-x86_64.AppImage` |
+| Linux x64 | `Unoblox-Beta-<version>-linux-amd64.deb` (Ubuntu, Debian) or `Unoblox-Beta-<version>-linux-x86_64.AppImage` |
 
 Beta installers are built by the **Build beta installers** workflow in this repository's Actions tab. Step-by-step instructions, including the one-time first-open prompt on each system, are in [docs/install.md](docs/install.md). You need an Unoblox API key from the Unoblox developer portal; the app asks for it on first launch.
 

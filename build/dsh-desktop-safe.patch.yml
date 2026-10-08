@@ -45,6 +45,66 @@
     provider: unoblox
     model: unoblox/auto
 
+# Privacy: Unoblox collects nothing from the user's machine and talks to no
+# server on its own except the Unoblox API. Upstream rows that would send data
+# elsewhere are switched off here, not left to a profile-name check:
+# - session-telemetry-otel / otel: a Like/Dislike (or /feedback) uploaded the
+#   whole session log with an anonymous user id to DeepSeek's OTel collector.
+#   Feedback itself stays local (message-feedback keeps working).
+# - product-analytics / desktop-product-telemetry: usage events (model,
+#   clicks, plugins, device and user ids) to the same collector; dormant only
+#   because the profile is not named "desktop".
+# - deepseek-account / account-controller: DeepSeek platform sign-in and
+#   balance (platform.deepseek.com, api.deepseek.com); unused without the
+#   DeepSeek routes.
+# - deepseek-llm-api-extensions / session-log-deepseek /
+#   plugin-package-inventory-deepseek: attach the session log and plugin list
+#   to DeepSeek API requests; the DeepSeek routes are disabled anyway.
+# - message-feedback / ui-message-feedback / command-feedback: the Like and
+#   Dislike buttons, feedback dialog and /feedback existed to send the session
+#   to DeepSeek; with that gone they would promise a submission that goes
+#   nowhere, so they are removed.
+# - ui-plugin-manager: no npm-registry ping when the install dialog opens.
+- id: session-telemetry-otel
+  disabled: true
+
+- id: otel
+  disabled: true
+
+- id: product-analytics
+  disabled: true
+
+- id: desktop-product-telemetry
+  disabled: true
+
+- id: deepseek-account
+  disabled: true
+
+- id: account-controller
+  disabled: true
+
+- id: deepseek-llm-api-extensions
+  disabled: true
+
+- id: session-log-deepseek
+  disabled: true
+
+- id: plugin-package-inventory-deepseek
+  disabled: true
+
+- id: message-feedback
+  disabled: true
+
+- id: ui-message-feedback
+  disabled: true
+
+- id: command-feedback
+  disabled: true
+
+- id: ui-plugin-manager
+  config:
+    registryProbeEnabled: false
+
 - id: web-search-deepseek
   disabled: true
 

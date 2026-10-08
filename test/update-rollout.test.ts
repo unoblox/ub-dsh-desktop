@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../src/main/desktop-service', () => ({ checkDesktopUpdate: mocks.policy }))
 vi.mock('electron-updater', () => ({ default: { autoUpdater: mocks.updater } }))
 vi.mock('electron', () => ({ app: { isPackaged: true, getVersion: () => '0.8.0', getPath: () => '/nonexistent-desktop-test', isReady: () => true }, BrowserWindow: { getAllWindows: () => [] }, powerMonitor: { on: vi.fn(), removeListener: vi.fn() }, ipcMain: { handle: vi.fn() } }))
-vi.mock('../src/main/update/update-policy', async importOriginal => ({ ...await importOriginal<object>(), supportsAutoUpdates: () => true }))
+// These tests exercise the updater for when an Unoblox feed exists.
+vi.mock('../src/main/update/update-policy', async importOriginal => ({ ...await importOriginal<object>(), supportsAutoUpdates: () => true, UNOBLOX_UPDATE_FEED_CONFIGURED: true }))
 let manager: typeof import('../src/main/update/update-manager')
 beforeEach(async () => {
   vi.resetModules(); vi.clearAllMocks(); mocks.handlers.clear()

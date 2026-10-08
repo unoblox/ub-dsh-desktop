@@ -61,10 +61,45 @@ export function validatePublishedCatalog(value) {
   return structuredClone(value)
 }
 
-export function createCatalogReader({ fetch: fetchCatalog = globalThis.fetch, url = DEFAULT_CATALOG_URL, now = Date.now } = {}) {
+/** An empty catalog for a first launch that has never fetched one. */
+const EMPTY_CATALOG = Object.freeze({ schemaVersion: 2, kind: 'catalog', categories: [], workbenches: [] })
+
+/**
+ * @param {object} [options]
+ * @param {string} [options.cachePath] - file keeping the last good catalog.
+ * @param {boolean} [options.fetchOnlyWhenForced] - never touch the network
+ *   unless the caller forces a refresh (the user opened the market or pressed
+ *   refresh); plain reads serve the in-memory or on-disk copy, or an empty
+ *   catalog marked `offline`. Unoblox makes no silent network calls.
+ */
+export function createCatalogReader({ fetch: fetchCatalog = globalThis.fetch, url = DEFAULT_CATALOG_URL, now = Date.now, cachePath, fetchOnlyWhenForced = false } = {}) {
   let cached
   let fetchedAt = 0
   let pending
+  let diskRead = false
+
+  const readDisk = async () => {
+    if (diskRead || cachePath === undefined) return
+    diskRead = true
+    try {
+      const { readFile } = await import('node:fs/promises')
+      cached ??= validatePublishedCatalog(JSON.parse(await readFile(cachePath, 'utf8')))
+    } catch {
+      // No saved copy yet, or an unusable one: the next forced refresh replaces it.
+    }
+  }
+  const writeDisk = async (catalog) => {
+    if (cachePath === undefined) return
+    try {
+      const { mkdir, rename, writeFile } = await import('node:fs/promises')
+      const { dirname } = await import('node:path')
+      await mkdir(dirname(cachePath), { recursive: true })
+      await writeFile(`${cachePath}.tmp`, JSON.stringify(catalog))
+      await rename(`${cachePath}.tmp`, cachePath)
+    } catch {
+      // The fresh catalog still serves this session; only the next launch loses it.
+    }
+  }
 
   const fetchFresh = async () => {
     const controller = new AbortController()
@@ -80,11 +115,18 @@ export function createCatalogReader({ fetch: fetchCatalog = globalThis.fetch, ur
       try { value = JSON.parse(new TextDecoder().decode(bytes)) } catch { fail('Workbench catalog returned invalid JSON.') }
       cached = validatePublishedCatalog(value)
       fetchedAt = now()
+      await writeDisk(cached)
       return { catalog: structuredClone(cached), stale: false }
     } finally { clearTimeout(timeout) }
   }
 
   return async function readCatalog({ force = false } = {}) {
+    if (fetchOnlyWhenForced && !force) {
+      await readDisk()
+      return cached
+        ? { catalog: structuredClone(cached), stale: now() - fetchedAt >= CACHE_MAX_AGE_MS }
+        : { catalog: structuredClone(EMPTY_CATALOG), stale: true, offline: true }
+    }
     if (!force && cached && now() - fetchedAt < CACHE_MAX_AGE_MS) return { catalog: structuredClone(cached), stale: false }
     if (!pending) pending = fetchFresh().finally(() => { pending = undefined })
     try { return await pending } catch (error) {

@@ -7,6 +7,7 @@ import {
   AUTO_INSTALL_ON_APP_QUIT,
   shouldCheckAfterResume,
   supportsAutoUpdates,
+  UNOBLOX_UPDATE_FEED_CONFIGURED,
   UPDATE_CHECK_INTERVAL_MS,
   UPDATE_STARTUP_DELAY_MS,
   UPDATE_STARTUP_JITTER_MS
@@ -61,7 +62,7 @@ export function registerUpdateHandlers(): void {
   ipcMain.handle('updates:install', () => installDownloadedUpdate())
   ipcMain.handle('updates:skip', (_event, version: unknown) => skipUpdate(version))
   ipcMain.handle('updates:download', () => downloadAvailableUpdate())
-  ipcMain.handle('updates:list-versions', () => fetchAvailableReleases(app.getVersion()))
+  ipcMain.handle('updates:list-versions', () => supportsUpdates() ? fetchAvailableReleases(app.getVersion()) : [])
   ipcMain.handle('updates:install-version', (_event, version: unknown) =>
     installSpecificVersion(version)
   )
@@ -102,7 +103,7 @@ export function startUpdateManager(options: { prepareToInstall: () => Promise<vo
   if (!supportsUpdates()) {
     transition({
       type: 'unsupported',
-      message: 'Updates are available in installed macOS and Windows builds.'
+      message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Updates are available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox release to update.'
     })
     return
   }
@@ -121,7 +122,7 @@ export async function checkForUpdates(manual = false): Promise<UpdateStatus> {
     transition(
       {
         type: 'unsupported',
-        message: 'Update checks are only available in installed macOS and Windows builds.'
+        message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Update checks are only available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox release to update.'
       },
       manual
     )
@@ -329,7 +330,7 @@ function checkAfterResume(): void {
 }
 
 function supportsUpdates(): boolean {
-  return supportsAutoUpdates(app.isPackaged, process.platform)
+  return UNOBLOX_UPDATE_FEED_CONFIGURED && supportsAutoUpdates(app.isPackaged, process.platform)
 }
 
 function errorMessage(error: unknown): string {

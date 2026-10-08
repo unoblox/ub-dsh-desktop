@@ -57,7 +57,9 @@ async function readPayload(request, maximum = MAX_STATE_BYTES, tooLarge = 'Workb
 
 export function apply(ctx, config) {
   const store = createStateStore(config.root)
-  const readCatalog = createCatalogReader()
+  // The online market catalog is fetched only on an explicit refresh (the user
+  // opens the market or presses refresh); startup serves the saved copy.
+  const readCatalog = createCatalogReader({ cachePath: join(config.root, 'market-catalog.json'), fetchOnlyWhenForced: true })
   const marketInstalls = createMarketInstallStore(config.root)
   // Providers must use the same persisted ownership as Desktop, never a second
   // settings namespace that could accidentally authorize an ordinary session.
@@ -189,7 +191,10 @@ export function apply(ctx, config) {
         try {
           const id = await catalogIdFrom(request)
           // The install source always comes from the Awesome catalog, never from the request.
+          // Installing is the user's own request, so it may refresh the market
+          // catalog when the saved copy does not list the entry yet.
           const entry = (await readCatalog()).catalog.workbenches.find((item) => item.id === id)
+            ?? (await readCatalog({ force: true })).catalog.workbenches.find((item) => item.id === id)
           if (!entry) throw new MarketInstallError('This workbench is no longer listed in the workbench market.', 404)
           const target = await resolveInstallTarget(entry)
           try {

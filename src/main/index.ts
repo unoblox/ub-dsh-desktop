@@ -2,6 +2,7 @@ import { initializeDesktopService, desktopDiagnostics } from './desktop-service'
 import { applyMacosWindowBackdrop } from './macos-window-backdrop'
 import { checkBlockingPluginUpdates, selectPluginRecoveryTarget, PluginRecoveryEvidence, planPluginRecovery, runPluginRecoveryPlan, type PluginRecoveryCheck } from './plugin-recovery-market'
 import { RepairAgentService, type CrashEvidence } from './repair-agent'
+import { disableSpellcheckDownloads, noAutomaticRegistryLookup } from './network-privacy'
 import { catalogEnvironment, catalogForLaunch, refreshUnobloxCatalog, type ResolvedCatalog } from './unoblox/model-catalog'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
@@ -2081,7 +2082,7 @@ async function showPluginRecovery(options?: {
           return evaluatePluginMarketCompatibility({
             packageName: targetPlugin, installedVersion, currentRuntimeVersion: runtimeVersion,
             hasLocalIssue: true, locale: harnessLocale(),
-            fetchFn: (input, init) => net.fetch(input instanceof URL ? input.href : input, init)
+            fetchFn: noAutomaticRegistryLookup
           })
         }
       })
@@ -2102,7 +2103,7 @@ async function showPluginRecovery(options?: {
         ? await evaluatePluginMarketCompatibility({
           packageName: 'dshmarket', installedVersion: market.installedVersion, currentRuntimeVersion: runtimeVersion,
           hasLocalIssue: true, locale: harnessLocale(),
-          fetchFn: (input, init) => net.fetch(input instanceof URL ? input.href : input, init)
+          fetchFn: noAutomaticRegistryLookup
         }).catch(() => undefined)
         : undefined
       // Like a plugin upgrade, a market release already tried here is not offered again.
@@ -2701,7 +2702,7 @@ async function showSafeModeManager(initial?: {
           bundledNodeModulesPath: join(bundledRuntimeRoot(), 'node_modules'),
           incompatiblePlugins: [...new Set([...safeModeSuspectedPlugins, ...incompatiblePluginNames])],
           failureTtlMs: SAFE_MODE_MARKET_FAILURE_TTL_MS,
-          fetchFn: (input, init) => net.fetch(input instanceof URL ? input.href : input, init),
+          fetchFn: noAutomaticRegistryLookup,
           locale: harnessLocale()
         }).catch((error: unknown) => {
           runtime.note(`[safe-mode] plugin market health checkup failed: ${String(error)}`)
@@ -3630,6 +3631,9 @@ if (isDaemonLaunch(process.env, process.platform)) {
         void openHarness(snapshot.url, 'user').catch(showUnexpectedError)
       }
     })
+    // Set before ready: the default session is created then, and its
+    // dictionary download is scheduled at creation.
+    app.on('session-created', (created) => disableSpellcheckDownloads(created))
     registerDesktopScheme()
     app.whenReady().then(bootstrap).catch((error: unknown) => {
       desktopDiagnostics?.startupFailed(error)

@@ -31,51 +31,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A job-level `if:` cannot read `matrix` (it is evaluated before the matrix
+  # expands), so the platform choice filters the matrix here instead.
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+      - id: pick
+        env:
+          TARGET: ${{ inputs.target || 'all' }}
+          ROWS: |
+            [
+              {"label": "macOS Apple Silicon", "family": "macos", "runner": "macos-15", "platform": "darwin", "arch": "arm64",
+               "builder": "npx --no-install electron-builder --mac --arm64", "artifact": "macos-apple-silicon", "files": "dist-dev/*.dmg\ndist-dev/*.zip"},
+              {"label": "macOS Intel", "family": "macos", "runner": "macos-15-intel", "platform": "darwin", "arch": "x64",
+               "builder": "npx --no-install electron-builder --mac --x64", "artifact": "macos-intel", "files": "dist-dev/*.dmg\ndist-dev/*.zip"},
+              {"label": "Windows x64", "family": "windows", "runner": "windows-2022", "platform": "win32", "arch": "x64",
+               "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "files": "dist-dev/*-setup.exe"},
+              {"label": "Linux x64", "family": "linux", "runner": "ubuntu-24.04", "platform": "linux", "arch": "x64",
+               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "files": "dist-dev/*.AppImage"}
+            ]
+        run: echo "include=$(jq -c --arg t "$TARGET" '[.[] | select($t == "all" or .family == $t)]' <<< "$ROWS")" >> "$GITHUB_OUTPUT"
+
   installers:
     name: ${{ matrix.label }}
-    if: inputs.target == 'all' || inputs.target == matrix.family
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - label: macOS Apple Silicon
-            family: macos
-            runner: macos-15
-            platform: darwin
-            arch: arm64
-            builder: npx --no-install electron-builder --mac --arm64
-            artifact: macos-apple-silicon
-            files: |
-              dist-dev/*.dmg
-              dist-dev/*.zip
-          - label: macOS Intel
-            family: macos
-            runner: macos-15-intel
-            platform: darwin
-            arch: x64
-            builder: npx --no-install electron-builder --mac --x64
-            artifact: macos-intel
-            files: |
-              dist-dev/*.dmg
-              dist-dev/*.zip
-          - label: Windows x64
-            family: windows
-            runner: windows-2022
-            platform: win32
-            arch: x64
-            builder: node scripts/electron-builder-windows.mjs --win --x64
-            artifact: windows-x64
-            files: |
-              dist-dev/*-setup.exe
-          - label: Linux x64
-            family: linux
-            runner: ubuntu-24.04
-            platform: linux
-            arch: x64
-            builder: npx --no-install electron-builder --linux --x64
-            artifact: linux-x64
-            files: |
-              dist-dev/*.AppImage
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4

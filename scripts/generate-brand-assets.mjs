@@ -76,15 +76,15 @@ await writeFile(join(root, 'build', 'icon.icns'), icns([
 ]))
 await writeFile(join(root, 'build', 'icon.ico'), ico([16, 24, 32, 48, 64, 128, 256].map((size) => [size, rendered[size]])))
 // The bare glyph (no tile) in the mark's 1024 coordinate space.
-const U_PATH = 'M253 321V475A163 163 0 0 0 579 475V321M579 321V686'
+const U_PATH = 'M288 360V563A124.5 124.5 0 0 0 537 563V360M537 360V736'
 const GOLD = '#D9A64A'
 function glyph({ width, height, scale, ink, background, dotScale = 1 }) {
-  // Glyph bounds in mark units: x 205..828, y 321..712; centre it.
-  const x = width / 2 - ((205 + 828) / 2) * scale
-  const y = height / 2 - ((321 + 712) / 2) * scale
+  // Glyph bounds in mark units: x 240..810, y 360..762; centre it.
+  const x = width / 2 - ((240 + 810) / 2) * scale
+  const y = height / 2 - ((360 + 762) / 2) * scale
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${
     background === undefined ? '' : `<rect width="${width}" height="${height}" fill="${background}"/>`
-  }<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${scale})"><path d="${U_PATH}" fill="none" stroke="${ink}" stroke-width="96"/><circle cx="738" cy="622" r="${(90 * dotScale).toFixed(2)}" fill="${GOLD}"/></g></svg>`)
+  }<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${scale})"><path d="${U_PATH}" fill="none" stroke="${ink}" stroke-width="96"/><circle cx="720" cy="672" r="${(90 * dotScale).toFixed(2)}" fill="${GOLD}"/></g></svg>`)
 }
 
 for (const [file, ink] of [['logo-light.png', '#0C0C0C'], ['logo-dark.png', '#F1E9DC']]) {

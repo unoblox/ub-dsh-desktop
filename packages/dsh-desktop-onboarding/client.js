@@ -35,8 +35,8 @@ window.__ModuleLoader__.load({
     // in currentColor so it follows the header text colour in both themes,
     // and the brand's gold dot.
     const BRAND_GOLD = '#D9A64A'
-    const U_PATH = 'M253 321V475A163 163 0 0 0 579 475V321M579 321V686'
-    const GLYPH_VIEWBOX = { x: 205, y: 321, width: 623, height: 391 }
+    const U_PATH = 'M288 360V563A124.5 124.5 0 0 0 537 563V360M537 360V736'
+    const GLYPH_VIEWBOX = { x: 240, y: 360, width: 570, height: 402 }
 
     const STYLE_ID = 'dsh-desktop-onboarding-style'
     // Same dialog chrome as the stock welcome notice it replaces: a bounded
@@ -152,7 +152,7 @@ window.__ModuleLoader__.load({
               fill: 'none'
             },
             React.createElement('path', { d: U_PATH, stroke: 'currentColor', strokeWidth: 96 }),
-            React.createElement('circle', { cx: 738, cy: 622, r: 90, fill: BRAND_GOLD })
+            React.createElement('circle', { cx: 720, cy: 672, r: 90, fill: BRAND_GOLD })
           )
         ),
         React.createElement('span', { className: 'dshDeskOnbBrandName' }, t('brandName')),

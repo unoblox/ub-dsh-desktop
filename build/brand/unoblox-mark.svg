@@ -4,6 +4,6 @@
        renders the same without the site's font. Source for every app icon:
        regenerate with `node scripts/generate-brand-assets.mjs`. -->
   <rect width="1024" height="1024" rx="224" fill="#0C0C0C"/>
-  <path d="M253 321V475A163 163 0 0 0 579 475V321M579 321V686" fill="none" stroke="#F1E9DC" stroke-width="96"/>
-  <circle cx="738" cy="622" r="90" fill="#D9A64A"/>
+  <path d="M288 360V563A124.5 124.5 0 0 0 537 563V360M537 360V736" fill="none" stroke="#F1E9DC" stroke-width="96"/>
+  <circle cx="720" cy="672" r="90" fill="#D9A64A"/>
 </svg>

@@ -12,9 +12,9 @@ window.__ModuleLoader__.load({
     // currentColor, so it follows the text colour in both themes, and the gold
     // dot. The gold is the brand asset's own colour, not a theme colour.
     const BRAND_GOLD = '#D9A64A'
-    const U_PATH = 'M253 321V475A163 163 0 0 0 579 475V321M579 321V686'
-    // Tight bounds of the glyph in the mark's 1024 space: x 205..828, y 321..712.
-    const GLYPH_VIEWBOX = { x: 205, y: 321, width: 623, height: 391 }
+    const U_PATH = 'M288 360V563A124.5 124.5 0 0 0 537 563V360M537 360V736'
+    // Tight bounds of the glyph in the mark's 1024 space: x 240..810, y 360..762.
+    const GLYPH_VIEWBOX = { x: 240, y: 360, width: 570, height: 402 }
 
     function UnobloxGlyph({ width, className }) {
       return React.createElement(
@@ -28,7 +28,7 @@ window.__ModuleLoader__.load({
           'aria-hidden': 'true'
         },
         React.createElement('path', { d: U_PATH, stroke: 'currentColor', strokeWidth: 96 }),
-        React.createElement('circle', { cx: 738, cy: 622, r: 90, fill: BRAND_GOLD })
+        React.createElement('circle', { cx: 720, cy: 672, r: 90, fill: BRAND_GOLD })
       )
     }
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Unoblox mark, from the unoblox.ai favicon: a cream "u" with the gold
+       dot on a near-black rounded square. The "u" is a path, not text, so it
+       renders the same without the site's font. Source for every app icon:
+       regenerate with `node scripts/generate-brand-assets.mjs`. -->
+  <rect width="1024" height="1024" rx="224" fill="#0C0C0C"/>
+  <path d="M253 321V475A163 163 0 0 0 579 475V321M579 321V686" fill="none" stroke="#F1E9DC" stroke-width="96"/>
+  <circle cx="738" cy="622" r="90" fill="#D9A64A"/>
+</svg>

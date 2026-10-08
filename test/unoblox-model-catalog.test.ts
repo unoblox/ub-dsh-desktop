@@ -96,6 +96,13 @@ describe('catalog resolution', () => {
       .toMatchObject({ source: 'fallback', detail: 'listing has no usable models' })
   })
 
+  it('survives overlapping refreshes (a Harness restart during a fetch)', async () => {
+    const path = await cachePath()
+    const results = await Promise.all(Array.from({ length: 6 }, () => refreshUnobloxCatalog({ cachePath: path, fetch: reply(LISTING) })))
+    for (const result of results) expect(result).toEqual({ rows: expect.any(Array), source: 'live' })
+    expect(parseCachedCatalog(await readFile(path, 'utf8'))).toHaveLength(4)
+  })
+
   it('ignores a corrupt cache', async () => {
     const path = await cachePath()
     await refreshUnobloxCatalog({ cachePath: path, fetch: reply(LISTING) })

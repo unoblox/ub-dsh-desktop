@@ -3232,7 +3232,15 @@ async function showMobilePairing(): Promise<void> {
   }
 
   mobileBridgeDemand.pairingOpened()
-  let snapshot = await mobileBridge.start()
+  let snapshot: Awaited<ReturnType<typeof mobileBridge.start>>
+  try {
+    snapshot = await mobileBridge.start()
+  } catch (error) {
+    // A failed start (e.g. the port is taken) must not leave pairing
+    // "wanted", or a later Harness restart would open the port unasked.
+    if (mobileBridgeDemand.pairingClosed(false)) stopMobileBridgeUnlessWanted()
+    throw error
+  }
   if (!snapshot.desktopUrl) {
     mobileBridgeDemand.pairingClosed(false)
     await mobileBridge.stop()
@@ -3263,12 +3271,22 @@ async function showMobilePairing(): Promise<void> {
       if (mobileBridgeDemand.pairingClosed(false)) stopMobileBridgeUnlessWanted()
       return
     }
-    snapshot = await mobileBridge.toggleTunnel(true)
+    try {
+      snapshot = await mobileBridge.toggleTunnel(true)
+    } catch (error) {
+      if (mobileBridgeDemand.pairingClosed(false)) stopMobileBridgeUnlessWanted()
+      throw error
+    }
   }
 
-  if (mobileWindow && !mobileWindow.isDestroyed()) mobileWindow.destroy()
+  // Replacing an open pairing window is not the user closing pairing: detach
+  // it first, so its 'closed' handler (which fires synchronously inside
+  // destroy()) does not stop the bridge the new window is about to use.
+  const previous = mobileWindow
+  mobileWindow = undefined
+  if (previous && !previous.isDestroyed()) previous.destroy()
   nativeTheme.themeSource = harnessThemePreference()
-  mobileWindow = new BrowserWindow({
+  const pairingWindow = new BrowserWindow({
     width: 560,
     height: 720,
     minWidth: 420,
@@ -3284,8 +3302,11 @@ async function showMobilePairing(): Promise<void> {
       webSecurity: true
     }
   })
-  secureWindow(mobileWindow)
-  mobileWindow.on('closed', () => {
+  mobileWindow = pairingWindow
+  secureWindow(pairingWindow)
+  pairingWindow.on('closed', () => {
+    // A newer pairing window replaced this one: pairing goes on.
+    if (mobileWindow !== pairingWindow) return
     mobileWindow = undefined
     // Without a paired phone (or Keep Phone Connected) the bridge closes its
     // port with the window.
@@ -3294,9 +3315,9 @@ async function showMobilePairing(): Promise<void> {
   if (!snapshot.desktopUrl) return
   const desktopUrl = mobileBridge.createDesktopUrl()
   if (!desktopUrl) return
-  await mobileWindow.loadURL(desktopUrl)
-  mobileWindow.show()
-  mobileWindow.focus()
+  await pairingWindow.loadURL(desktopUrl)
+  pairingWindow.show()
+  pairingWindow.focus()
 }
 
 async function bootstrap(): Promise<void> {

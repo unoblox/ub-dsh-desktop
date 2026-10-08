@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
@@ -141,7 +142,8 @@ async function fetchListing(deps: CatalogDependencies): Promise<UnobloxModelRow[
 
 async function writeCache(cachePath: string, rows: readonly UnobloxModelRow[]): Promise<void> {
   await mkdir(dirname(cachePath), { recursive: true })
-  const temporary = `${cachePath}.${String(process.pid)}.tmp`
+  // Unique per write: a Harness restart can overlap an earlier refresh.
+  const temporary = `${cachePath}.${randomUUID()}.tmp`
   await writeFile(temporary, `${JSON.stringify({ version: 1, fetchedAt: new Date().toISOString(), models: rows.slice(1) })}\n`, 'utf8')
   await rename(temporary, cachePath)
 }

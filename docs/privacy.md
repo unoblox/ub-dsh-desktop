@@ -26,7 +26,7 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 | Feedback buttons, dialog and `/feedback` (`message-feedback`, `ui-message-feedback`, `command-feedback`) | — | Removed. They existed to send the conversation to DeepSeek; with that gone they would promise a submission that goes nowhere. |
 | DeepSeek account and request extensions (`deepseek-account`, `account-controller`, `deepseek-llm-api-extensions`, `session-log-deepseek`, `plugin-package-inventory-deepseek`) | `platform.deepseek.com`, `api.deepseek.com` | Rows disabled. The DeepSeek model and search routes were already off. |
 | Update checks, which sent the installation ID, version and platform | `dshdesktop.com` | Off: `UNOBLOX_UPDATE_FEED_CONFIGURED = false` in `src/main/update/update-policy.ts`. No check, version listing or download runs. Users update by installing the latest Unoblox release. |
-| Crash reports, consent-gated but sent with the installation ID | `dshdesktop.com/crash` | The desktop service has no network: crashes are kept locally for the app's own recovery prompts, and nothing is uploaded or offered for upload. |
+| Crash reports, consent-gated but sent with the installation ID | `dshdesktop.com/crash` | The desktop service has no network: nothing is uploaded or offered for upload, and pending crash reports are deleted at the next launch. Recovery screens work from the current session's own evidence. |
 | Spell-check dictionary download on Linux and Windows | Google (`redirector.gvt1.com`) | Chromium's spellchecker is off on Linux and Windows, with an empty dictionary list set as each session is created (switching it off alone still downloads the dictionary). macOS keeps its system spellchecker, which stays local. |
 | Workbench market catalog fetched at every launch | `market.dshdesktop.com` | The workbench panel is off for the beta (its copy is Chinese-only and it lists the upstream catalog). If it returns, the catalog is fetched only when the user opens the market, refreshes, or installs from it. |
 | npm registry ping when the plugin-install dialog opens | `registry.npmjs.org`, `registry.npmmirror.com` | `registryProbeEnabled: false`. |
@@ -47,7 +47,7 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 
 - The Unoblox API key: in the Harness credential store, never sent anywhere but `api.unoblox.ai`, and never to the renderer.
 - Conversations, workspaces and settings: under the app's user-data folder.
-- Local diagnostics: the harness log and crash records, used only by the app's own recovery screens.
+- Local diagnostics: the harness log, used only by the app's own recovery screens.
 
 The phone bridge listens on the local network only while the user is pairing, while a phone paired this session, or when Keep Phone Connected is on (PIN-protected, inbound only, no advertising). It sends nothing out by itself.
 

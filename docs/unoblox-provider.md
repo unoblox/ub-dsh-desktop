@@ -34,16 +34,18 @@ The patched `@deepseek-ai/dsh-client-ui-settings-models` hides the Models page's
 
 ## Info strip under the composer
 
-`packages/dsh-desktop-unoblox-info` shows what Unoblox reports, below the chat input (slot `conversation.composer.dock`, order 30, after the stock stats pills and the PPT chooser). Nothing shown is a copied number:
+`packages/dsh-desktop-unoblox-info` adds two icon pills to the composer dock (slot `conversation.composer.dock`, order 30). They sit on the same row as the stock stats pills and the context meter, with the same pill metrics. Nothing shown is a copied number:
 
-| Shown | Source |
-| --- | --- |
-| Search price, e.g. `Search ₹101.59 / 1,000`; *Details* adds "at most ₹0.11 per search" | `GET https://unoblox.ai/api/webapi/public/search-pricing` (public, no key), fetched host-side and cached for 5 minutes. The price moves (10162 → 10159 paise per 1000 within an hour on 2026-10-07). Prices are in paise and are shown in ₹ only. |
-| `Balance ₹…`, and `Last reply ₹… (estimated)` | The `x-unoblox-freemium` header on each chat completion: `balance_inr`, `charged_inr`, `charged_estimated` (streaming responses), `tier`, `stage`, and the gateway's own `note` sentence (in *Details*). |
-| `Model google/…` and the routing reason in *Details* | `x-unoblox-served-model` / `x-unoblox-selected-model` and `x-unoblox-selection-reason`. |
+| Pill | Source | Tooltip / accessible label |
+| --- | --- | --- |
+| Wallet icon + balance, e.g. `₹383.63` | `balance_inr` in the `x-unoblox-freemium` header of the latest chat response from any conversation | The gateway's own `note` sentence (charge, tier) |
+| Sparkle icon + model, e.g. `gemma-4-26b-a4b-it` | `x-unoblox-served-model` / `x-unoblox-selected-model` of this conversation's latest reply | Full slug and `x-unoblox-selection-reason` |
 
+- Nothing renders until Unoblox has reported a value: no loading or placeholder text. A missing key shows a warning pill, "No API key". A failed refresh keeps the values already shown. The pills refresh when a turn ends.
+- In a narrow window the strip shrinks before the stock pills. The balance never truncates; the model name does.
+- The search price and the per-reply charge are no longer shown in the row; the charge is still in the balance tooltip, as part of the gateway's note.
 - Unoblox has no balance endpoint: `/v1/key`, `/v1/credits`, `/v1/balance`, `/v1/usage`, `/v1/account`, `/v1/me` and `/v1/generation(s)` all return 404 (`UB-REQ-404`) with a valid key. The strip therefore says "Balance shows after the first reply" until this Harness process has made a chat call. The balance is per account and shows in every conversation; the charge and the model belong to the conversation's own latest reply.
-- Search responses carry no cost or balance (only `usage.search_requests` and the `srch_…` id), and no rate-limit headers were seen on any endpoint, so neither is shown. Token counts are already in the stock stats pills.
+- Search responses carry no cost or balance (only `usage.search_requests` and the `srch_…` id), and no rate-limit headers were seen on any endpoint. Token counts and cache hits are in the stock stats pills.
 - How the headers reach the plugin: the `dsh-llm-pi-ai` patch passes pi-ai's `onResponse` hook and publishes each successful response's status and headers (cookies removed, no body) as the Cordis event `llm-pi-ai/response` (`{ provider, model, sessionId?, status, headers }`). The plugin keeps entries for `provider: unoblox` only. Remove this part of the patch when upstream offers an equivalent response observer.
 - Header values reach JavaScript as Latin-1 views of the bytes, while Unoblox sends UTF-8 (`₹`, `—`). `info.js` decodes them back before showing the note.
 - The renderer reads one same-origin route, `GET /api/desktop-unoblox.info?session=<id>`, behind the Harness session cookie (401 without it). The response contains `key: set | missing | unknown`, never the key itself.

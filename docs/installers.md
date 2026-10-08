@@ -42,7 +42,7 @@ Output goes to `dist-dev/`. The `package:dev:*` scripts use `electron-builder.de
   1. The first-run dialog shows, with a password-type key field.
   2. "Connect and continue" stores the key in the credential store.
   3. A chat turn and a `web_search` turn complete through Unoblox.
-  4. The strip under the composer shows the live search price, the balance, the estimated charge and the routed model.
+  4. The composer dock shows the Unoblox balance and the routed model as icon pills, on the same row as the stock stats.
 - Not verified here: macOS and Windows installers (they need native runners), AppImage under real FUSE and the desktop's AppArmor policy, and Wayland sessions.
 
 ## Not done by these builds

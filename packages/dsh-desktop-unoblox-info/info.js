@@ -2,10 +2,7 @@
  * Pure parsing and state for the Unoblox info strip.
  *
  * Every value shown comes from what Unoblox itself returns; nothing here is a
- * copied price or a guessed balance:
- * - search price: `GET https://unoblox.ai/api/webapi/public/search-pricing`
- *   (public, no key) — `{ price_inr_paise_per_1000_searches,
- *   price_inr_micro_paise_per_search, max_inr_paise_per_search }`;
+ * guessed balance:
  * - balance and charge: the `x-unoblox-freemium` header on each chat
  *   completion (`balance_inr`, `charged_inr`, `charged_estimated` when
  *   streaming, `tier`, `stage`, `note`). Unoblox has no balance endpoint, so
@@ -14,11 +11,6 @@
  *   `x-unoblox-served-model` and `x-unoblox-selection-reason`.
  */
 
-export const UNOBLOX_SEARCH_PRICING_URL = 'https://unoblox.ai/api/webapi/public/search-pricing'
-// Long enough to avoid a request per turn, short enough that a price change
-// reaches the strip within minutes.
-export const PRICING_TTL_MS = 5 * 60_000
-const PRICING_TIMEOUT_MS = 10_000
 // One entry per conversation that talked to Unoblox; old ones fall off first.
 export const MAX_TRACKED_SESSIONS = 200
 // Gateway text is shown as text, never markup; a bound keeps one odd header
@@ -33,10 +25,6 @@ function finiteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function nonNegativeInteger(value) {
-  return Number.isSafeInteger(value) && value >= 0 ? value : undefined
-}
-
 function text(value) {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
@@ -45,23 +33,6 @@ function text(value) {
 
 function defined(entries) {
   return Object.fromEntries(Object.entries(entries).filter(([, value]) => value !== undefined))
-}
-
-/**
- * Normalize the public search-pricing body. Prices stay in integer paise (and
- * micro-paise) as Unoblox sends them; the client formats them as rupees.
- * @param {unknown} body - parsed JSON.
- * @returns {{ paisePer1000: number, microPaisePerSearch?: number, maxPaisePerSearch?: number } | undefined}
- */
-export function parseSearchPricing(body) {
-  if (!isRecord(body)) return undefined
-  const paisePer1000 = nonNegativeInteger(body.price_inr_paise_per_1000_searches)
-  if (paisePer1000 === undefined) return undefined
-  return defined({
-    paisePer1000,
-    microPaisePerSearch: nonNegativeInteger(body.price_inr_micro_paise_per_search),
-    maxPaisePerSearch: nonNegativeInteger(body.max_inr_paise_per_search)
-  })
 }
 
 /**
@@ -159,47 +130,6 @@ export function createTurnStore({ maxSessions = MAX_TRACKED_SESSIONS, now = Date
     },
     latestBilling() {
       return latestBilling
-    }
-  }
-}
-
-/**
- * Cached reader of the public search-pricing endpoint. A success is reused for
- * `ttlMs`; concurrent reads share one request; a failure is reported (not
- * replaced by an older price) and retried on the next read.
- */
-export function createPricingSource({ url = UNOBLOX_SEARCH_PRICING_URL, fetch: doFetch = fetch, ttlMs = PRICING_TTL_MS, now = Date.now } = {}) {
-  let cached
-  let inflight
-  const load = async () => {
-    let response
-    try {
-      response = await doFetch(url, {
-        headers: { accept: 'application/json' },
-        redirect: 'error',
-        signal: AbortSignal.timeout(PRICING_TIMEOUT_MS)
-      })
-    } catch (error) {
-      return { error: `search pricing request failed: ${error instanceof Error ? error.message : String(error)}` }
-    }
-    if (!response.ok) return { error: `search pricing returned HTTP ${String(response.status)}` }
-    let pricing
-    try {
-      pricing = parseSearchPricing(await response.json())
-    } catch (error) {
-      return { error: `search pricing body is not JSON: ${error instanceof Error ? error.message : String(error)}` }
-    }
-    if (pricing === undefined) return { error: 'search pricing body has no price_inr_paise_per_1000_searches' }
-    cached = { pricing, fetchedAt: now() }
-    return cached
-  }
-  return {
-    read() {
-      if (cached !== undefined && now() - cached.fetchedAt < ttlMs) return Promise.resolve(cached)
-      inflight ??= load().finally(() => {
-        inflight = undefined
-      })
-      return inflight
     }
   }
 }

@@ -118,7 +118,7 @@ try {
   const info = await fetch(new URL(`/api/desktop-unoblox.info?session=${encodeURIComponent(session.sessionId)}`, origin), { headers: { Cookie: cookie } })
   const body = await info.json()
   if (info.status !== 200 || !['set', 'missing', 'unknown'].includes(body.key)) throw new Error(`unoblox info route: HTTP ${info.status} ${JSON.stringify(body)}`)
-  console.log(`smoke: unoblox info route ok (key ${body.key}, search price ${body.searchPricing ? 'live' : `unavailable: ${body.searchPricingError}`})`)
+  console.log(`smoke: unoblox info route ok (key ${body.key})`)
   console.log('smoke: PASS')
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error))

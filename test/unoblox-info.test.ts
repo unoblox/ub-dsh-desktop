@@ -9,13 +9,12 @@ import { projectRoot } from './patch-path'
 // @ts-expect-error Local host plugins are authored as ESM JavaScript.
 import { apply as applyInfo, INFO_ROUTE } from '../packages/dsh-desktop-unoblox-info/index.js'
 // @ts-expect-error Local host plugins are authored as ESM JavaScript.
-import { createPricingSource, createTurnStore, parseBilling, parseSearchPricing, turnFromHeaders, utf8HeaderValue } from '../packages/dsh-desktop-unoblox-info/info.js'
+import { createTurnStore, parseBilling, turnFromHeaders, utf8HeaderValue } from '../packages/dsh-desktop-unoblox-info/info.js'
 
 afterEach(() => vi.unstubAllGlobals())
 
 // Shapes recorded from the live gateway on 2026-10-07 (docs/unoblox-provider.md).
-// The public search price is verbatim; account values and ids are replaced.
-const SEARCH_PRICING = { price_inr_paise_per_1000_searches: 10162, price_inr_micro_paise_per_search: 10161795, max_inr_paise_per_search: 11 }
+// Account values and ids are replaced.
 const FREEMIUM_STREAMING = {
   balance_inr: 250.5, balance_requirement_inr: 1000.0, base_inr: 0.0, charged_estimated: true, charged_inr: 0.0, gst_inr: 0.0, gst_rate_bps: 0,
   note: 'Charged ₹0.00 at standard rates — this freemium model needs a ₹1000.00 balance held (never spent), and your balance ₹250.50 is below it. Add funds to restore free access, or turn on paid access for this key in Settings for unlimited access at standard rates.',
@@ -41,13 +40,6 @@ const SSE = [
 ].map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n'
 
 describe('Unoblox response parsing', () => {
-  it('reads the public search price in paise', () => {
-    expect(parseSearchPricing(SEARCH_PRICING)).toEqual({ paisePer1000: 10162, microPaisePerSearch: 10161795, maxPaisePerSearch: 11 })
-    expect(parseSearchPricing({ price_inr_paise_per_1000_searches: '10162' })).toBeUndefined()
-    expect(parseSearchPricing({ price_inr_paise_per_1000_searches: 1.5 })).toBeUndefined()
-    expect(parseSearchPricing(null)).toBeUndefined()
-  })
-
   it('reads billing and routing from a streamed chat response', () => {
     expect(turnFromHeaders(CHAT_HEADERS)).toEqual({
       billing: {
@@ -102,39 +94,6 @@ describe('turn store', () => {
   })
 })
 
-describe('search pricing source', () => {
-  it('caches a success, shares concurrent reads, and refreshes after the TTL', async () => {
-    let clock = 0
-    const fetch = vi.fn(async () => Response.json(SEARCH_PRICING))
-    const source = createPricingSource({ fetch, ttlMs: 1000, now: () => clock })
-    const [first, second] = await Promise.all([source.read(), source.read()])
-    expect(first).toEqual({ pricing: parseSearchPricing(SEARCH_PRICING), fetchedAt: 0 })
-    expect(second).toBe(first)
-    clock = 999
-    await source.read()
-    expect(fetch).toHaveBeenCalledTimes(1)
-    clock = 1000
-    await source.read()
-    expect(fetch).toHaveBeenCalledTimes(2)
-  })
-
-  it('reports failures without a stale price and retries on the next read', async () => {
-    const replies = [
-      () => Promise.reject(new Error('offline')),
-      () => Promise.resolve(new Response('busy', { status: 503 })),
-      () => Promise.resolve(new Response('<html>', { status: 200 })),
-      () => Promise.resolve(Response.json({ price: 1 })),
-      () => Promise.resolve(Response.json(SEARCH_PRICING))
-    ]
-    const source = createPricingSource({ fetch: () => replies.shift()!() })
-    expect(await source.read()).toEqual({ error: 'search pricing request failed: offline' })
-    expect(await source.read()).toEqual({ error: 'search pricing returned HTTP 503' })
-    expect((await source.read()).error).toMatch(/^search pricing body is not JSON/u)
-    expect(await source.read()).toEqual({ error: 'search pricing body has no price_inr_paise_per_1000_searches' })
-    expect(await source.read()).toMatchObject({ pricing: { paisePer1000: 10162 } })
-  })
-})
-
 function host(credential: { value?: string, throws?: boolean } | undefined) {
   const listeners = new Map<string, (payload: unknown) => void>()
   const routes = new Map<string, (request: Request) => Promise<Response>>()
@@ -154,19 +113,18 @@ function host(credential: { value?: string, throws?: boolean } | undefined) {
       routes.set(route.path, route.fetch)
     } } }
   }
-  const fetch = vi.fn(async () => Response.json(SEARCH_PRICING))
-  applyInfo(ctx, {}, { fetch, now: () => 5 })
+  applyInfo(ctx, {}, { now: () => 5 })
   const emit = (payload: unknown) => listeners.get('llm-pi-ai/response')!(payload)
   const read = async (session?: string) => {
     const response = await routes.get(INFO_ROUTE)!(new Request(`http://127.0.0.1${INFO_ROUTE}${session === undefined ? '' : `?session=${session}`}`))
     expect(response.headers.get('cache-control')).toBe('no-store')
     return response.json()
   }
-  return { emit, read, warnings, fetch }
+  return { emit, read, warnings }
 }
 
 describe('info route', () => {
-  it('serves the search price, the latest balance and this session\'s routed model, never the key', async () => {
+  it('serves the latest balance and this session\'s routed model, never the key', async () => {
     const { emit, read } = host({ value: 'ub-gw-secret-test-value' })
     emit({ provider: 'unoblox', model: 'unoblox/auto', sessionId: 's1', status: 200, headers: CHAT_HEADERS })
     emit({ provider: 'openai', model: 'x', sessionId: 's1', status: 200, headers: { 'x-unoblox-served-model': 'spoofed' } })
@@ -174,8 +132,6 @@ describe('info route', () => {
     expect(JSON.stringify(body)).not.toContain('ub-gw-secret-test-value')
     expect(body).toEqual({
       key: 'set',
-      searchPricing: { paisePer1000: 10162, microPaisePerSearch: 10161795, maxPaisePerSearch: 11, fetchedAt: 5 },
-      searchPricingError: null,
       billing: { ...turnFromHeaders(CHAT_HEADERS).billing, at: 5 },
       turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 }
     })
@@ -255,10 +211,11 @@ describe('info strip client', () => {
       useState: (initial: unknown) => [typeof initial === 'function' ? (initial as () => unknown)() : initial, () => {}],
       useCallback: (fn: unknown) => fn, useEffect: () => {}, useRef: (value: unknown) => ({ current: value }), useId: () => 'details-id'
     }
+    const primitives = { IconSparkleRegular: () => null, IconWarningOutlineRegular: () => null }
     let exported: Record<string, any> = {}
     const source = readFileSync(path.join(projectRoot, 'packages/dsh-desktop-unoblox-info/client.js'), 'utf8')
     vm.runInNewContext(source, {
-      window: { __ModuleLoader__: { load: ({ factory }: { factory: (require: (id: string) => unknown) => Record<string, unknown> }) => { exported = factory((id) => id === 'react' ? React : {}) } } },
+      window: { __ModuleLoader__: { load: ({ factory }: { factory: (require: (id: string) => unknown) => Record<string, unknown> }) => { exported = factory((id) => id === 'react' ? React : primitives) } } },
       Intl, Date
     })
     return exported
@@ -278,43 +235,61 @@ describe('info strip client', () => {
   const view = (body: unknown) => client.toView(body)
   const routeBody = {
     key: 'set',
-    searchPricing: { paisePer1000: 10162, maxPaisePerSearch: 11, fetchedAt: 5 },
-    searchPricingError: null,
     billing: { ...turnFromHeaders(CHAT_HEADERS).billing, at: 5 },
     turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 }
   }
+  // Pills by their visible text and their accessible description.
+  function pills(node: unknown): { text: string, description: unknown }[] {
+    const found: { text: string, description: unknown }[] = []
+    const walk = (current: unknown): void => {
+      if (current === null || current === undefined || typeof current !== 'object') return
+      if (Array.isArray(current)) return current.forEach(walk)
+      const element = current as Element
+      if (typeof element.type === 'function') return walk((element.type as (props: unknown) => unknown)(element.props))
+      if (typeof element.props.className === 'string' && element.props.className.startsWith('dshUbxInfoPill')) {
+        found.push({ text: text(element.props.children), description: element.props['aria-label'] })
+      }
+      walk(element.props.children)
+    }
+    walk(node)
+    return found
+  }
+
+  it('only uses primitives the installed Harness exports', () => {
+    const source = readFileSync(path.join(projectRoot, 'packages/dsh-desktop-unoblox-info/client.js'), 'utf8')
+    const match = /const \{([^}]+)\} = require\('@deepseek-ai\/dsh-client-ui-primitives'\)/u.exec(source)
+    const bundle = readFileSync(path.join(projectRoot, 'node_modules/@deepseek-ai/dsh-client-ui-primitives/lib/index.js'), 'utf8')
+    const exported = new Set([...bundle.matchAll(/export \{([^}]*)\}/gu)].flatMap((block) => block[1]!.split(',').map((part) => part.trim().split(/\s+as\s+/u).pop()!)))
+    for (const name of match![1]!.split(',').map((part) => part.trim())) expect(exported.has(name), name).toBe(true)
+  })
 
   it('keeps zh and en keys in step', () => {
     expect(Object.keys(client.locales.zh).sort()).toEqual(Object.keys(client.locales.en).sort())
   })
 
-  it('formats rupees only', () => {
-    expect(client.formatPaise(10162)).toBe('₹101.62')
-    expect(client.formatPaise(11)).toBe('₹0.11')
+  it('formats rupees only and shortens model slugs', () => {
     expect(client.formatInr(123456.5)).toBe('₹1,23,456.50')
+    expect(client.shortModel('google/gemma-4-26b-a4b-it')).toBe('gemma-4-26b-a4b-it')
+    expect(client.shortModel('solo')).toBe('solo')
   })
 
-  it('shows price, balance, estimated charge and routed model from the route', () => {
-    const rendered = text(client.UnobloxInfoStrip({ state: { phase: 'ready', view: view(routeBody) }, t, onRetry: () => {} }))
-    expect(rendered).toContain('Search ₹101.62 / 1,000')
-    expect(rendered).toContain('Balance ₹250.50')
-    expect(rendered).toContain('Last reply ₹0.00 (estimated)')
-    expect(rendered).toContain('Model google/gemma-4-26b-a4b-it')
-    expect(rendered).not.toContain('$')
+  it('shows only balance and model, as icon pills in one row', () => {
+    const row = client.UnobloxInfoStrip({ view: view(routeBody), t })
+    expect(row.props.className).toBe('dshUbxInfo')
+    expect(pills(row).map((pill) => pill.text)).toEqual(['₹250.50', 'gemma-4-26b-a4b-it'])
+    const [balance, model] = pills(row)
+    expect(balance!.description).toContain('Unoblox balance ₹250.50. Charged ₹0.00 at standard rates')
+    expect(model!.description).toBe('Model google/gemma-4-26b-a4b-it. unoblox/auto -> google/gemma-4-26b-a4b-it (best value: quality-per-price over capable models)')
+    expect(text(row)).not.toMatch(/\$|Search|Last reply|Details/u)
   })
 
-  it('covers missing key, pending balance, pricing failure, loading and error', () => {
-    const missing = text(client.UnobloxInfoStrip({ state: { phase: 'ready', view: view({ ...routeBody, key: 'missing', billing: null, turn: null }) }, t }))
-    expect(missing).toContain('No Unoblox API key')
-    expect(missing).not.toContain('Balance')
-    const pending = text(client.UnobloxInfoStrip({ state: { phase: 'ready', view: view({ ...routeBody, billing: null, turn: null, searchPricing: null, searchPricingError: 'search pricing returned HTTP 503' }) }, t }))
-    expect(pending).toContain('Balance shows after the first reply')
-    expect(pending).toContain('Search price unavailable')
-    expect(text(client.UnobloxInfoStrip({ state: { phase: 'loading' }, t }))).toBe('Loading Unoblox info…')
-    expect(text(client.UnobloxInfoStrip({ state: { phase: 'error', error: 'HTTP 500' }, t }))).toBe('Unoblox info unavailableRetry')
-    const stale = text(client.UnobloxInfoStrip({ state: { phase: 'error', view: view(routeBody), error: 'HTTP 500' }, t }))
-    expect(stale).toContain('Balance ₹250.50')
-    expect(stale).toContain('Unoblox info unavailable')
+  it('renders nothing before Unoblox has reported anything, and flags a missing key', () => {
+    expect(client.UnobloxInfoStrip({ view: undefined, t })).toBeNull()
+    expect(client.UnobloxInfoStrip({ view: view({ key: 'set', billing: null, turn: null }), t })).toBeNull()
+    const missing = client.UnobloxInfoStrip({ view: view({ key: 'missing', billing: null, turn: null }), t })
+    expect(pills(missing)).toEqual([{ text: 'No API key', description: 'Add your Unoblox API key in Settings → Models.' }])
+    // Balance known from another conversation, no reply here yet: balance only.
+    expect(pills(client.UnobloxInfoStrip({ view: view({ ...routeBody, turn: null }), t })).map((pill) => pill.text)).toEqual(['₹250.50'])
   })
 
   it('requests the route same-origin without caching and rejects unexpected shapes', async () => {
@@ -324,7 +299,7 @@ describe('info strip client', () => {
       return Response.json(calls.length === 1 ? routeBody : { nope: true })
     })
     const signal = new AbortController().signal
-    expect(await service.load('s 1', signal)).toMatchObject({ key: 'set', pricing: { paisePer1000: 10162 } })
+    expect(await service.load('s 1', signal)).toMatchObject({ key: 'set', balanceInr: 250.5, model: 'google/gemma-4-26b-a4b-it' })
     expect(calls[0]).toEqual([`${INFO_ROUTE}?session=s%201`, { credentials: 'same-origin', cache: 'no-store', signal }])
     await expect(service.load(undefined, signal)).rejects.toThrow('unexpected response shape')
     expect(calls[1]![0]).toBe(INFO_ROUTE)

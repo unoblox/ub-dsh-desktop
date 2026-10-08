@@ -6,68 +6,42 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const React = require('react')
-    const { useCallback, useEffect, useId, useRef, useState } = React
+    const { useCallback, useEffect, useRef, useState } = React
+    const { IconSparkleRegular, IconWarningOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
     const h = React.createElement
 
     const NS = 'desktop-unoblox-info'
     // Served by index.js; same origin as the page, behind the Harness session cookie.
     const INFO_ROUTE = '/api/desktop-unoblox.info'
     const STYLE_ID = 'dsh-desktop-unoblox-info-style'
+    // Same metrics as the stock stats pills beside it (dsh-client-ui-chat
+    // StatsPills), so balance and model read as part of that one row.
     const STYLE = `
-      /* Take only the room the stock dock items leave (basis 0), never theirs. */
-      .dshUbxInfo{position:relative;flex:1 1 0%;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:2px 10px;min-width:0;max-width:100%;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
-      .dshUbxInfoItem{display:inline-flex;align-items:baseline;gap:4px;min-width:0;white-space:nowrap}
-      .dshUbxInfoValue{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
-      .dshUbxInfoModel{max-width:220px;overflow:hidden;text-overflow:ellipsis}
-      .dshUbxInfoButton{border:0;background:transparent;padding:0 2px;font:inherit;color:var(--dsw-alias-label-secondary);text-decoration:underline;text-underline-offset:2px;cursor:pointer;border-radius:4px;transition:color .15s ease}
-      .dshUbxInfoButton:hover{color:var(--dsw-alias-label-primary)}
-      .dshUbxInfoButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-      /* Details float above the strip so opening them never grows the dock. */
-      .dshUbxInfoDetails{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-height:min(320px,50vh);overflow-y:auto;margin:0;padding:10px 12px;list-style:none;display:flex;flex-direction:column;gap:4px;white-space:normal;color:var(--dsw-alias-label-secondary);background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-1));backdrop-filter:var(--dsw-menu-backdrop-filter);-webkit-backdrop-filter:var(--dsw-menu-backdrop-filter);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;box-shadow:var(--dsw-elevation-panel)}
-      @media (prefers-reduced-motion:reduce){.dshUbxInfoButton{transition:none}}
+      /* Give up room before the stock pills do; only the model name truncates. */
+      .dshUbxInfo{box-sizing:border-box;flex:0 100 auto;min-width:0;display:inline-flex;align-items:center;gap:12px;font-size:calc(var(--dsh-content-font-size-secondary,13px) - 1px);line-height:calc(20px + var(--dsh-content-font-delta-secondary,0px))}
+      .dshUbxInfoPill{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;min-width:0;padding:1px 8px;border-radius:999px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;white-space:nowrap}
+      .dshUbxInfoPill svg{flex:none;width:14px;height:14px}
+      .dshUbxInfoPill:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+      .dshUbxInfoLabel{min-width:0;overflow:hidden;text-overflow:ellipsis}
+      .dshUbxInfoBalance{flex:none}
+      .dshUbxInfoModel .dshUbxInfoLabel{max-width:180px}
     `
 
     const en = {
       label: 'Unoblox',
-      loading: 'Loading Unoblox info…',
-      unavailable: 'Unoblox info unavailable',
-      retry: 'Retry',
-      keyMissing: 'No Unoblox API key. Add it in Settings → Models.',
-      searchPrice: 'Search {price} / 1,000',
-      searchPriceUnavailable: 'Search price unavailable',
-      balance: 'Balance {amount}',
-      balancePending: 'Balance shows after the first reply',
-      lastTurn: 'Last reply {amount}',
-      lastTurnEstimated: 'Last reply {amount} (estimated)',
+      balance: 'Unoblox balance {amount}',
       model: 'Model {model}',
-      details: 'Details',
-      hideDetails: 'Hide details',
-      maxPerSearch: 'At most {price} per search',
-      tier: 'Tier: {tier}',
-      tierStage: 'Tier: {tier} · {stage}',
-      routing: 'Routing: {reason}',
-      balanceAt: 'Balance as of {time}'
+      modelRouted: 'Model {model}. {reason}',
+      keyMissing: 'No API key',
+      keyMissingHint: 'Add your Unoblox API key in Settings → Models.'
     }
     const zh = {
       label: 'Unoblox',
-      loading: '正在加载 Unoblox 信息…',
-      unavailable: '无法获取 Unoblox 信息',
-      retry: '重试',
-      keyMissing: '尚未设置 Unoblox API 密钥，请在“设置 → 模型”中添加。',
-      searchPrice: '搜索 {price} / 1,000 次',
-      searchPriceUnavailable: '无法获取搜索价格',
-      balance: '余额 {amount}',
-      balancePending: '首次回复后显示余额',
-      lastTurn: '上次回复 {amount}',
-      lastTurnEstimated: '上次回复 {amount}（估算）',
+      balance: 'Unoblox 余额 {amount}',
       model: '模型 {model}',
-      details: '详情',
-      hideDetails: '收起详情',
-      maxPerSearch: '每次搜索最多 {price}',
-      tier: '套餐：{tier}',
-      tierStage: '套餐：{tier} · {stage}',
-      routing: '路由：{reason}',
-      balanceAt: '余额更新于 {time}'
+      modelRouted: '模型 {model}。{reason}',
+      keyMissing: '未设置 API 密钥',
+      keyMissingHint: '请在“设置 → 模型”中添加 Unoblox API 密钥。'
     }
 
     // ---------- formatting (pure) ----------
@@ -79,13 +53,10 @@ window.__ModuleLoader__.load({
       return `₹${RUPEES.format(amount)}`
     }
 
-    /** Integer paise (the pricing endpoint's unit) as rupees. */
-    function formatPaise(paise) {
-      return formatInr(paise / 100)
-    }
-
-    function formatTime(at) {
-      return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    /** `author/model` slugs show the model part; the full slug stays in the tooltip. */
+    function shortModel(slug) {
+      const slash = slug.lastIndexOf('/')
+      return slash < 0 ? slug : slug.slice(slash + 1)
     }
 
     function isRecord(value) {
@@ -98,16 +69,14 @@ window.__ModuleLoader__.load({
      */
     function toView(body) {
       if (!isRecord(body) || typeof body.key !== 'string') return undefined
-      const pricing = isRecord(body.searchPricing) && typeof body.searchPricing.paisePer1000 === 'number' ? body.searchPricing : undefined
       const billing = isRecord(body.billing) && typeof body.billing.balanceInr === 'number' ? body.billing : undefined
       const turn = isRecord(body.turn) ? body.turn : undefined
+      const routing = turn !== undefined && isRecord(turn.routing) ? turn.routing : undefined
+      const model = typeof routing?.servedModel === 'string' ? routing.servedModel : typeof routing?.selectedModel === 'string' ? routing.selectedModel : undefined
       return {
         key: body.key,
-        pricing,
-        pricingError: typeof body.searchPricingError === 'string' ? body.searchPricingError : undefined,
-        billing,
-        turnBilling: turn !== undefined && isRecord(turn.billing) && typeof turn.billing.balanceInr === 'number' ? turn.billing : undefined,
-        routing: turn !== undefined && isRecord(turn.routing) ? turn.routing : undefined
+        ...(billing === undefined ? {} : { balanceInr: billing.balanceInr, ...(typeof billing.note === 'string' ? { note: billing.note } : {}) }),
+        ...(model === undefined ? {} : { model, ...(typeof routing.reason === 'string' ? { reason: routing.reason } : {}) })
       }
     }
 
@@ -131,21 +100,22 @@ window.__ModuleLoader__.load({
      * Load on mount and session change, then again whenever a turn ends
      * (running true → false), when Unoblox has just reported a new balance.
      * A newer load aborts the older one; results after unmount are dropped.
+     * A failed refresh keeps the last values rather than blanking the row.
      */
     function useUnobloxInfo(service, sessionId, running) {
-      const [state, setState] = useState({ phase: 'loading', view: undefined })
+      const [view, setView] = useState(undefined)
       const controller = useRef(undefined)
       const reload = useCallback(() => {
         controller.current?.abort()
         const current = new AbortController()
         controller.current = current
         service.load(sessionId, current.signal).then(
-          (view) => {
-            if (!current.signal.aborted) setState({ phase: 'ready', view })
+          (next) => {
+            if (!current.signal.aborted) setView(next)
           },
-          (error) => {
-            if (current.signal.aborted) return
-            setState((previous) => ({ phase: 'error', view: previous.view, error: error instanceof Error ? error.message : String(error) }))
+          () => {
+            // Nothing to show is the honest state for an unreachable route;
+            // the next turn end retries. Values already shown stay.
           }
         )
       }, [service, sessionId])
@@ -158,107 +128,63 @@ window.__ModuleLoader__.load({
         if (wasRunning.current === true && running === false) reload()
         wasRunning.current = running
       }, [running, reload])
-      return { state, reload }
+      return view
     }
 
     // ---------- display ----------
 
-    function Item({ children, title, className }) {
-      return h('span', { className: className === undefined ? 'dshUbxInfoItem' : `dshUbxInfoItem ${className}`, title }, children)
+    // Wallet glyph (14px grid, currentColor); the primitives set has none.
+    function WalletIcon() {
+      return h('svg', { viewBox: '0 0 16 16', width: 14, height: 14, 'aria-hidden': 'true', focusable: 'false' },
+        h('path', {
+          d: 'M2.5 4.5h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-7Zm0 0 7.6-2.2a.8.8 0 0 1 1 .77V4.5M10.5 8.5h1.5',
+          fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round'
+        }))
     }
 
-    function Labeled({ t, keyName, params, valueName }) {
-      // Keep the value styled separately without splitting translated text.
-      const template = t(keyName, { ...params, [valueName]: '\u0000' })
-      const [before, after = ''] = template.split('\u0000')
-      return h(React.Fragment, null, before, h('span', { className: 'dshUbxInfoValue' }, params[valueName]), after)
+    function Pill({ icon, text, description, className }) {
+      // Focusable so keyboard users reach the same detail the tooltip shows.
+      return h('span', {
+        className: className === undefined ? 'dshUbxInfoPill' : `dshUbxInfoPill ${className}`,
+        title: description,
+        'aria-label': description,
+        tabIndex: 0
+      }, icon, h('span', { className: 'dshUbxInfoLabel' }, text))
     }
 
-    /** Presentational strip: props in, `onRetry` out. */
-    function UnobloxInfoStrip({ state, t, onRetry }) {
-      const [open, setOpen] = useState(false)
-      const detailsId = useId()
-      const rootRef = useRef(null)
-      const toggleRef = useRef(null)
-      // A non-modal popover: Esc closes it and returns focus to the toggle; a
-      // pointer press outside the strip closes it.
-      useEffect(() => {
-        if (!open || typeof document === 'undefined') return undefined
-        const onKey = (event) => {
-          if (event.key !== 'Escape') return
-          setOpen(false)
-          toggleRef.current?.focus()
-        }
-        const onPointer = (event) => {
-          if (rootRef.current !== null && !rootRef.current.contains(event.target)) setOpen(false)
-        }
-        document.addEventListener('keydown', onKey)
-        document.addEventListener('pointerdown', onPointer)
-        return () => {
-          document.removeEventListener('keydown', onKey)
-          document.removeEventListener('pointerdown', onPointer)
-        }
-      }, [open])
-      const view = state.view
-      if (view === undefined) {
-        if (state.phase === 'loading') return h('div', { className: 'dshUbxInfo', 'data-unoblox-info': '' }, h('span', { role: 'status' }, t('loading')))
-        return h('div', { className: 'dshUbxInfo', 'data-unoblox-info': '' },
-          h('span', { role: 'status' }, t('unavailable')),
-          h('button', { type: 'button', className: 'dshUbxInfoButton', onClick: onRetry }, t('retry')))
+    /**
+     * Presentational row: balance and model as icon pills, or a missing-key
+     * pill. Renders nothing until Unoblox has reported a value, so the row
+     * never shows placeholders.
+     */
+    function UnobloxInfoStrip({ view, t }) {
+      if (view === undefined) return null
+      const pills = []
+      if (view.key === 'missing') {
+        pills.push(h(Pill, { key: 'key', icon: h(IconWarningOutlineRegular, { size: 14 }), text: t('keyMissing'), description: t('keyMissingHint') }))
       }
-      const items = []
-      if (view.key === 'missing') items.push(h(Item, { key: 'key' }, t('keyMissing')))
-      if (view.pricing !== undefined) {
-        const max = view.pricing.maxPaisePerSearch
-        items.push(h(Item, { key: 'search', title: max === undefined ? undefined : t('maxPerSearch', { price: formatPaise(max) }) },
-          h(Labeled, { t, keyName: 'searchPrice', params: { price: formatPaise(view.pricing.paisePer1000) }, valueName: 'price' })))
-      } else {
-        items.push(h(Item, { key: 'search', title: view.pricingError }, t('searchPriceUnavailable')))
+      if (view.balanceInr !== undefined) {
+        const amount = formatInr(view.balanceInr)
+        const label = t('balance', { amount })
+        pills.push(h(Pill, { key: 'balance', className: 'dshUbxInfoBalance', icon: h(WalletIcon), text: amount, description: view.note === undefined ? label : `${label}. ${view.note}` }))
       }
-      if (view.billing !== undefined) {
-        items.push(h(Item, { key: 'balance' }, h(Labeled, { t, keyName: 'balance', params: { amount: formatInr(view.billing.balanceInr) }, valueName: 'amount' })))
-      } else if (view.key !== 'missing') {
-        items.push(h(Item, { key: 'balance' }, t('balancePending')))
+      if (view.model !== undefined) {
+        pills.push(h(Pill, {
+          key: 'model',
+          className: 'dshUbxInfoModel',
+          icon: h(IconSparkleRegular, { size: 14 }),
+          text: shortModel(view.model),
+          description: view.reason === undefined ? t('model', { model: view.model }) : t('modelRouted', { model: view.model, reason: view.reason })
+        }))
       }
-      const charged = view.turnBilling?.chargedInr
-      if (charged !== undefined) {
-        items.push(h(Item, { key: 'turn' }, h(Labeled, {
-          t, keyName: view.turnBilling.chargedEstimated ? 'lastTurnEstimated' : 'lastTurn', params: { amount: formatInr(charged) }, valueName: 'amount'
-        })))
-      }
-      const model = view.routing?.servedModel ?? view.routing?.selectedModel
-      if (model !== undefined) {
-        items.push(h(Item, { key: 'model', className: 'dshUbxInfoModel', title: model }, h(Labeled, { t, keyName: 'model', params: { model }, valueName: 'model' })))
-      }
-
-      const details = []
-      if (view.pricing?.maxPaisePerSearch !== undefined) details.push(t('maxPerSearch', { price: formatPaise(view.pricing.maxPaisePerSearch) }))
-      if (view.billing?.note !== undefined) details.push(view.billing.note)
-      if (view.billing?.tier !== undefined) {
-        details.push(view.billing.stage === undefined ? t('tier', { tier: view.billing.tier }) : t('tierStage', { tier: view.billing.tier, stage: view.billing.stage }))
-      }
-      if (view.billing?.at !== undefined) details.push(t('balanceAt', { time: formatTime(view.billing.at) }))
-      if (view.routing?.reason !== undefined) details.push(t('routing', { reason: view.routing.reason }))
-      if (details.length > 0) {
-        items.push(h('button', {
-          key: 'toggle', ref: toggleRef, type: 'button', className: 'dshUbxInfoButton', 'aria-expanded': open, 'aria-controls': detailsId, onClick: () => setOpen((value) => !value)
-        }, t(open ? 'hideDetails' : 'details')))
-      }
-      if (state.phase === 'error') {
-        items.push(h('span', { key: 'error', role: 'status', className: 'dshUbxInfoItem', title: state.error }, t('unavailable')),
-          h('button', { key: 'retry', type: 'button', className: 'dshUbxInfoButton', onClick: onRetry }, t('retry')))
-      }
-      return h('div', { ref: rootRef, className: 'dshUbxInfo', role: 'group', 'aria-label': t('label'), 'data-unoblox-info': '' },
-        ...items,
-        open && details.length > 0
-          ? h('ul', { id: detailsId, className: 'dshUbxInfoDetails', 'aria-label': t('details') }, details.map((line, index) => h('li', { key: index }, line)))
-          : null)
+      if (pills.length === 0) return null
+      return h('div', { className: 'dshUbxInfo', role: 'group', 'aria-label': t('label'), 'data-unoblox-info': '' }, ...pills)
     }
 
     function UnobloxInfoDock(props) {
       const sessionId = props.session?.sessionId ?? props.sessionId
-      const { state, reload } = useUnobloxInfo(props.service, sessionId, props.session?.running)
-      return h(UnobloxInfoStrip, { state, t: props.t, onRetry: reload })
+      const view = useUnobloxInfo(props.service, sessionId, props.session?.running)
+      return h(UnobloxInfoStrip, { view, t: props.t })
     }
 
     function installStyles() {
@@ -295,7 +221,7 @@ window.__ModuleLoader__.load({
     exports.createInfoService = createInfoService
     exports.toView = toView
     exports.formatInr = formatInr
-    exports.formatPaise = formatPaise
+    exports.shortModel = shortModel
     exports.UnobloxInfoStrip = UnobloxInfoStrip
     exports.UnobloxInfoDock = UnobloxInfoDock
     exports.locales = { en, zh }

@@ -2,14 +2,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const readmes = [
-  'README.md',
-  'README.zh.md',
-  'README.ja.md',
-  'README.ru.md',
-  'README.es.md',
-  'README.pt.md'
-]
+// Unoblox is English-only, so there is one README.
+const readmes = ['README.md']
 
 const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as { dependencies: Record<string, string> }
 const requiredFacts = [
@@ -24,7 +18,7 @@ const requiredFacts = [
   'docs/architecture.md'
 ]
 
-describe('localized README parity', () => {
+describe('README facts', () => {
   for (const path of readmes) {
     it(`${path} carries the current product facts`, () => {
       const content = readFileSync(path, 'utf8')

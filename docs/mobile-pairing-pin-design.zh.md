@@ -194,7 +194,7 @@ pairingPinStore?: {
 - 补：默认未同意时 PIN 不落盘且 5 分钟过期需重扫；`/desktop/pin/consent` 置 true 生成长效 PIN 并落盘、置 false 清除并回临时模式
 - [`test/lan-mobile-pages.test.ts`](../test/lan-mobile-pages.test.ts)、[`test/lan-mobile-tunnel.test.ts`](../test/lan-mobile-tunnel.test.ts)：去掉批准断言
 - 补：Cloudflare / Pinggy 进程退出后 `tunnelActive` 转 false，**不**自动重开、**不**触发 `onReconnectRequested`；`/api/status` 带 `tunnelProvider` 与剩余时间
-- [`README.zh.md`](../README.zh.md)、[`README.md`](../README.md)、[`docs/architecture.md`](architecture.md)：WiFi 扫码即连；隧道默认 5 分钟临时 PIN，用户同意后才生成长效 PIN（隐私说明）；Cloudflare 为长连接主路径，免费 Pinggy 约 60 分钟需重连/重扫（Cloudflare 不可用者的说明）
+- [`README.md`](../README.md)、[`docs/architecture.md`](architecture.md)：WiFi 扫码即连；隧道默认 5 分钟临时 PIN，用户同意后才生成长效 PIN（隐私说明）；Cloudflare 为长连接主路径，免费 Pinggy 约 60 分钟需重连/重扫（Cloudflare 不可用者的说明）
 
 ## 12. 本次不改动的范围
 

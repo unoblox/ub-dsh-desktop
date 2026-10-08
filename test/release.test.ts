@@ -531,24 +531,13 @@ describe('GitHub release contract', () => {
     expect(installer).not.toMatch(/Add-MpPreference|HKLM|ExecShell\s+"runas"/)
   })
 
-  it('routes stable downloads through the website and previews through GitHub', async () => {
-    const readmes = await Promise.all(
-      ['README.md', 'README.zh.md', 'README.ja.md', 'README.ru.md', 'README.es.md', 'README.pt.md'].map((file) =>
-        readFile(path.join(projectRoot, file), 'utf8')
-      )
-    )
-
-    for (const readme of readmes) {
-      expect(readme).toMatch(/https:\/\/(?:www\.)?dshdesktop\.com\/(?:#download|zh\/)/)
-      expect(readme).not.toContain('| Platform | Package | Download |')
-      expect(readme).not.toContain('| 平台 | 安装包 | 下载 |')
-      expect(readme).not.toContain('Coming soon')
-      expect(readme).not.toContain('即将发布')
-      expect(readme).toContain('https://github.com/dataelement/dsh-desktop/releases')
-      expect(readme).toContain('**Pre-release**')
-      for (const asset of releaseAssets) {
-        expect(readme).not.toContain(`releases/latest/download/${asset}`)
-      }
+  it('points readers at the Unoblox beta install guide, not upstream downloads', async () => {
+    const readme = await readFile(path.join(projectRoot, 'README.md'), 'utf8')
+    expect(readme).toContain('docs/install.md')
+    expect(readme).toContain('https://unoblox.ai')
+    expect(readme).not.toMatch(/dshdesktop\.com|dataelement\/dsh-desktop/)
+    for (const asset of releaseAssets) {
+      expect(readme).not.toContain(`releases/latest/download/${asset}`)
     }
   })
 })

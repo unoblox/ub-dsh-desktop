@@ -1,4 +1,5 @@
 import type { Session } from 'electron'
+import { PRODUCT_NAME } from '../shared/brand'
 
 /**
  * Unoblox makes no silent network calls: the only host the app contacts on
@@ -35,5 +36,5 @@ export function disableSpellcheckDownloads(
  * not run.
  */
 export function noAutomaticRegistryLookup(): Promise<Response> {
-  return Promise.reject(new Error('Unoblox does not look up plugin versions online on its own'))
+  return Promise.reject(new Error(`${PRODUCT_NAME} does not look up plugin versions online on its own`))
 }

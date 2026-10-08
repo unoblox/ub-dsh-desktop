@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { DesktopService } from './service'
 import { attachDiagnostics } from './diagnostics'
+import { PRODUCT_NAME } from '../../shared/brand'
 
 let service: DesktopService | undefined
 export let desktopDiagnostics: ReturnType<typeof attachDiagnostics> | undefined
@@ -19,7 +20,7 @@ export function initializeDesktopService(): void {
       // to upstream's dshdesktop.com; here it has no network at all. Crashes
       // are still captured locally for this app's own recovery prompts, and
       // reports are discarded without asking or sending.
-      request: () => Promise.reject(new Error('Unoblox sends no crash reports or update checks')),
+      request: () => Promise.reject(new Error(`${PRODUCT_NAME} sends no crash reports or update checks`)),
       confirmUpload: async () => false
     })
     desktopDiagnostics = attachDiagnostics(app, service, {

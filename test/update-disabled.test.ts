@@ -18,7 +18,7 @@ it('never checks, lists or installs updates while no Unoblox feed is configured'
   manager.startUpdateManager({ prepareToInstall: async () => {} })
   const status = await manager.checkForUpdates(true)
   expect(status.phase).toBe('unsupported')
-  expect(status.message).toContain('Install the latest Unoblox beta')
+  expect(status.message).toContain('Install the latest unoblox works beta')
   await manager.installSpecificVersion('2.0.0')
   expect(mocks.policy).not.toHaveBeenCalled()
   expect(mocks.check).not.toHaveBeenCalled()

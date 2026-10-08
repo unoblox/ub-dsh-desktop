@@ -104,13 +104,15 @@ describe('DSH Desktop client slot occupants', () => {
     const render = (node: Node): Node => typeof node.type === 'function' ? render((node.type as (props: unknown) => Node)(node.props)) : node
     const children = (node: Node) => node.props.children as Array<Node | string>
 
-    // Unoblox wordmark: real text with the gold full stop, like unoblox.ai.
+    // Product wordmark: real lowercase text "unoblox works" with the gold
+    // full stop, like unoblox.ai.
     const sidebarName = registrations.find(
       ({ config }) => config.name === 'sidebar.brand.name'
     )!.component({}) as Node
     expect(sidebarName.type).toBe('span')
-    const [word, stop] = children(sidebarName)
-    expect(word).toBe('unoblox')
+    const [word, works, stop] = children(sidebarName)
+    expect(word).toBe('unoblox ')
+    expect((works as Node).props.children).toEqual(['works'])
     expect((stop as Node).props.children).toEqual(['.'])
     expect(((stop as Node).props.style as { color: string }).color).toBe('#D9A64A')
 

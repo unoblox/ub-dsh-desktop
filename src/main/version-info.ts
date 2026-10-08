@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PRODUCT_NAME } from '../shared/brand'
 
 interface PackageMetadata {
   version?: unknown
@@ -36,7 +37,7 @@ export function aboutDetail(
 ): string {
   const harness = harnessVersion ?? (locale === 'zh' ? '未知' : 'Unknown')
   if (locale === 'zh') {
-    return `Unoblox 版本：${desktopVersion}\n内置 Harness 版本：${harness}\n\nHarness 随 Unoblox 更新。`
+    return `${PRODUCT_NAME} 版本：${desktopVersion}\n内置 Harness 版本：${harness}\n\nHarness 随 ${PRODUCT_NAME} 更新。`
   }
-  return `Unoblox version: ${desktopVersion}\nBundled Harness version: ${harness}\n\nHarness is updated with Unoblox.`
+  return `${PRODUCT_NAME} version: ${desktopVersion}\nBundled Harness version: ${harness}\n\nHarness is updated with ${PRODUCT_NAME}.`
 }

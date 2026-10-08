@@ -36,8 +36,10 @@ window.__ModuleLoader__.load({
       return React.createElement(UnobloxGlyph, { width: 22 })
     }
 
-    // The unoblox.ai header wordmark: lowercase, semibold, tight tracking,
-    // with a gold full stop. Real text, so it is read out as "unoblox".
+    // The product wordmark "unoblox works", always lowercase (see
+    // src/shared/brand.ts): "unoblox" in the unoblox.ai header style
+    // (semibold, tight tracking), "works" lighter, then the gold full stop.
+    // Real text, so it is read out as "unoblox works".
     function DesktopBrandName() {
       return React.createElement(
         'span',
@@ -45,7 +47,8 @@ window.__ModuleLoader__.load({
           'data-unoblox-wordmark': '',
           style: { fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1, whiteSpace: 'nowrap', color: 'currentColor' }
         },
-        'unoblox',
+        'unoblox ',
+        React.createElement('span', { style: { fontWeight: 400 } }, 'works'),
         React.createElement('span', { style: { color: BRAND_GOLD }, 'aria-hidden': 'true' }, '.')
       )
     }
@@ -154,7 +157,7 @@ window.__ModuleLoader__.load({
           html[data-platform=darwin] [data-ds-dark-theme] [class*="_sidebarCol"] {
             background:var(--dsw-specific-sidebar-fill);
           }
-          /* The expanded sidebar header shows the "unoblox." wordmark alone:
+          /* The expanded sidebar header shows the "unoblox works." wordmark alone:
              the glyph beside it repeated the same "u.". The collapsed rail
              keeps the glyph (same slot, outside the identity row). */
           [class*="_brandIdentity"] > [class*="_brandMark"] { display:none; }

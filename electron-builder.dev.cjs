@@ -2,15 +2,15 @@ const packageJson = require('./package.json')
 
 module.exports = {
   ...packageJson.build,
-  appId: 'io.dsh.desktop.dev',
-  productName: 'Unoblox Dev',
+  appId: 'ai.unoblox.works.dev',
+  productName: 'unoblox works dev',
   directories: {
     ...packageJson.build.directories,
     output: 'dist-dev'
   },
   extraMetadata: {
     name: 'dsh-desktop-dev',
-    productName: 'Unoblox Dev',
+    productName: 'unoblox works dev',
     dshDesktopChannel: 'development'
   },
   artifactName: 'dsh-desktop-dev-${os}-${arch}.${ext}',

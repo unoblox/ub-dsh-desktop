@@ -3,7 +3,7 @@ const packageJson = require('./package.json')
 /**
  * Public beta installers, built without paid signing certificates.
  *
- * Same identity as a release ("Unoblox", app id io.dsh.desktop, userData
+ * Same identity as a release ("unoblox works", app id ai.unoblox.works, userData
  * `dsh-desktop`), so a later signed release installs over a beta and keeps its
  * data. What differs:
  *
@@ -28,7 +28,7 @@ module.exports = {
     ...packageJson.build.directories,
     output: 'dist-beta'
   },
-  artifactName: 'Unoblox-Beta-${version}-${os}-${arch}.${ext}',
+  artifactName: 'unoblox-works-beta-${version}-${os}-${arch}.${ext}',
   mac: {
     ...packageJson.build.mac,
     // The zip exists for auto-update, which the beta does not have.
@@ -50,12 +50,14 @@ module.exports = {
   },
   deb: {
     // apt shows this name; the repository package name is dsh-desktop.
-    packageName: 'unoblox',
-    artifactName: 'Unoblox-Beta-${version}-linux-${arch}.${ext}'
+    packageName: 'unoblox-works',
+    // The first .deb betas were named "unoblox"; installing this one removes it.
+    fpm: ['--conflicts', 'unoblox', '--replaces', 'unoblox'],
+    artifactName: 'unoblox-works-beta-${version}-linux-${arch}.${ext}'
   },
   dmg: {
     ...packageJson.build.dmg,
-    title: 'Unoblox Beta',
+    title: 'unoblox works beta',
     background: 'build/dmg-background.png',
     iconSize: 96,
     window: { width: DMG_WINDOW.width, height: DMG_WINDOW.height },
@@ -66,7 +68,7 @@ module.exports = {
   },
   nsis: {
     ...packageJson.build.nsis,
-    artifactName: 'Unoblox-Beta-${version}-windows-${arch}-setup.${ext}'
+    artifactName: 'unoblox-works-beta-${version}-windows-${arch}-setup.${ext}'
   },
   publish: null
 }

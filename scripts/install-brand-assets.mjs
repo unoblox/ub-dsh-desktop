@@ -20,14 +20,15 @@ const indexPath = path.join(destinationDirectory, 'index.html')
 const manifestPath = path.join(destinationDirectory, 'manifest.webmanifest')
 
 /** Product name shown in the page title and web manifest. */
-const PRODUCT_NAME = 'Unoblox'
+// Always lowercase; see src/shared/brand.ts.
+const PRODUCT_NAME = 'unoblox works'
 
 /**
  * Replace the static page title (upstream ships "DeepSeek Harness"). The
  * runtime title comes from dsh-client-ui-layout, patched to the same name.
  * @param contents - index.html source.
  * @param file - path shown in the failure message.
- * @returns index.html with the Unoblox title.
+ * @returns index.html with the product title.
  */
 function replaceTitle(contents, file) {
   const titles = contents.match(/<title>[^<]*<\/title>/gu) ?? []
@@ -83,7 +84,7 @@ function replaceManifestIcon(contents, file) {
   target.src = '/dsh-desktop-logo.png'
   target.sizes = '1024x1024'
   target.type = 'image/png'
-  // The installed app is Unoblox; the manifest still named upstream.
+  // The installed app is unoblox works; the manifest still named upstream.
   manifest.name = PRODUCT_NAME
   manifest.short_name = PRODUCT_NAME
   return `${JSON.stringify(manifest, null, 2)}\n`

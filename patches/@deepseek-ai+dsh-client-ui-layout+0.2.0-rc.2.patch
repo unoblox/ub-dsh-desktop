@@ -1,5 +1,5 @@
 diff --git a/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js
-index e90615e..b908e61 100644
+index e90615e..f5ffcd5 100644
 --- a/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js
 +++ b/node_modules/@deepseek-ai/dsh-client-ui-layout/lib/client.js
 @@ -295,7 +295,8 @@ window.__ModuleLoader__.load({
@@ -7,8 +7,8 @@ index e90615e..b908e61 100644
  				actions.setRightbar(rightbarBase.current - dx);
  			}, [actions]);
 -			const productTitle = "DeepSeek Harness";
-+			// DSH Desktop patch: the installed product is Unoblox.
-+			const productTitle = "Unoblox";
++			// DSH Desktop patch: the installed product is "unoblox works" (lowercase).
++			const productTitle = "unoblox works";
  			const rightbarMax = cols.rightbar === 0 ? 0 : clampWidth(rightbarPreference, 300, viewport * RIGHTBAR_MAX_RATIO);
  			const sidebar = (0, react.useMemo)(() => renderSlot("sidebar", {
  				collapsed: sidebarCollapsed,

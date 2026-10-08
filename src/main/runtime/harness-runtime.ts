@@ -11,6 +11,7 @@ import { prepareHostDisabledPluginsPatch } from '../state/host-disabled-plugins'
 import { prepareHostPluginSourcesPatch } from '../state/host-plugin-sources'
 import { parsePluginStartupFailures, type PluginStartupFailure } from '../../shared/plugin-startup-failure'
 import { removeStaleWriterLocks } from './stale-writer-locks'
+import { PRODUCT_NAME } from '../../shared/brand'
 
 export interface HarnessRuntimeOptions {
   dshEntryPath: string
@@ -484,7 +485,7 @@ export class HarnessRuntime {
       ? this.options.dshSafePatchPath
       : this.options.dshPatchPath
     if (!existsSync(sourcePatchPath)) {
-      this.setState('failed', `Unoblox patch was not found: ${sourcePatchPath}`)
+      this.setState('failed', `${PRODUCT_NAME} patch was not found: ${sourcePatchPath}`)
       return
     }
     await mkdir(this.options.dshHome, { recursive: true })
@@ -534,7 +535,7 @@ export class HarnessRuntime {
       )
     }
     this.writeLog(`[desktop] endpoint ${url}`)
-    this.setState('starting', 'Starting Unoblox…')
+    this.setState('starting', `Starting ${PRODUCT_NAME}…`)
 
     const shellEnvironment = await prewarmShellEnvironment()
     let launchEnvironment: Record<string, string> = {}

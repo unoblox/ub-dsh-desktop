@@ -3,6 +3,7 @@ import type { SpawnOptionsWithoutStdio } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import type { UtilityProcess } from 'electron'
 import type { HarnessChildProcess } from './harness-runtime'
+import { PRODUCT_NAME } from '../../shared/brand'
 
 interface UtilityProcessLauncher {
   fork(modulePath: string, args?: string[], options?: Electron.ForkOptions): UtilityProcess
@@ -37,7 +38,7 @@ export function buildDisclaimedUtilityProcessSpec(
       env: definedEnvironment(spawnOptions.env),
       execArgv: [internalLoaderFlag],
       stdio: 'pipe',
-      serviceName: 'Unoblox Harness',
+      serviceName: `${PRODUCT_NAME} Harness`,
       // Harness loads user-installed plugins and can launch third-party tools.
       // Keep their TCC requests out of DSH Desktop's responsibility chain in production.
       disclaim: utilityProcessOptions?.disclaim ?? true

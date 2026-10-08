@@ -258,7 +258,7 @@ jobs:
       - name: Verify signed and notarized ${{ matrix.label }} app
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'signed' || inputs.mode == 'prerelease'))
         run: |
-          app_path="dist/${{ matrix.app-directory }}/Unoblox.app"
+          app_path="dist/${{ matrix.app-directory }}/unoblox works.app"
           codesign --verify --deep --strict --verbose=2 "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
           xcrun stapler validate "$app_path"
@@ -348,7 +348,7 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         shell: pwsh
         env:
-          SMOKE_EXE: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'signed' || inputs.mode == 'prerelease'))) && 'dist\win-unpacked\Unoblox.exe' || 'dist-dev\win-unpacked\Unoblox Dev.exe' }}
+          SMOKE_EXE: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'signed' || inputs.mode == 'prerelease'))) && 'dist\win-unpacked\unoblox works.exe' || 'dist-dev\win-unpacked\unoblox works dev.exe' }}
           SMOKE_USERDATA: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'signed' || inputs.mode == 'prerelease'))) && 'dsh-desktop' || 'dsh-desktop-dev' }}
         run: |
           $userData = Join-Path $env:APPDATA $env:SMOKE_USERDATA
@@ -400,7 +400,7 @@ jobs:
             $endpoint = $null
             while ((Get-Date) -lt $deadline) {
               if ($desktop.HasExited) {
-                throw "Unoblox Dev exited before Harness was ready (exit code $($desktop.ExitCode))."
+                throw "unoblox works dev exited before Harness was ready (exit code $($desktop.ExitCode))."
               }
               if (Test-Path $logPath) {
                 $log = Get-Content -Raw $logPath
@@ -469,7 +469,7 @@ jobs:
               throw 'Harness process exited after workspace and session creation.'
             }
             if ($desktop.HasExited) {
-              throw "Unoblox Dev exited after workspace and session creation (exit code $($desktop.ExitCode))."
+              throw "unoblox works dev exited after workspace and session creation (exit code $($desktop.ExitCode))."
             }
             Write-Host 'Packaged Windows Harness smoke test passed.'
           } finally {
@@ -632,7 +632,7 @@ jobs:
             --tsmode RFC3161 \
             --tsretries 3 \
             --tsretrywait 10 \
-            --name 'Unoblox' \
+            --name 'unoblox works' \
             --url https://www.dshdesktop.com \
             --verbose \
             "$installer"
@@ -856,7 +856,7 @@ jobs:
             gh release create "$RELEASE_TAG" release-assets/* \
               --verify-tag \
               --notes-file "$notes" \
-              --title "Unoblox $RELEASE_TAG" \
+              --title "unoblox works $RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY"
           fi
       - name: Mirror release assets to ModelScope
@@ -1069,7 +1069,7 @@ jobs:
               --prerelease \
               --target "$GITHUB_SHA" \
               --generate-notes \
-              --title "Unoblox $RELEASE_TAG（预发布）" \
+              --title "unoblox works $RELEASE_TAG（预发布）" \
               --repo "$GITHUB_REPOSITORY"
           fi
       - name: Mirror pre-release assets to ModelScope

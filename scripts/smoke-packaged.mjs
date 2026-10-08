@@ -44,8 +44,8 @@ function executableIn(directory) {
   } else {
     // Linux: build.linux.executableName; Windows: <productName>.exe.
     const names = process.platform === 'win32'
-      ? readdirSync(directory).filter((name) => /^Unoblox( Dev)?\.exe$/u.test(name))
-      : ['dsh-desktop', 'dsh-desktop-dev']
+      ? readdirSync(directory).filter((name) => /^unoblox works( dev)?\.exe$/u.test(name))
+      : ['unoblox-works', 'unoblox-works-dev']
     for (const name of names) {
       if (existsSync(join(directory, name))) return join(directory, name)
     }
@@ -100,7 +100,7 @@ child.on('exit', (code, signal) => {
  */
 function logCandidates() {
   if (process.platform === 'darwin') {
-    return ['Unoblox Dev', 'Unoblox'].map((name) => join(homedir(), 'Library', 'Logs', name, 'harness.log'))
+    return ['unoblox works dev', 'unoblox works'].map((name) => join(homedir(), 'Library', 'Logs', name, 'harness.log'))
   }
   return ['dsh-desktop-dev', 'dsh-desktop'].map((name) => join(appDataDirectory(home), name, 'logs', 'harness.log'))
 }

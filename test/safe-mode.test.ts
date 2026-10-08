@@ -95,7 +95,7 @@ describe('Safe Mode', () => {
       applyLabel: 'Disable selected plugins',
       agentLabel: 'Close',
       restartLabel: 'Exit Safe Mode and restart',
-      quitLabel: 'Quit Unoblox'
+      quitLabel: 'Quit unoblox works'
     })
   })
 

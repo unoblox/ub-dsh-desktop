@@ -1,10 +1,10 @@
 <h1 align="center">
-  <img src="build/icon.png" width="64" alt="Unoblox logo" valign="middle" />
-  Unoblox
+  <img src="build/icon.png" width="64" alt="unoblox works logo" valign="middle" />
+  unoblox works
 </h1>
 
 <p align="center">
-  <strong>Make it happen.</strong> A desktop AI agent for macOS, Windows and Linux, powered by the <a href="https://unoblox.ai">Unoblox</a> unified AI gateway.
+  <strong>Make it happen.</strong> unoblox works is a desktop AI agent for macOS, Windows and Linux, powered by the <a href="https://unoblox.ai">Unoblox</a> unified AI gateway.
 </p>
 
 <p align="center">
@@ -15,22 +15,22 @@
   <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-D9A64A.svg" />
 </p>
 
-![Unoblox in dark mode: sidebar with workspaces, and the "Make it happen." composer](docs/images/unoblox-overview-dark.png)
+![unoblox works in dark mode: sidebar with workspaces, and the "Make it happen." composer](docs/images/unoblox-overview-dark.png)
 
-Unoblox runs AI agents on your computer. In the workspace folders you choose, an agent can read and write files, run commands, search the web, and create documents, spreadsheets and slides. Risky actions ask for your approval first.
+unoblox works runs AI agents on your computer. In the workspace folders you choose, an agent can read and write files, run commands, search the web, and create documents, spreadsheets and slides. Risky actions ask for your approval first.
 
 Every model call goes through the Unoblox gateway with one API key and one prepaid ₹ balance: pick **Unoblox Auto** to route each request to the best-value model, or choose a specific model per conversation from the live catalog.
 
 > [!IMPORTANT]
-> Unoblox is in **beta**. Installers are not yet signed with paid Apple or Microsoft certificates, so your computer asks you to confirm the app once on first open, and the app does not update itself yet. See [Install Unoblox Beta](docs/install.md).
+> unoblox works is in **beta**. Installers are not yet signed with paid Apple or Microsoft certificates, so your computer asks you to confirm the app once on first open, and the app does not update itself yet. See [Install unoblox works beta](docs/install.md).
 
 ## Install
 
 | Platform | Installer |
 | --- | --- |
-| macOS (Apple Silicon, M1 or later) | `Unoblox-Beta-<version>-mac-arm64.dmg` |
-| Windows 10/11 x64 | `Unoblox-Beta-<version>-windows-x64-setup.exe` (NSIS) |
-| Linux x64 | `Unoblox-Beta-<version>-linux-amd64.deb` (Ubuntu, Debian) or `Unoblox-Beta-<version>-linux-x86_64.AppImage` |
+| macOS (Apple Silicon, M1 or later) | `unoblox-works-beta-<version>-mac-arm64.dmg` |
+| Windows 10/11 x64 | `unoblox-works-beta-<version>-windows-x64-setup.exe` (NSIS) |
+| Linux x64 | `unoblox-works-beta-<version>-linux-amd64.deb` (Ubuntu, Debian) or `unoblox-works-beta-<version>-linux-x86_64.AppImage` |
 
 Beta installers are built by the **Build beta installers** workflow in this repository's Actions tab. Step-by-step instructions, including the one-time first-open prompt on each system, are in [docs/install.md](docs/install.md). You need an Unoblox API key from the Unoblox developer portal; the app asks for it on first launch.
 
@@ -40,12 +40,12 @@ Beta installers are built by the **Build beta installers** workflow in this repo
 - **One gateway, many models:** Unoblox Auto or any tool-capable model from the live Unoblox catalog. The composer shows your balance and the model that served the last reply.
 - **Documents:** offline DOCX, PPTX and XLSX skills with a bundled Python runtime, and a PPT mode that turns source material into editable PPTX decks from 16 templates.
 - **Phone access:** continue sessions from your phone on the same Wi-Fi, or through a temporary Cloudflare Quick Tunnel (Pinggy as fallback) when you choose internet mode. The bridge listens only while you pair, while a paired phone is attached, or when **Harness › Keep Phone Connected** is on.
-- **Recovery:** startup and plugin failures are detected and logged to `harness.log`, with a guided recovery screen and a non-destructive Safe Mode that blocks third-party plugins. If the normal interface cannot open, start with `--safe-mode` (macOS: `open -a "Unoblox" --args --safe-mode`).
+- **Recovery:** startup and plugin failures are detected and logged to `harness.log`, with a guided recovery screen and a non-destructive Safe Mode that blocks third-party plugins. If the normal interface cannot open, start with `--safe-mode` (macOS: `open -a "unoblox works" --args --safe-mode`).
 - **Portable presets:** import and export custom agent presets as [`.dshpreset` packages](docs/preset-packages.md).
 
 ## Privacy
 
-Unoblox collects no usage or analytics data, and talks to no server on its own except the Unoblox API (`api.unoblox.ai`). Everything else (web pages an agent fetches, plugins you install, phone tunnels) happens only when you ask for it. Details, and the tests that keep it that way, are in [docs/privacy.md](docs/privacy.md).
+unoblox works collects no usage or analytics data, and talks to no server on its own except the Unoblox API (`api.unoblox.ai`). Everything else (web pages an agent fetches, plugins you install, phone tunnels) happens only when you ask for it. Details, and the tests that keep it that way, are in [docs/privacy.md](docs/privacy.md).
 
 Your API key is stored on your machine in the Harness credential store and is sent only to `api.unoblox.ai`. Conversations, workspaces and settings stay in your user data folder.
 
@@ -58,7 +58,7 @@ Your API key is stored on your machine in the Harness credential store and is se
 
 ## Development
 
-Unoblox is built on the open-source [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`@deepseek-ai/dsh@0.2.0-rc.2`) and started from the MIT-licensed DSH Desktop. Read [AGENTS.md](AGENTS.md) first, then:
+unoblox works is built on the open-source [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`@deepseek-ai/dsh@0.2.0-rc.2`) and started from the MIT-licensed DSH Desktop. Read [AGENTS.md](AGENTS.md) first, then:
 
 - [Development guide](docs/development.md): setup, validation, patch maintenance and target-native packaging
 - [Architecture](docs/architecture.md): runtime flow, persistent data, security boundaries, recovery and mobile access
@@ -76,4 +76,4 @@ Installers are built on the matching operating system; cross-builds are refused.
 
 ## License
 
-Unoblox is open source under the [MIT License](LICENSE). DeepSeek Harness and its dependencies remain under their own licenses and trademark policies.
+unoblox works is open source under the [MIT License](LICENSE). DeepSeek Harness and its dependencies remain under their own licenses and trademark policies.

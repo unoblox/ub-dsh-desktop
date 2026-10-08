@@ -116,18 +116,18 @@ const DMG_WINDOW = JSON.parse(await readFile(join(root, 'build', 'brand', 'dmg-l
 function dmgBackground(scale) {
   const { width, height, app, applications } = DMG_WINDOW
   const steps = [
-    'Double-click Unoblox in Applications. If macOS says it cannot verify the app, click Done.',
+    'Double-click unoblox works in Applications. If macOS says it cannot verify the app, click Done.',
     'Open System Settings \u203a Privacy &amp; Security, scroll down and click Open Anyway.'
   ]
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
   <rect width="${width}" height="${height}" fill="#F8F8F6"/>
-  <text x="${width / 2}" y="54" text-anchor="middle" font-family="Inter" font-size="19" font-weight="600" fill="#0C0C0C">Drag Unoblox to Applications</text>
+  <text x="${width / 2}" y="54" text-anchor="middle" font-family="Inter" font-size="19" font-weight="600" fill="#0C0C0C">Drag unoblox works to Applications</text>
   <circle cx="${app.x}" cy="${app.y}" r="66" fill="#FFFFFF" stroke="#E6E2DA"/>
   <circle cx="${applications.x}" cy="${applications.y}" r="66" fill="#FFFFFF" stroke="#E6E2DA"/>
   <path d="M${app.x + 92} ${app.y}H${applications.x - 100}" stroke="#D9A64A" stroke-width="4" stroke-linecap="round"/>
   <path d="M${applications.x - 114} ${app.y - 13}L${applications.x - 98} ${app.y}L${applications.x - 114} ${app.y + 13}" fill="none" stroke="#D9A64A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   <rect x="40" y="290" width="${width - 80}" height="118" rx="14" fill="#FFFFFF" stroke="#E6E2DA"/>
-  <text x="62" y="320" font-family="Inter" font-size="13" font-weight="600" fill="#0C0C0C">First open (once): Unoblox Beta is not notarized by Apple yet</text>
+  <text x="62" y="320" font-family="Inter" font-size="13" font-weight="600" fill="#0C0C0C">First open (once): unoblox works beta is not notarized by Apple yet</text>
   ${steps.map((step, index) => `<circle cx="70" cy="${348 + index * 30}" r="10" fill="#D9A64A"/><text x="70" y="${352.5 + index * 30}" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#FFFFFF">${index + 1}</text><text x="88" y="${352.5 + index * 30}" font-family="Inter" font-size="12.5" fill="#3A3A38">${step}</text>`).join('')}
 </svg>`)
 }

@@ -344,15 +344,15 @@ describe('GitHub release contract', () => {
     expect(packageJson.scripts['package:dev:win']).toContain('verify-target.mjs win32 x64')
     expect(packageJson.scripts['package:dev:win']).toContain('electron-builder.dev.cjs')
     expect(packageJson.scripts['package:dev:win']).toContain('--publish never')
-    expect(developmentConfig.appId).toBe('io.dsh.desktop.dev')
-    expect(developmentConfig.productName).toBe('Unoblox Dev')
+    expect(developmentConfig.appId).toBe('ai.unoblox.works.dev')
+    expect(developmentConfig.productName).toBe('unoblox works dev')
     expect(developmentConfig.directories.output).toBe('dist-dev')
     expect(developmentConfig.extraMetadata.dshDesktopChannel).toBe('development')
     expect(developmentConfig.artifactName).toBe('dsh-desktop-dev-${os}-${arch}.${ext}')
     expect(developmentConfig.nsis.artifactName).toBe('dsh-desktop-dev-windows-${arch}-setup.${ext}')
   })
 
-  it('packages the public beta as Unoblox without paid signing', async () => {
+  it('packages the public beta as unoblox works without paid signing', async () => {
     const require = createRequire(import.meta.url)
     const packageJson = require('../package.json') as { build: { appId: string }; scripts: Record<string, string> }
     const beta = require('../electron-builder.beta.cjs') as {
@@ -370,7 +370,10 @@ describe('GitHub release contract', () => {
 
     // Same identity as a release, so a later signed release keeps beta data.
     expect(beta.appId).toBe(packageJson.build.appId)
-    expect(beta.productName).toBe('Unoblox')
+    // The product name is always lowercase (src/shared/brand.ts); the app id
+    // matches it so Apple signing registers the final identity.
+    expect(beta.productName).toBe('unoblox works')
+    expect(beta.appId).toBe('ai.unoblox.works')
     expect(beta.publish).toBeNull()
     expect(beta.directories.output).toBe('dist-beta')
     // Ad-hoc: a valid seal without a certificate (an unsigned build reads as "damaged").
@@ -378,7 +381,7 @@ describe('GitHub release contract', () => {
     // Ubuntu 24.04+ needs the .deb's AppArmor profile for Chromium's sandbox.
     expect(beta.linux.target.map((entry) => entry.target)).toEqual(['AppImage', 'deb'])
     expect(beta.linux.maintainer).toBe('Unoblox <hello@unoblox.ai>')
-    expect(beta.deb.packageName).toBe('unoblox')
+    expect(beta.deb.packageName).toBe('unoblox-works')
     expect(workflow).toContain('sudo apt-get install -y xvfb ./dist-beta/*.deb')
     expect(beta.dmg.background).toBe('build/dmg-background.png')
     expect(beta.dmg.contents).toEqual([
@@ -411,7 +414,7 @@ describe('GitHub release contract', () => {
     expect(workflow).toContain('$executable = Join-Path $isolatedApp $sourceExecutable.Name')
     expect(workflow).toContain('-WorkingDirectory $isolatedApp')
     expect(workflow).toContain('Packaged koffi native binding failed (exit code $koffiExitCode).')
-    expect(workflow).toContain("'dist-dev\\win-unpacked\\Unoblox Dev.exe'")
+    expect(workflow).toContain("'dist-dev\\win-unpacked\\unoblox works dev.exe'")
     expect(workflow).toContain('if (-not [string]::IsNullOrEmpty($log))')
     expect(workflow).toContain("dsh web: (http://127\\.0\\.0\\.1:\\d+/\\?token=[^\\s]+)")
     expect(workflow).toContain('-SessionVariable harnessSession')

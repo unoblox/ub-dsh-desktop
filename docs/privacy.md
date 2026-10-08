@@ -1,6 +1,6 @@
 # Privacy and network policy
 
-Unoblox follows two rules:
+unoblox works follows two rules:
 
 1. **No usage, analytics or telemetry data leaves the user's machine.**
 2. **No silent network traffic.** The only server the app contacts on its own is the Unoblox API, `api.unoblox.ai`. Any other connection must be something the user asked for at that moment.

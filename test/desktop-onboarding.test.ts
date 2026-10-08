@@ -291,9 +291,9 @@ describe('DSH Desktop onboarding wizard', () => {
     const zh = dictsRecord.zh ?? {}
     const en = dictsRecord.en ?? {}
     expect(Object.keys(zh).sort()).toEqual(Object.keys(en).sort())
-    expect(zh.step0Title).toBe('欢迎使用 Unoblox')
-    expect(en.step0Title).toBe('Welcome to Unoblox')
-    expect(en.brandName).toBe('Unoblox')
+    expect(zh.step0Title).toBe('欢迎使用 unoblox works')
+    expect(en.step0Title).toBe('Welcome to unoblox works')
+    expect(en.brandName).toBe('unoblox works')
     expect(en.later).toBe('Not now')
     expect(en.brandBy).toBe('Beta')
     expect(en.unobloxKeyLater).toContain('Settings › Models')

@@ -1,5 +1,6 @@
 import type { ProfileCompatibilityIssue } from './state/profile-compatibility'
 import type { PluginHealthReport, PluginHealthStatus } from './state/plugin-market-check'
+import { PRODUCT_NAME } from '../shared/brand'
 
 export type SafeModeLocale = 'en' | 'zh'
 
@@ -364,7 +365,7 @@ export function buildSafeModeViewModel(options: {
   if (options.locale === 'zh') {
     return {
       locale: 'zh',
-      brand: 'Unoblox',
+      brand: `${PRODUCT_NAME}`,
       badge: '安全模式',
       heading: '',
       summary: '安全模式暂时跳过第三方插件。停用有问题的插件后重启；插件和数据都会保留。',
@@ -391,7 +392,7 @@ export function buildSafeModeViewModel(options: {
       restartLabel: '退出安全模式并重启',
       restartBusyLabel: '正在重启…',
       restartConfirm: safeModeExitConfirmation(blockingGroups, 'zh'),
-      quitLabel: '退出 Unoblox',
+      quitLabel: `退出 ${PRODUCT_NAME}`,
       notice: options.notice,
       noticeSummary: summarizeLongNotice(options.notice, 'zh'),
       noticeTone: options.noticeTone,
@@ -406,7 +407,7 @@ export function buildSafeModeViewModel(options: {
 
   return {
     locale: 'en',
-    brand: 'Unoblox',
+    brand: `${PRODUCT_NAME}`,
     badge: 'Safe Mode',
     heading: '',
     summary: 'Safe Mode temporarily skips third-party plugins. Disable the faulty plugin and restart; your plugins and data stay intact.',
@@ -433,7 +434,7 @@ export function buildSafeModeViewModel(options: {
     restartLabel: 'Exit Safe Mode and restart',
     restartBusyLabel: 'Restarting…',
     restartConfirm: safeModeExitConfirmation(blockingGroups, 'en'),
-    quitLabel: 'Quit Unoblox',
+    quitLabel: `Quit ${PRODUCT_NAME}`,
     notice: options.notice,
     noticeSummary: summarizeLongNotice(options.notice, 'en'),
     noticeTone: options.noticeTone,

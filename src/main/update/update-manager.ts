@@ -29,6 +29,7 @@ import {
   fetchAvailableReleases,
   STABLE_FEED_URL
 } from './version-catalog'
+import { PRODUCT_NAME } from '../../shared/brand'
 
 const { autoUpdater } = electronUpdater
 const TRANSIENT_STATUS_MS = 8_000
@@ -103,7 +104,7 @@ export function startUpdateManager(options: { prepareToInstall: () => Promise<vo
   if (!supportsUpdates()) {
     transition({
       type: 'unsupported',
-      message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Updates are available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox beta to update.'
+      message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Updates are available in installed macOS and Windows builds.' : `Automatic updates are off. Install the latest ${PRODUCT_NAME} beta to update.`
     })
     return
   }
@@ -122,7 +123,7 @@ export async function checkForUpdates(manual = false): Promise<UpdateStatus> {
     transition(
       {
         type: 'unsupported',
-        message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Update checks are only available in installed macOS and Windows builds.' : 'Automatic updates are off. Install the latest Unoblox beta to update.'
+        message: UNOBLOX_UPDATE_FEED_CONFIGURED ? 'Update checks are only available in installed macOS and Windows builds.' : `Automatic updates are off. Install the latest ${PRODUCT_NAME} beta to update.`
       },
       manual
     )

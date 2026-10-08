@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop",
   "version": "0.1.1",
-  "description": "Unoblox: a desktop AI agent for macOS, Windows and Linux on the Unoblox unified AI gateway.",
+  "description": "unoblox works: a desktop AI agent for macOS, Windows and Linux on the Unoblox unified AI gateway.",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
@@ -322,8 +322,8 @@
     "koffi": "3.1.5"
   },
   "build": {
-    "appId": "io.dsh.desktop",
-    "productName": "Unoblox",
+    "appId": "ai.unoblox.works",
+    "productName": "unoblox works",
     "asar": true,
     "asarUnpack": [
       "**/*.{node,dylib,dll,so,exe}",
@@ -481,7 +481,7 @@
     "linux": {
       "icon": "build/app-icon.png",
       "category": "Development",
-      "executableName": "dsh-desktop",
+      "executableName": "unoblox-works",
       "synopsis": "Desktop AI agent workbench on the Unoblox gateway",
       "target": [
         {

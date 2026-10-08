@@ -2,7 +2,7 @@ name: Build beta installers
 
 # Beta installers for every desktop platform, built on native runners
 # (packaging is never cross-compiled: scripts/verify-target refuses it) with
-# electron-builder.beta.cjs: product "Unoblox", macOS (Apple Silicon only for
+# electron-builder.beta.cjs: product "unoblox works", macOS (Apple Silicon only for
 # the beta) ad-hoc signed, Windows
 # unsigned, no update feed. Nothing is published; the installers are kept as
 # workflow artifacts. Each job launches the packaged app and checks it starts.
@@ -46,7 +46,7 @@ jobs:
               {"label": "Windows x64", "family": "windows", "runner": "windows-2022", "platform": "win32", "arch": "x64",
                "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "unpacked": "dist-beta/win-unpacked", "files": "dist-beta/*-setup.exe"},
               {"label": "Linux x64", "family": "linux", "runner": "ubuntu-24.04", "platform": "linux", "arch": "x64",
-               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "unpacked": "/opt/Unoblox", "files": "dist-beta/*.AppImage\ndist-beta/*.deb"}
+               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "unpacked": "/opt/unoblox works", "files": "dist-beta/*.AppImage\ndist-beta/*.deb"}
             ]
         run: echo "include=$(jq -c --arg t "$TARGET" '[.[] | select($t == "all" or .family == $t)]' <<< "$ROWS")" >> "$GITHUB_OUTPUT"
 

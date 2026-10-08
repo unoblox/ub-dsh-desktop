@@ -1,4 +1,5 @@
 import type { UpdateStatus } from '../shared/contracts'
+import { PRODUCT_NAME } from '../shared/brand'
 
 export type UpdateLocale = 'en' | 'zh'
 
@@ -74,7 +75,7 @@ export function updateHeadline(status: UpdateStatus, locale: UpdateLocale): Upda
     case 'unsupported':
       return {
         title: zh ? '自动更新已关闭' : 'Automatic updates are off',
-        description: zh ? '安装最新的 Unoblox 测试版即可更新。' : 'Install the latest Unoblox beta to update.'
+        description: zh ? `安装最新的 ${PRODUCT_NAME} 测试版即可更新。` : `Install the latest ${PRODUCT_NAME} beta to update.`
       }
     case 'error':
       return {
@@ -109,15 +110,15 @@ export function updateMessage(status: UpdateStatus, locale: UpdateLocale): strin
     case 'available':
       return zh
         ? `发现新版本${version}，是否更新？`
-        : `Unoblox${version} is available. Update now?`
+        : `${PRODUCT_NAME}${version} is available. Update now?`
     case 'downloading': {
       const percent = Math.round(status.percent ?? 0)
       return zh ? `正在下载更新 ${percent}%` : `Downloading update ${percent}%`
     }
     case 'downloaded':
-      return zh ? `Unoblox${version} 已下载完成` : `Unoblox${version} is ready to install`
+      return zh ? `${PRODUCT_NAME}${version} 已下载完成` : `${PRODUCT_NAME}${version} is ready to install`
     case 'up-to-date':
-      return zh ? 'Unoblox 已是最新版本' : 'Unoblox is up to date'
+      return zh ? `${PRODUCT_NAME} 已是最新版本` : `${PRODUCT_NAME} is up to date`
     case 'unsupported':
       return zh ? '当前版本不支持自动更新' : 'Automatic updates are unavailable in this build'
     case 'error':

@@ -291,6 +291,29 @@ window.__ModuleLoader__.load({
       }
     }
 
+    // Harness can still be starting (plugins loading, a profile restart) when
+    // the shell first asks, and one timed-out or failed describe then read as
+    // "unknown" and showed the notice to a user whose key was stored. Ask again
+    // until the store gives a definite answer; ~30 s covers a cold start.
+    const KEY_STATE_ATTEMPTS = 12
+    const KEY_STATE_RETRY_MS = 2500
+
+    /**
+     * {@link unobloxKeyState}, retried while the answer is 'unknown'.
+     * @param options - attempts and the pause between them (tests shorten these).
+     */
+    async function settledUnobloxKeyState(credentials, options = {}) {
+      const attempts = options.attempts ?? KEY_STATE_ATTEMPTS
+      const retryMs = options.retryMs ?? KEY_STATE_RETRY_MS
+      let state = 'unknown'
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, retryMs))
+        state = await unobloxKeyState(credentials)
+        if (state !== 'unknown' || credentials === undefined) return state
+      }
+      return state
+    }
+
     // ---------- the first-run notice ----------
 
     function DesktopOnboardingNotice(props) {
@@ -323,7 +346,7 @@ window.__ModuleLoader__.load({
       const [keyState, setKeyState] = useState('pending')
       useEffect(() => {
         let current = true
-        unobloxKeyState(credentials).then((state) => {
+        settledUnobloxKeyState(credentials).then((state) => {
           if (current) setKeyState(state)
         })
         return () => { current = false }
@@ -484,6 +507,7 @@ window.__ModuleLoader__.load({
     exports.inject = inject
     exports.onboardingDecision = onboardingDecision
     exports.unobloxKeyState = unobloxKeyState
+    exports.settledUnobloxKeyState = settledUnobloxKeyState
     exports.storeUnobloxKey = storeUnobloxKey
     return module.exports
   }

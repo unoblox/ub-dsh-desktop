@@ -115,6 +115,10 @@ function loadPlugin() {
       inject: string[]
       onboardingDecision: (value: unknown, keyState?: string) => 'show' | 'complete'
       unobloxKeyState: (credentials: unknown) => Promise<'configured' | 'missing' | 'unknown'>
+      settledUnobloxKeyState: (
+        credentials: unknown,
+        options?: { attempts?: number; retryMs?: number }
+      ) => Promise<'configured' | 'missing' | 'unknown'>
       storeUnobloxKey: (
         credentials: unknown,
         t: (key: string) => string,
@@ -320,6 +324,29 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(await plugin.unobloxKeyState({ describe: async () => ({ ok: false, error: { message: 'x' } }) })).toBe('unknown')
     expect(await plugin.unobloxKeyState({ describe: async () => { throw new Error('offline') } })).toBe('unknown')
     expect(await plugin.unobloxKeyState(undefined)).toBe('unknown')
+  })
+
+  it('keeps asking while Harness is still starting instead of re-prompting a stored key', async () => {
+    const { plugin } = loadPlugin()
+    // Two failed describes (the credential service not mounted yet), then the
+    // stored key: a relaunch must not show the key dialog again.
+    const answers = [
+      async () => ({ ok: false, error: { message: 'no credential provider is mounted' } }),
+      async () => { throw new Error('socket hang up') },
+      async () => ({ ok: true, value: { UNOBLOX_API_KEY: { configured: true, source: 'file', writable: true } } })
+    ]
+    const describe = vi.fn(() => answers.shift()!())
+    expect(await plugin.settledUnobloxKeyState({ describe }, { attempts: 5, retryMs: 1 })).toBe('configured')
+    expect(describe).toHaveBeenCalledTimes(3)
+
+    // A definite "missing" is final at once; persistent failure stays unknown.
+    const missing = vi.fn(async () => ({ ok: true, value: { UNOBLOX_API_KEY: { configured: false, writable: true } } }))
+    expect(await plugin.settledUnobloxKeyState({ describe: missing }, { attempts: 5, retryMs: 1 })).toBe('missing')
+    expect(missing).toHaveBeenCalledTimes(1)
+    const failing = vi.fn(async () => ({ ok: false, error: { message: 'x' } }))
+    expect(await plugin.settledUnobloxKeyState({ describe: failing }, { attempts: 3, retryMs: 1 })).toBe('unknown')
+    expect(failing).toHaveBeenCalledTimes(3)
+    expect(await plugin.settledUnobloxKeyState(undefined, { attempts: 3, retryMs: 1 })).toBe('unknown')
   })
 
   it('treats every non-empty wizard version as acknowledgement', () => {

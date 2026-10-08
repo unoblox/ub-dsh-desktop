@@ -4,6 +4,24 @@ unoblox works beta is free to install on macOS, Windows and Linux. The beta is n
 
 You need an Unoblox API key. The app asks for it on first launch.
 
+## Install from the command line (no first-open prompt)
+
+If you have the [GitHub CLI](https://cli.github.com) signed in to an account that can read this repository (`gh auth login`), one command downloads the latest beta build and installs it. Files downloaded by `gh` carry no "downloaded from the internet" mark, so macOS and Windows open the app without the confirmation steps below.
+
+macOS (Apple Silicon) and Linux x64, in Terminal:
+
+```bash
+gh api -H "Accept: application/vnd.github.raw" "repos/unoblox/ub-dsh-desktop/contents/scripts/install-beta.sh?ref=claude/charming-bohr-lpab0z" | bash
+```
+
+Windows x64, in PowerShell:
+
+```powershell
+gh api -H "Accept: application/vnd.github.raw" "repos/unoblox/ub-dsh-desktop/contents/scripts/install-beta.ps1?ref=claude/charming-bohr-lpab0z" | Out-String | Invoke-Expression
+```
+
+The scripts (`scripts/install-beta.sh`, `scripts/install-beta.ps1`) replace an installed unoblox works, then open it. On Linux they install the `.deb` with apt, which asks for your password.
+
 ## macOS (Apple Silicon: M1 or later)
 
 1. Download `unoblox-works-beta-…-mac-arm64.dmg`. Intel Macs are not supported by the beta.

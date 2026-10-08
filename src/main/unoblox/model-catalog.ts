@@ -141,12 +141,29 @@ async function fetchListing(deps: CatalogDependencies): Promise<UnobloxModelRow[
   return rows
 }
 
-async function writeCache(cachePath: string, rows: readonly UnobloxModelRow[]): Promise<void> {
+// One write at a time per cache file: Windows refuses to rename over a file
+// another rename is replacing (EPERM), and overlapping refreshes happen when
+// Harness restarts during a fetch.
+const cacheWrites = new Map<string, Promise<void>>()
+
+async function writeCacheNow(cachePath: string, rows: readonly UnobloxModelRow[]): Promise<void> {
   await mkdir(dirname(cachePath), { recursive: true })
-  // Unique per write: a Harness restart can overlap an earlier refresh.
+  // Unique per write, so a failed write never leaves a shared temp name behind.
   const temporary = `${cachePath}.${randomUUID()}.tmp`
   await writeFile(temporary, `${JSON.stringify({ version: 1, fetchedAt: new Date().toISOString(), models: rows.slice(1) })}\n`, 'utf8')
   await rename(temporary, cachePath)
+}
+
+function writeCache(cachePath: string, rows: readonly UnobloxModelRow[]): Promise<void> {
+  const previous = cacheWrites.get(cachePath) ?? Promise.resolve()
+  // Run after the previous write whether it succeeded or not; its own caller
+  // already received that outcome.
+  const next = previous.catch(() => undefined).then(() => writeCacheNow(cachePath, rows))
+  cacheWrites.set(cachePath, next)
+  void next.finally(() => {
+    if (cacheWrites.get(cachePath) === next) cacheWrites.delete(cachePath)
+  }).catch(() => undefined)
+  return next
 }
 
 async function readCache(cachePath: string): Promise<UnobloxModelRow[] | undefined> {

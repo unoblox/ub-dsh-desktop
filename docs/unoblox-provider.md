@@ -8,7 +8,7 @@ DSH Desktop serves models only through the [Unoblox](https://unoblox.ai/docs/qui
 | Protocol (`api`) | `openai-completions` |
 | `baseURL` | `https://api.unoblox.ai/v1` |
 | Credential reference (`apiKeyEnv`) | `UNOBLOX_API_KEY` |
-| Model | `unoblox/auto` (the Unoblox router picks the model and fails over between providers) |
+| Models | `unoblox/auto` (default; the Unoblox router picks the model and fails over between providers) plus the live Unoblox catalog |
 
 ## How the lock works
 
@@ -16,7 +16,7 @@ DSH Desktop serves models only through the [Unoblox](https://unoblox.ai/docs/qui
 
 - `llm-pi-ai` gets a provider set containing only `unoblox`. Routes that a profile declared earlier (OpenAI, a custom gateway, and so on) are hidden but not deleted. The settings service refuses Models-page writes that this overlay would override.
 - `llm-deepseek` and `llm-deepseek-account` are disabled, which removes the official DeepSeek API-key and account routes.
-- `agent-default-model` is pinned to `unoblox` / `unoblox/auto`. When a session changes model, Harness tries to save that as the new default. The overlay refuses the save and Harness logs a warning. There is no other model to choose.
+- `agent-default-model` is pinned to `unoblox` / `unoblox/auto`. Users can pick another Unoblox model per session in the model picker. Harness then tries to save that as the new default; the overlay refuses the save and Harness logs a warning, so new sessions start on Auto again.
 - `web-search-deepseek` is disabled, because it called DeepSeek directly with a DeepSeek key. In the normal profile, web search goes through Unoblox instead (see below). Safe Mode keeps `web_search` off, because recovery must not load optional product plugins.
 
 The patched `@deepseek-ai/dsh-client-ui-settings-models` hides the Models page's **Add** button (`DESKTOP_PROVIDER_SET_LOCKED`). Users therefore never see an add-provider flow that the overlay would refuse.
@@ -66,6 +66,15 @@ The key (`ub-gw-…`) is never written to configuration. It is stored in the Har
 - New installs: the first-run dialog (`packages/dsh-desktop-onboarding/client.js`) has an Unoblox API-key field. The dialog also shows on any launch while no key is stored. Unoblox is the only provider, so this covers upgrades from DSH Desktop, development builds and a removed key. It reads only whether the key is configured, never its value.
 - Everyone else: enter the key on the Unoblox row in Settings → Models. With the overlay in place, that card writes no settings and only stores the credential.
 
-## Changing the endpoint or models
+## Model catalog
 
-Edit the `llm-pi-ai` row in both patch files. `models` is the complete catalog that users can pick from, and they cannot add to it from the UI. Add any further Unoblox model ids (`author/model` slugs) there. `test/unoblox-provider.test.ts` composes the real base bundle, a profile that declares other providers, and each Desktop patch. It asserts the locked result.
+The model picker offers what Unoblox serves, not a copied list:
+
+- At startup the Desktop main process fetches `GET https://api.unoblox.ai/v1/models`. The listing is public, so no key is needed. `src/main/unoblox/model-catalog.ts` keeps text models with tool support (the agent needs tools): 64 of the 65 listed on 2026-10-07, leaving out DeepSeek-OCR. Each row carries the id, name, `context_length`, `max_completion_tokens` when given, and text/image input. Auto comes first, then models by name.
+- The rows reach Harness through `DSH_DESKTOP_UNOBLOX_MODELS`. Both patch files read it with a `!!js` expression. A missing or malformed value yields Auto alone, so it can never break boot.
+- Harness reads configuration at launch, so the catalog is per launch. A launch waits at most 2.5 s for the listing. After that it uses the last good listing cached in `<userData>/harness/unoblox-models.json`, or Auto alone on a first offline launch, and the harness log names the source. Each Harness restart fetches again.
+- `unoblox/auto` stays the default model.
+
+## Changing the endpoint
+
+Edit the `llm-pi-ai` row in both patch files, and `UNOBLOX_MODELS_URL` if the listing moves. `test/unoblox-provider.test.ts` composes the real base bundle, a profile that declares other providers, and each Desktop patch, then asserts the locked result, including the catalog expression for set, missing and malformed values.

@@ -2,6 +2,7 @@ import { initializeDesktopService, desktopDiagnostics } from './desktop-service'
 import { applyMacosWindowBackdrop } from './macos-window-backdrop'
 import { checkBlockingPluginUpdates, selectPluginRecoveryTarget, PluginRecoveryEvidence, planPluginRecovery, runPluginRecoveryPlan, type PluginRecoveryCheck } from './plugin-recovery-market'
 import { RepairAgentService, type CrashEvidence } from './repair-agent'
+import { catalogEnvironment, catalogForLaunch, refreshUnobloxCatalog, type ResolvedCatalog } from './unoblox/model-catalog'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -3257,7 +3258,25 @@ async function bootstrap(): Promise<void> {
     }
   })
   createWindow()
+  // The live Unoblox model list for the picker (see unoblox/model-catalog.ts).
+  // Fetched alongside startup; each launch takes it if ready in time, else the
+  // cached list, and the next launch starts a fresh fetch.
+  const unobloxCatalogCache = join(dshHome, 'unoblox-models.json')
+  const fetchUnobloxCatalog = (): Promise<ResolvedCatalog> => refreshUnobloxCatalog({
+    cachePath: unobloxCatalogCache,
+    fetch: (url, init) => net.fetch(url, init)
+  })
+  let pendingUnobloxCatalog: Promise<ResolvedCatalog> | undefined = fetchUnobloxCatalog()
   runtime = new HarnessRuntime({
+    launchEnvironment: async () => {
+      const pending = pendingUnobloxCatalog ?? fetchUnobloxCatalog()
+      pendingUnobloxCatalog = undefined
+      const catalog = await catalogForLaunch(pending, unobloxCatalogCache, 2_500)
+      return {
+        environment: catalogEnvironment(catalog),
+        note: `Unoblox model catalog: ${String(catalog.rows.length)} models (${catalog.source}${catalog.detail === undefined ? '' : `: ${catalog.detail}`})`
+      }
+    },
     // A packaged app's stdout may be a closed pipe; only mirror logs in development.
     echoLogs: !app.isPackaged,
     dshEntryPath: dshEntryPath(),

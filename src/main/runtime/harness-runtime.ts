@@ -31,6 +31,11 @@ export interface HarnessRuntimeOptions {
   startupTimeoutMs?: number
   /** Mirror log lines to the console (development builds only). */
   echoLogs?: boolean
+  /**
+   * Extra variables for this launch (e.g. the live Unoblox model catalog the
+   * patch files read). Resolved per start; a failure launches without them.
+   */
+  launchEnvironment?: () => Promise<{ environment: Record<string, string>; note?: string }>
   onChanged(snapshot: RuntimeSnapshot): void
 }
 
@@ -529,6 +534,16 @@ export class HarnessRuntime {
     this.setState('starting', 'Starting DeepSeek Harness…')
 
     const shellEnvironment = await prewarmShellEnvironment()
+    let launchEnvironment: Record<string, string> = {}
+    if (this.options.launchEnvironment !== undefined) {
+      try {
+        const resolved = await this.options.launchEnvironment()
+        launchEnvironment = resolved.environment
+        if (resolved.note !== undefined) this.writeLog(`[desktop] ${resolved.note}`)
+      } catch (error) {
+        this.writeLog(`[desktop] launch environment unavailable: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
     let child: HarnessChildProcess
     try {
       child = this.options.launchProcess(
@@ -538,7 +553,7 @@ export class HarnessRuntime {
           launchDirectory,
           this.options.dshHome,
           process.platform,
-          shellEnvironment,
+          { ...shellEnvironment, ...launchEnvironment },
           profile
         )
       )

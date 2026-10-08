@@ -11,8 +11,16 @@ const UNOBLOX_ROUTE = {
   displayName: 'Unoblox',
   apiKeyEnv: 'UNOBLOX_API_KEY',
   api: 'openai-completions',
-  baseURL: 'https://api.unoblox.ai/v1',
-  models: [{ id: 'unoblox/auto', name: 'Unoblox Auto' }]
+  baseURL: 'https://api.unoblox.ai/v1'
+}
+const AUTO_ONLY = [{ id: 'unoblox/auto', name: 'Unoblox Auto' }]
+
+/** Evaluate a `!!js` node the way cordis-plugin-loader does, against a given environment. */
+function evaluateJs(node: unknown, env: Record<string, string | undefined>): unknown {
+  const expr = (node as { __jsExpr?: unknown }).__jsExpr
+  if (typeof expr !== 'string') throw new Error('expected a !!js expression')
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- mirrors the loader's own evaluation
+  return new Function('ctx', 'expr', 'with (ctx) { return eval(expr) }')({ process: { env } }, expr)
 }
 
 // A profile that had configured other providers and picked one as the default,
@@ -59,7 +67,16 @@ function entry(entries: Entry[], id: string): Entry {
 describe.each(DESKTOP_PATCHES)('Unoblox provider lock in %s', (desktopPatch) => {
   it('leaves Unoblox as the only llm-pi-ai route, hiding routes the profile declared', () => {
     const { entries } = compose(desktopPatch)
-    expect(entry(entries, 'llm-pi-ai').config).toEqual({ providers: { unoblox: UNOBLOX_ROUTE } })
+    const config = entry(entries, 'llm-pi-ai').config as { providers: Record<string, Record<string, unknown>> }
+    expect(Object.keys(config.providers)).toEqual(['unoblox'])
+    const { models, ...route } = config.providers.unoblox!
+    expect(route).toEqual(UNOBLOX_ROUTE)
+    // The catalog comes from the launch environment; Auto alone without it.
+    expect(evaluateJs(models, {})).toEqual(AUTO_ONLY)
+    expect(evaluateJs(models, { DSH_DESKTOP_UNOBLOX_MODELS: '{not json' })).toEqual(AUTO_ONLY)
+    expect(evaluateJs(models, { DSH_DESKTOP_UNOBLOX_MODELS: '[]' })).toEqual(AUTO_ONLY)
+    const live = [...AUTO_ONLY, { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B', contextWindow: 262144, input: ['text'] }]
+    expect(evaluateJs(models, { DSH_DESKTOP_UNOBLOX_MODELS: JSON.stringify(live) })).toEqual(live)
   })
 
   it('disables the DeepSeek API-key and account adapters', () => {

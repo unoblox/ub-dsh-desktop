@@ -146,6 +146,14 @@ window.__ModuleLoader__.load({
             outline:2px solid var(--dsw-alias-state-business-primary); outline-offset:2px;
             background:var(--dsw-alias-bg-base);
           }
+          /* macOS dark: upstream draws the sidebar half-transparent over the
+             window's sidebar vibrancy, which reads as a flat grey wash. Use
+             the sidebar fill other platforms get, one step lighter than the
+             conversation background. Hashed class names change per build,
+             hence the suffix match. */
+          html[data-platform=darwin] [data-ds-dark-theme] [class*="_sidebarCol"] {
+            background:var(--dsw-specific-sidebar-fill);
+          }
         `
         document.head.appendChild(style)
         return () => style.remove()

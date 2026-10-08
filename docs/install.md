@@ -4,9 +4,9 @@ Unoblox Beta is free to install on macOS, Windows and Linux. The beta is not yet
 
 You need an Unoblox API key. The app asks for it on first launch.
 
-## macOS (Apple Silicon or Intel)
+## macOS (Apple Silicon: M1 or later)
 
-1. Download `Unoblox-Beta-…-mac-arm64.dmg` (Apple Silicon: M1 or later) or `Unoblox-Beta-…-mac-x64.dmg` (Intel).
+1. Download `Unoblox-Beta-…-mac-arm64.dmg`. Intel Macs are not supported by the beta.
 2. Open the disk image and drag **Unoblox** onto **Applications**.
 3. Open Unoblox from Applications. macOS says it cannot verify the app: click **Done**.
 4. Open **System Settings › Privacy & Security**, scroll down to the message about Unoblox and click **Open Anyway**. Confirm with your password or Touch ID.

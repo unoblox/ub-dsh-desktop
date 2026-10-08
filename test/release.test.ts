@@ -378,12 +378,14 @@ describe('GitHub release contract', () => {
       { ...layout.app, type: 'file' },
       { ...layout.applications, type: 'link', path: '/Applications' }
     ])
-    for (const script of ['package:beta:mac:arm64', 'package:beta:mac:x64', 'package:beta:win', 'package:beta:linux']) {
+    for (const script of ['package:beta:mac:arm64', 'package:beta:win', 'package:beta:linux']) {
       expect(packageJson.scripts[script]).toContain('electron-builder.beta.cjs')
     }
     expect(workflow).toContain('--config electron-builder.beta.cjs')
     expect(workflow).toContain("grep -q 'Signature=adhoc'")
     expect(workflow).toContain('node scripts/smoke-packaged.mjs')
+    // The beta ships Apple Silicon only.
+    expect(workflow).not.toContain('macos-15-intel')
   })
 
   it('builds and publishes every supported platform', async () => {

@@ -4,7 +4,7 @@ Each installer is built on its own operating system. `scripts/verify-target.mjs`
 
 | Platform | Installer | User experience |
 | --- | --- | --- |
-| macOS Apple Silicon / Intel | `.dmg` | Open the dmg and drag the app to Applications. |
+| macOS Apple Silicon (no Intel build for the beta) | `.dmg` | Open the dmg and drag the app to Applications. |
 | Windows x64 | NSIS `…-setup.exe` | Run the setup, choose a folder, and get desktop and Start menu shortcuts. |
 | Linux x64 | `.AppImage` | One file: `chmod +x` and double-click, or run it. No install step and no root. |
 
@@ -20,9 +20,9 @@ User-facing install steps (including the one-time first-open prompt) are in [ins
 - Windows unsigned (SmartScreen asks once), Linux AppImage;
 - no publish target and no update feed. Output goes to `dist-beta/`, named `Unoblox-Beta-<version>-<os>-<arch>`.
 
-`.github/workflows/build-installers.yml` (manual dispatch; the `target` input picks all platforms or one) builds the four beta installers on native GitHub runners and keeps them as workflow artifacts for 14 days. Every job launches the packaged app with `scripts/smoke-packaged.mjs` (Harness ready, login, client bootstrap, a workspace and a session). The macOS jobs also mount the disk image and check that the app inside has a valid ad-hoc signature. A dispatch from a branch other than the default one goes through the API or `gh workflow run build-installers.yml --ref <branch>`, because the Actions page offers only workflows that exist on the default branch.
+`.github/workflows/build-installers.yml` (manual dispatch; the `target` input picks all platforms or one) builds the beta installers (macOS Apple Silicon, Windows x64, Linux x64; no Intel Mac build for the beta) on native GitHub runners and keeps them as workflow artifacts for 14 days. Every job launches the packaged app with `scripts/smoke-packaged.mjs` (Harness ready, login, client bootstrap, a workspace and a session). The macOS jobs also mount the disk image and check that the app inside has a valid ad-hoc signature. A dispatch from a branch other than the default one goes through the API or `gh workflow run build-installers.yml --ref <branch>`, because the Actions page offers only workflows that exist on the default branch.
 
-Locally, on the matching machine: `npm run package:beta:mac:arm64`, `package:beta:mac:x64`, `package:beta:win` or `package:beta:linux`.
+Locally, on the matching machine: `npm run package:beta:mac:arm64`, `package:beta:win` or `package:beta:linux`.
 
 ## Development builds
 

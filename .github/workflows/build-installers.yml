@@ -2,7 +2,8 @@ name: Build beta installers
 
 # Beta installers for every desktop platform, built on native runners
 # (packaging is never cross-compiled: scripts/verify-target refuses it) with
-# electron-builder.beta.cjs: product "Unoblox", macOS ad-hoc signed, Windows
+# electron-builder.beta.cjs: product "Unoblox", macOS (Apple Silicon only for
+# the beta) ad-hoc signed, Windows
 # unsigned, no update feed. Nothing is published; the installers are kept as
 # workflow artifacts. Each job launches the packaged app and checks it starts.
 
@@ -42,8 +43,6 @@ jobs:
             [
               {"label": "macOS Apple Silicon", "family": "macos", "runner": "macos-15", "platform": "darwin", "arch": "arm64",
                "builder": "npx --no-install electron-builder --mac --arm64", "artifact": "macos-apple-silicon", "unpacked": "dist-beta/mac-arm64", "files": "dist-beta/*.dmg"},
-              {"label": "macOS Intel", "family": "macos", "runner": "macos-15-intel", "platform": "darwin", "arch": "x64",
-               "builder": "npx --no-install electron-builder --mac --x64", "artifact": "macos-intel", "unpacked": "dist-beta/mac", "files": "dist-beta/*.dmg"},
               {"label": "Windows x64", "family": "windows", "runner": "windows-2022", "platform": "win32", "arch": "x64",
                "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "unpacked": "dist-beta/win-unpacked", "files": "dist-beta/*-setup.exe"},
               {"label": "Linux x64", "family": "linux", "runner": "ubuntu-24.04", "platform": "linux", "arch": "x64",

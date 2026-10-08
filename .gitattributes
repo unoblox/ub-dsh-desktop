@@ -1,6 +1,10 @@
 # Dependency patches preserve the upstream bundle's mixed indentation so that
 # patch-package can match and replay it exactly.
 patches/*.patch whitespace=-space-before-tab
+# Always LF: on a Windows checkout with core.autocrlf, a CRLF patch makes
+# patch-package write its added lines with CRLF, so the patched dependency
+# would differ by platform.
+patches/*.patch text eol=lf
 
 # Preserve pinned third-party inputs byte-for-byte, including upstream whitespace.
 packages/ppt-runtime/upstream/** -whitespace

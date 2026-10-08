@@ -83,6 +83,11 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
+          # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's
+          # sandbox prefers, so it falls back to the SUID helper, which must be
+          # root-owned with mode 4755 (as a system package install sets it).
+          sudo chown root:root dist-dev/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 dist-dev/linux-unpacked/chrome-sandbox
           xvfb-run -a node scripts/smoke-packaged-linux.mjs dist-dev/linux-unpacked
       - uses: actions/upload-artifact@v4
         with:

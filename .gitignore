@@ -2,6 +2,7 @@ node_modules/
 out/
 dist/
 dist-dev/
+dist-beta/
 .DS_Store
 *.log
 coverage/

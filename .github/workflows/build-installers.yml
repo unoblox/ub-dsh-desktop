@@ -1,13 +1,10 @@
-name: Build unsigned installers
+name: Build beta installers
 
-# Unsigned, isolated development installers for every desktop platform, built
-# on native runners (packaging is never cross-compiled: scripts/verify-target
-# refuses it). Nothing is published, signed or notified; the installers are
-# kept as workflow artifacts. Signed releases stay in release.yml.
-#
-# The development config (electron-builder.dev.cjs) gives the app its own
-# appId, name and userData, and turns off the auto-update manager, so these
-# builds never install over, or update to, a release build.
+# Beta installers for every desktop platform, built on native runners
+# (packaging is never cross-compiled: scripts/verify-target refuses it) with
+# electron-builder.beta.cjs: product "Unoblox", macOS ad-hoc signed, Windows
+# unsigned, no update feed. Nothing is published; the installers are kept as
+# workflow artifacts. Each job launches the packaged app and checks it starts.
 
 on:
   workflow_dispatch:
@@ -44,13 +41,13 @@ jobs:
           ROWS: |
             [
               {"label": "macOS Apple Silicon", "family": "macos", "runner": "macos-15", "platform": "darwin", "arch": "arm64",
-               "builder": "npx --no-install electron-builder --mac --arm64", "artifact": "macos-apple-silicon", "files": "dist-dev/*.dmg\ndist-dev/*.zip"},
+               "builder": "npx --no-install electron-builder --mac --arm64", "artifact": "macos-apple-silicon", "unpacked": "dist-beta/mac-arm64", "files": "dist-beta/*.dmg"},
               {"label": "macOS Intel", "family": "macos", "runner": "macos-15-intel", "platform": "darwin", "arch": "x64",
-               "builder": "npx --no-install electron-builder --mac --x64", "artifact": "macos-intel", "files": "dist-dev/*.dmg\ndist-dev/*.zip"},
+               "builder": "npx --no-install electron-builder --mac --x64", "artifact": "macos-intel", "unpacked": "dist-beta/mac", "files": "dist-beta/*.dmg"},
               {"label": "Windows x64", "family": "windows", "runner": "windows-2022", "platform": "win32", "arch": "x64",
-               "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "files": "dist-dev/*-setup.exe"},
+               "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "unpacked": "dist-beta/win-unpacked", "files": "dist-beta/*-setup.exe"},
               {"label": "Linux x64", "family": "linux", "runner": "ubuntu-24.04", "platform": "linux", "arch": "x64",
-               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "files": "dist-dev/*.AppImage"}
+               "builder": "npx --no-install electron-builder --linux --x64", "artifact": "linux-x64", "unpacked": "dist-beta/linux-unpacked", "files": "dist-beta/*.AppImage"}
             ]
         run: echo "include=$(jq -c --arg t "$TARGET" '[.[] | select($t == "all" or .family == $t)]' <<< "$ROWS")" >> "$GITHUB_OUTPUT"
 
@@ -78,20 +75,42 @@ jobs:
         shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: node scripts/verify-target.mjs ${{ matrix.platform }} ${{ matrix.arch }} && ${{ matrix.builder }} --publish never --config electron-builder.dev.cjs
-      - name: Smoke test the packaged Linux app
+        run: node scripts/verify-target.mjs ${{ matrix.platform }} ${{ matrix.arch }} && ${{ matrix.builder }} --publish never --config electron-builder.beta.cjs
+      - name: Check the macOS signature users get
+        if: matrix.platform == 'darwin'
+        shell: bash
+        # The app inside the disk image must carry a valid ad-hoc seal: a broken
+        # one is what Gatekeeper reports as "damaged" on Apple Silicon.
+        run: |
+          mount="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" dist-beta/*.dmg
+          app="$(ls -d "$mount"/*.app)"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | tee /dev/stderr | grep -q 'Signature=adhoc'
+          test -L "$mount/Applications"
+          ls -la "$mount" "$mount/.background" || true
+          hdiutil detach "$mount"
+      - name: Prepare the Linux sandbox helper
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb
           # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's
           # sandbox prefers, so it falls back to the SUID helper, which must be
           # root-owned with mode 4755 (as a system package install sets it).
-          sudo chown root:root dist-dev/linux-unpacked/chrome-sandbox
-          sudo chmod 4755 dist-dev/linux-unpacked/chrome-sandbox
-          xvfb-run -a node scripts/smoke-packaged-linux.mjs dist-dev/linux-unpacked
+          sudo chown root:root ${{ matrix.unpacked }}/chrome-sandbox
+          sudo chmod 4755 ${{ matrix.unpacked }}/chrome-sandbox
+      - name: Smoke test the packaged app
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          if [ "${{ matrix.platform }}" = linux ]; then
+            xvfb-run -a node scripts/smoke-packaged.mjs "${{ matrix.unpacked }}"
+          else
+            node scripts/smoke-packaged.mjs "${{ matrix.unpacked }}"
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: dsh-desktop-dev-${{ matrix.artifact }}
+          name: unoblox-beta-${{ matrix.artifact }}
           retention-days: 14
           compression-level: 0
           if-no-files-found: error

@@ -9,7 +9,9 @@
  * (PNG entries, 16–1024 px), build/icon.ico (PNG entries, 16–256 px), the
  * light/dark logos (build/logo-{light,dark}.png, 336x192, the "u." glyph on
  * transparency) and the splash loaders (build/dsh-loader{,-dark}.gif: the
- * glyph with a gently pulsing gold dot, on each splash theme's background).
+ * glyph with a gently pulsing gold dot, on each splash theme's background)
+ * and the macOS disk image background (build/dmg-background{,@2x}.png: drag
+ * to Applications, plus how to open an app macOS cannot verify).
  * The outputs are committed because electron-builder and the window code read
  * them directly; edit the SVG, rerun this, and commit both.
  */
@@ -105,4 +107,31 @@ for (const [file, ink, background] of [['dsh-loader.gif', '#0C0C0C', '#f8f8f6'],
   }).gif({ delay: Array.from({ length: LOADER.frames }, () => LOADER.delay), loop: 0, effort: 10 }).toBuffer())
 }
 
-console.log('brand assets written: icon.png, app-icon.png, icon.icns, icon.ico, logo-light.png, logo-dark.png, dsh-loader.gif, dsh-loader-dark.gif')
+// Disk image window: the app icon and the Applications link sit on the two
+// circles (build/brand/dmg-layout.json, also read by electron-builder.beta.cjs). Beta builds
+// are ad-hoc signed, not notarized, so macOS blocks the first open; the panel
+// says how to allow it once. Text is rendered with Inter (installed where this
+// script runs), so the committed PNGs do not depend on the build machine.
+const DMG_WINDOW = JSON.parse(await readFile(join(root, 'build', 'brand', 'dmg-layout.json'), 'utf8'))
+function dmgBackground(scale) {
+  const { width, height, app, applications } = DMG_WINDOW
+  const steps = [
+    'Double-click Unoblox in Applications. If macOS says it cannot verify the app, click Done.',
+    'Open System Settings \u203a Privacy &amp; Security, scroll down and click Open Anyway.'
+  ]
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#F8F8F6"/>
+  <text x="${width / 2}" y="54" text-anchor="middle" font-family="Inter" font-size="19" font-weight="600" fill="#0C0C0C">Drag Unoblox to Applications</text>
+  <circle cx="${app.x}" cy="${app.y}" r="66" fill="#FFFFFF" stroke="#E6E2DA"/>
+  <circle cx="${applications.x}" cy="${applications.y}" r="66" fill="#FFFFFF" stroke="#E6E2DA"/>
+  <path d="M${app.x + 92} ${app.y}H${applications.x - 100}" stroke="#D9A64A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M${applications.x - 114} ${app.y - 13}L${applications.x - 98} ${app.y}L${applications.x - 114} ${app.y + 13}" fill="none" stroke="#D9A64A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="40" y="290" width="${width - 80}" height="118" rx="14" fill="#FFFFFF" stroke="#E6E2DA"/>
+  <text x="62" y="320" font-family="Inter" font-size="13" font-weight="600" fill="#0C0C0C">First open (once): Unoblox Beta is not notarized by Apple yet</text>
+  ${steps.map((step, index) => `<circle cx="70" cy="${348 + index * 30}" r="10" fill="#D9A64A"/><text x="70" y="${352.5 + index * 30}" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#FFFFFF">${index + 1}</text><text x="88" y="${352.5 + index * 30}" font-family="Inter" font-size="12.5" fill="#3A3A38">${step}</text>`).join('')}
+</svg>`)
+}
+await writeFile(join(root, 'build', 'dmg-background.png'), await sharp(dmgBackground(1)).png({ compressionLevel: 9 }).toBuffer())
+await writeFile(join(root, 'build', 'dmg-background@2x.png'), await sharp(dmgBackground(2)).png({ compressionLevel: 9 }).toBuffer())
+
+console.log('brand assets written: icon.png, app-icon.png, icon.icns, icon.ico, logo-light.png, logo-dark.png, dsh-loader.gif, dsh-loader-dark.gif, dmg-background.png, dmg-background@2x.png')

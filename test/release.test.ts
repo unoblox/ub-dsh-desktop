@@ -352,6 +352,40 @@ describe('GitHub release contract', () => {
     expect(developmentConfig.nsis.artifactName).toBe('dsh-desktop-dev-windows-${arch}-setup.${ext}')
   })
 
+  it('packages the public beta as Unoblox without paid signing', async () => {
+    const require = createRequire(import.meta.url)
+    const packageJson = require('../package.json') as { build: { appId: string }; scripts: Record<string, string> }
+    const beta = require('../electron-builder.beta.cjs') as {
+      appId: string
+      productName: string
+      publish: unknown
+      directories: { output: string }
+      mac: { identity: string; hardenedRuntime: boolean; target: string[] }
+      dmg: { background: string; contents: Array<{ x: number; y: number; type: string; path?: string }> }
+    }
+    const layout = require('../build/brand/dmg-layout.json') as { app: { x: number; y: number }; applications: { x: number; y: number } }
+    const workflow = await readFile(path.join(projectRoot, '.github', 'workflows', 'build-installers.yml'), 'utf8')
+
+    // Same identity as a release, so a later signed release keeps beta data.
+    expect(beta.appId).toBe(packageJson.build.appId)
+    expect(beta.productName).toBe('Unoblox')
+    expect(beta.publish).toBeNull()
+    expect(beta.directories.output).toBe('dist-beta')
+    // Ad-hoc: a valid seal without a certificate (an unsigned build reads as "damaged").
+    expect(beta.mac).toMatchObject({ identity: '-', hardenedRuntime: false, target: ['dmg'] })
+    expect(beta.dmg.background).toBe('build/dmg-background.png')
+    expect(beta.dmg.contents).toEqual([
+      { ...layout.app, type: 'file' },
+      { ...layout.applications, type: 'link', path: '/Applications' }
+    ])
+    for (const script of ['package:beta:mac:arm64', 'package:beta:mac:x64', 'package:beta:win', 'package:beta:linux']) {
+      expect(packageJson.scripts[script]).toContain('electron-builder.beta.cjs')
+    }
+    expect(workflow).toContain('--config electron-builder.beta.cjs')
+    expect(workflow).toContain("grep -q 'Signature=adhoc'")
+    expect(workflow).toContain('node scripts/smoke-packaged.mjs')
+  })
+
   it('builds and publishes every supported platform', async () => {
     const workflow = await readFile(
       path.join(projectRoot, '.github', 'workflows', 'release.yml'),

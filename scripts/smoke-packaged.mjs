@@ -1,34 +1,63 @@
 #!/usr/bin/env node
 /**
- * Smoke test a packaged Linux build: launch the real app (Electron main,
- * Harness child through Electron Node mode, installed plugins and Office
- * payload) with a throwaway HOME, then check each startup stage through the
- * same authenticated HTTP surface the window uses.
+ * Smoke test a packaged build: launch the real app (Electron main, Harness
+ * child, installed plugins and Office payload), then check each startup stage
+ * through the same authenticated HTTP surface the window uses.
  *
- * Usage (needs a display, e.g. under xvfb-run):
- *   node scripts/smoke-packaged-linux.mjs <unpacked-app-directory>
+ * Usage:
+ *   node scripts/smoke-packaged.mjs <unpacked-app-directory | .app>
+ *
+ * Linux needs a display (e.g. xvfb-run) and runs with a throwaway HOME. On
+ * macOS and Windows Electron resolves its data folder from the OS, not from
+ * HOME, so the app uses the machine's real Unoblox profile there; the script
+ * therefore runs only on CI (CI=true) or with --real-profile.
  *
  * Stages checked, in order: Harness ready (URL line in harness.log) → token
  * login → HTML with the client bootstrap → bootstrap registers the module
  * system → workspace and session creation → the Unoblox info route. A model
  * call is not made; that needs a key and belongs to a keyed live check.
  */
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 
 const appDirectory = resolve(process.argv[2] ?? 'dist-dev/linux-unpacked')
 const READY_TIMEOUT_MS = 120_000
 
+if (process.platform !== 'linux' && process.env.CI !== 'true' && !process.argv.includes('--real-profile')) {
+  console.error('smoke: on macOS and Windows the app uses the real Unoblox profile; run on CI or pass --real-profile')
+  process.exit(2)
+}
+
 function executableIn(directory) {
-  // electron-builder names the binary after linux.executableName.
-  for (const name of ['dsh-desktop', 'dsh-desktop-dev']) {
-    if (existsSync(join(directory, name))) return join(directory, name)
+  if (process.platform === 'darwin') {
+    // dist*/mac*/<Product>.app/Contents/MacOS/<Product>, or the .app itself.
+    const bundle = directory.endsWith('.app')
+      ? directory
+      : join(directory, readdirSync(directory).find((name) => name.endsWith('.app')) ?? '')
+    const macos = join(bundle, 'Contents', 'MacOS')
+    const binary = existsSync(macos) ? readdirSync(macos)[0] : undefined
+    if (binary !== undefined) return join(macos, binary)
+  } else {
+    // Linux: build.linux.executableName; Windows: <productName>.exe.
+    const names = process.platform === 'win32'
+      ? readdirSync(directory).filter((name) => /^Unoblox( Dev)?\.exe$/u.test(name))
+      : ['dsh-desktop', 'dsh-desktop-dev']
+    for (const name of names) {
+      if (existsSync(join(directory, name))) return join(directory, name)
+    }
   }
   throw new Error(`no app executable in ${directory}: ${readdirSync(directory).join(', ')}`)
+}
+
+/** Where Electron keeps app data on this OS (`app.getPath('appData')`). */
+function appDataDirectory(home) {
+  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support')
+  if (process.platform === 'win32') return process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming')
+  return join(home, '.config')
 }
 
 function fail(message) {
@@ -37,7 +66,7 @@ function fail(message) {
 }
 
 const executable = executableIn(appDirectory)
-const home = await mkdtemp(join(tmpdir(), 'dsh-linux-smoke-'))
+const home = await mkdtemp(join(tmpdir(), 'dsh-smoke-'))
 const config = join(home, '.config')
 await mkdir(config, { recursive: true })
 const args = []
@@ -59,7 +88,7 @@ child.on('exit', (code, signal) => {
 
 function findLog() {
   for (const name of ['dsh-desktop-dev', 'dsh-desktop']) {
-    const path = join(config, name, 'logs', 'harness.log')
+    const path = join(appDataDirectory(home), name, 'logs', 'harness.log')
     if (existsSync(path)) return path
   }
   return undefined
@@ -126,7 +155,10 @@ try {
   const log = findLog()
   if (log !== undefined) console.error(readFileSync(log, 'utf8').split('\n').slice(-80).join('\n'))
 } finally {
-  if (!exited) {
+  if (!exited && process.platform === 'win32') {
+    // Signals reach only the main process on Windows; end the Harness child too.
+    spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' })
+  } else if (!exited) {
     child.kill('SIGTERM')
     await new Promise((done) => {
       const timer = setTimeout(() => {

@@ -7,23 +7,27 @@ const projectRoot = path.resolve(import.meta.dirname, '..')
 const read = (...parts: string[]) => readFile(path.join(projectRoot, ...parts), 'utf8')
 
 describe('Documents folder for the first-use workspace', () => {
+  // Built with this platform's path rules, so the cases hold on Windows too.
+  const home = path.resolve('/home/asha')
+  const documents = path.join(home, 'Documents')
+
   it('passes Electron’s Documents folder to the Harness', () => {
-    expect(documentsDirectory('/home/asha/Documents', '/home/asha')).toBe('/home/asha/Documents')
-    expect(documentsDirectory('/home/asha/Dokumente/', '/home/asha')).toBe('/home/asha/Dokumente')
-    expect(documentsEnvironment('/home/asha/Documents', '/home/asha')).toEqual({ [DOCUMENTS_DIRECTORY_ENV]: '/home/asha/Documents' })
+    expect(documentsDirectory(documents, home)).toBe(documents)
+    expect(documentsDirectory(path.join(home, 'Dokumente') + path.sep, home)).toBe(path.join(home, 'Dokumente'))
+    expect(documentsEnvironment(documents, home)).toEqual({ [DOCUMENTS_DIRECTORY_ENV]: documents })
   })
 
   it('never puts the workspace folder loose in home', () => {
-    expect(documentsDirectory('/home/asha', '/home/asha')).toBe('/home/asha/Documents')
-    expect(documentsDirectory('/home/asha/', '/home/asha')).toBe('/home/asha/Documents')
-    expect(documentsDirectory('/home/asha/./', '/home/asha/')).toBe('/home/asha/Documents')
+    expect(documentsDirectory(home, home)).toBe(documents)
+    expect(documentsDirectory(home + path.sep, home)).toBe(documents)
+    expect(documentsDirectory(path.join(home, '.') + path.sep, home + path.sep)).toBe(documents)
   })
 
   it('leaves the lookup to the Harness when Electron has no usable answer', () => {
-    expect(documentsDirectory(undefined, '/home/asha')).toBeUndefined()
-    expect(documentsDirectory('', '/home/asha')).toBeUndefined()
-    expect(documentsDirectory('Documents', '/home/asha')).toBeUndefined()
-    expect(documentsEnvironment(undefined, '/home/asha')).toEqual({})
+    expect(documentsDirectory(undefined, home)).toBeUndefined()
+    expect(documentsDirectory('', home)).toBeUndefined()
+    expect(documentsDirectory('Documents', home)).toBeUndefined()
+    expect(documentsEnvironment(undefined, home)).toEqual({})
   })
 })
 

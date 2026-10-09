@@ -172,13 +172,19 @@ jobs:
           app="$(ls -d "$mount"/*.app)"
           codesign --verify --deep --strict --verbose=2 "$app"
           if [ "$MAC_SIGNING" = true ]; then
-            codesign -dvv "$app" 2>&1 | tee /dev/stderr | grep -q 'Authority=Developer ID Application'
+            # Capture first: grep -q stops reading at its match, and tee then
+            # fails on the closed pipe under pipefail.
+            details="$(codesign -dvv "$app" 2>&1)"
+            echo "$details"
+            grep -q 'Authority=Developer ID Application' <<< "$details"
             if [ "$MAC_NOTARIZING" = true ]; then
               xcrun stapler validate "$app"
               spctl --assess --type execute --verbose=4 "$app"
             fi
           else
-            codesign -dv "$app" 2>&1 | tee /dev/stderr | grep -q 'Signature=adhoc'
+            details="$(codesign -dv "$app" 2>&1)"
+            echo "$details"
+            grep -q 'Signature=adhoc' <<< "$details"
           fi
           test -L "$mount/Applications"
           ls -la "$mount" "$mount/.background" || true

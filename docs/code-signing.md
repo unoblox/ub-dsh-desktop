@@ -1,8 +1,23 @@
 # Code signing and release secrets
 
-Signed installers open with a double-click: no "cannot verify" step on macOS and a named publisher on Windows. Certificates carry the legal entity, so Windows shows **OGMA CONSULTING PRIVATE LIMITED** as the verified publisher; certificate authorities do not issue them in a brand or trading name. The beta builds sign themselves as soon as the secrets below exist in **Settings › Secrets and variables › Actions** of this repository. Until then they stay ad-hoc signed (macOS) and unsigned (Windows), as today. Nothing else changes: the same workflow, **Build beta installers**, builds both.
+Signed installers open with a double-click: no "cannot verify" step on macOS and a named publisher on Windows. Certificates carry the legal entity, so Windows shows **OGMA CONSULTING PRIVATE LIMITED** as the verified publisher; certificate authorities do not issue them in a brand or trading name. Builds run with **publish** ticked sign themselves as soon as the secrets below exist in the `release` environment. Until then, and in every test build, they stay ad-hoc signed (macOS) and unsigned (Windows). Nothing else changes: the same workflow, **Build beta installers**, builds both.
 
-Never paste a certificate, password or key into an issue, chat, log or commit. Add them only as repository secrets.
+Never paste a certificate, password or key into an issue, chat, log or commit. Add them only as `release` environment secrets.
+
+## Where the secrets go: the `release` environment
+
+Together these secrets can sign any program as the company and push an update to every installed copy, so they are not repository secrets: anyone who can change a workflow could read those. They live in a GitHub environment that hands them to a job only after a reviewer approves it.
+
+One-time setup, by a repository admin:
+
+1. **Settings › Environments › New environment**, name it `release`.
+2. Tick **Required reviewers** and add yourself (and anyone else allowed to release). Leave **Prevent self-review** off if you release alone.
+3. Under **Deployment branches and tags**, choose **Selected branches and tags** and add `main` once the release work is merged there. Until then **No restriction** lets a branch build be published.
+4. Under **Environment secrets**, add each secret below. Do not add them under **Settings › Secrets and variables › Actions** as repository secrets; if any are there already, delete them.
+
+How a release then runs: start **Build beta installers** with **publish** ticked. The three platform builds wait with **Review pending deployments**; approving once releases all three. When they pass, the publish job waits again: check the build, then approve to publish. Test builds (publish unticked) never enter the environment, never see a secret and start without approval.
+
+Also keep two-factor sign-in on for everyone with write access, keep that list short, and protect `main`. If a secret might have leaked: revoke the certificate at the issuer, change the password, and replace `UPDATE_SIGNING_KEY` (see below).
 
 ## macOS: Apple Developer ID and notarization
 
@@ -12,7 +27,7 @@ Cost: Apple Developer Program, US$99 a year (or the local equivalent).
 2. **Enrol as an organisation** at <https://developer.apple.com/programs/enroll/> with an Apple ID that has two-factor authentication. You need the legal entity name, the D-U-N-S number, a website on the company domain (unoblox.ai) and the authority to sign for the company.
 3. **Developer ID Application certificate.** On a Mac: Keychain Access › Certificate Assistant › Request a Certificate From a Certificate Authority, saved to disk. Then <https://developer.apple.com/account/resources/certificates> › **+** › **Developer ID Application**, upload the request, download the certificate and double-click it. In Keychain Access, find "Developer ID Application: …", right-click › Export as `.p12` with a strong password.
 4. **Notarization key.** App Store Connect › Users and Access › Integrations › App Store Connect API › Team Keys › **+**, role **Developer**. Download the `.p8` file (only once) and note the **Key ID** and the **Issuer ID**.
-5. **Secrets** (macOS Terminal for the base64 step):
+5. **Secrets** in the `release` environment (macOS Terminal for the base64 step):
 
 | Secret | Value |
 | --- | --- |
@@ -44,7 +59,7 @@ Works from GitHub Actions with no hardware token. Roughly US$130–250 a year pl
 | `ESIGNER_CREDENTIAL_ID` | the eSigner credential ID |
 | `ESIGNER_TOTP_SECRET` | the eSigner TOTP secret |
 
-eSigner bills per signature, so only builds run with **publish** ticked are signed (about four signatures each); test builds stay unsigned. CI installs SSL.com CodeSignTool, and `scripts/esigner-windows-hook.mjs` signs the app, its helpers, the uninstaller and the setup `.exe`. CI then checks every signature with `Get-AuthenticodeSignature`.
+eSigner bills per signature; only builds run with **publish** ticked are signed (about four signatures each), and test builds stay unsigned. CI installs SSL.com CodeSignTool, and `scripts/esigner-windows-hook.mjs` signs the app, its helpers, the uninstaller and the setup `.exe`. CI then checks every signature with `Get-AuthenticodeSignature`.
 
 ### Azure Artifact Signing (formerly Trusted Signing)
 
@@ -65,7 +80,7 @@ Nothing to buy. The `.deb` and AppImage install without prompts.
 
 ## Over-the-air update publishing
 
-Separate from code signing, two secrets let **Build beta installers** with **publish** ticked release a build to installed apps (see `docs/installers.md`):
+Separate from code signing, two more `release` environment secrets let **Build beta installers** with **publish** ticked release a build to installed apps (see `docs/installers.md`):
 
 | Secret | Value |
 | --- | --- |

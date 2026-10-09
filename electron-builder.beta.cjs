@@ -45,8 +45,8 @@ module.exports = {
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] }
     ],
-    maintainer: 'Unoblox <hello@unoblox.ai>',
-    vendor: 'Unoblox'
+    maintainer: 'unoblox <hello@unoblox.ai>',
+    vendor: 'unoblox'
   },
   deb: {
     // apt shows this name; the repository package name is dsh-desktop.

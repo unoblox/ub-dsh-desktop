@@ -104,7 +104,7 @@ export function renderDocumentPage(markdown, { markdownUrl }) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(title)} — Unoblox</title>
+<title>${escapeHtml(title)} — unoblox</title>
 <link rel="alternate" type="text/markdown" href="${escapeHtml(markdownUrl)}">
 <style>
 :root{color-scheme:light dark;--bg:#fbfbf9;--fg:#1b1b1a;--muted:#6b6b66;--line:#e2e2dc;--code:#f0f0eb;--link:#2457c5}

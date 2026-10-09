@@ -8,12 +8,12 @@ type PatchRow = Parameters<typeof composeEntries>[0][number][number]
 type Entry = ReturnType<typeof composeEntries>[number]
 
 const UNOBLOX_ROUTE = {
-  displayName: 'Unoblox',
+  displayName: 'unoblox',
   apiKeyEnv: 'UNOBLOX_API_KEY',
   api: 'openai-completions',
   baseURL: 'https://api.unoblox.ai/v1'
 }
-const AUTO_ONLY = [{ id: 'unoblox/auto', name: 'Unoblox Auto · best value' }]
+const AUTO_ONLY = [{ id: 'unoblox/auto', name: 'unoblox Auto · best value' }]
 
 /** Evaluate a `!!js` node the way cordis-plugin-loader does, against a given environment. */
 function evaluateJs(node: unknown, env: Record<string, string | undefined>): unknown {
@@ -64,8 +64,8 @@ function entry(entries: Entry[], id: string): Entry {
   return found
 }
 
-describe.each(DESKTOP_PATCHES)('Unoblox provider lock in %s', (desktopPatch) => {
-  it('leaves Unoblox as the only llm-pi-ai route, hiding routes the profile declared', () => {
+describe.each(DESKTOP_PATCHES)('unoblox provider lock in %s', (desktopPatch) => {
+  it('leaves unoblox as the only llm-pi-ai route, hiding routes the profile declared', () => {
     const { entries } = compose(desktopPatch)
     const config = entry(entries, 'llm-pi-ai').config as { providers: Record<string, Record<string, unknown>> }
     expect(Object.keys(config.providers)).toEqual(['unoblox'])
@@ -85,7 +85,7 @@ describe.each(DESKTOP_PATCHES)('Unoblox provider lock in %s', (desktopPatch) => 
     expect(entry(entries, 'llm-deepseek-account').disabled).toBe(true)
   })
 
-  it('starts new agents on Unoblox even when the profile chose another provider', () => {
+  it('starts new agents on unoblox even when the profile chose another provider', () => {
     const { entries } = compose(desktopPatch)
     expect(entry(entries, 'agent-default-model').config).toEqual({ provider: 'unoblox', model: 'unoblox/auto' })
   })
@@ -108,8 +108,8 @@ describe.each(DESKTOP_PATCHES)('Unoblox provider lock in %s', (desktopPatch) => 
   })
 })
 
-describe('Unoblox web search wiring', () => {
-  it('searches through Unoblox in the normal profile', () => {
+describe('unoblox web search wiring', () => {
+  it('searches through unoblox in the normal profile', () => {
     const { entries } = compose('dsh-desktop.patch.yml')
     expect(entry(entries, 'dsh-desktop-unoblox-search').name).toBe('dsh-desktop-unoblox-search')
     expect(entry(entries, 'web').config).toEqual({ searchProvider: 'unoblox', fetchProvider: 'http' })
@@ -124,7 +124,7 @@ describe('Unoblox web search wiring', () => {
   })
 })
 
-describe('Unoblox-only Models settings', () => {
+describe('unoblox-only Models settings', () => {
   it('does not offer adding another provider', async () => {
     const [patch, installed] = await Promise.all([
       readFile(patchPath('@deepseek-ai/dsh-client-ui-settings-models'), 'utf8'),

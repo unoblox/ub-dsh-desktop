@@ -128,7 +128,7 @@ export async function prepareHostDisabledPluginsPatch(
     await rm(overlayPath, { force: true })
     return undefined
   }
-  const text = `# Managed by Unoblox. Do not edit.\n${entries.map(({ id, disabled: off }) =>
+  const text = `# Managed by unoblox. Do not edit.\n${entries.map(({ id, disabled: off }) =>
     `- id: ${JSON.stringify(id)}\n  disabled: ${off}\n`).join('')}`
   if (await readIfPresent(overlayPath) === text) return overlayPath
   const temporary = `${overlayPath}.${randomUUID()}.tmp`

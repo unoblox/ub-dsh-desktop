@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Regenerate the app icons from build/brand/unoblox-mark.svg, the single
- * source for the Unoblox mark (taken from the unoblox.ai favicon).
+ * source for the unoblox mark (taken from the unoblox.ai favicon).
  *
  *   node scripts/generate-brand-assets.mjs
  *

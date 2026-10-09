@@ -3,12 +3,12 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 /**
- * The live Unoblox model catalog for the model picker.
+ * The live unoblox model catalog for the model picker.
  *
- * The Unoblox route is declared in build/dsh-desktop*.patch.yml, which reads
+ * The unoblox route is declared in build/dsh-desktop*.patch.yml, which reads
  * its `models` from DSH_DESKTOP_UNOBLOX_MODELS. This module fills that
  * variable from `GET https://api.unoblox.ai/v1/models` (public, no key), so
- * the picker always offers what Unoblox serves instead of a copied list.
+ * the picker always offers what unoblox serves instead of a copied list.
  *
  * Harness reads configuration once at launch, so the catalog is resolved per
  * launch: a fresh listing when it arrives in time, otherwise the last good
@@ -29,7 +29,7 @@ export interface UnobloxModelRow {
 }
 
 // The picker shows names only, so the name says what Auto does.
-export const UNOBLOX_AUTO_ROW: UnobloxModelRow = { id: 'unoblox/auto', name: 'Unoblox Auto · best value' }
+export const UNOBLOX_AUTO_ROW: UnobloxModelRow = { id: 'unoblox/auto', name: 'unoblox Auto · best value' }
 
 // The picker shows names only, so a free model says so in its name. Rows
 // carry no other fields: they go to Harness's model config as they are.
@@ -61,7 +61,7 @@ function zeroPrice(value: unknown): boolean {
 }
 
 /**
- * Whether Unoblox lists the model at no charge: its prompt and completion
+ * Whether unoblox lists the model at no charge: its prompt and completion
  * prices are both zero, and a per-request price, if any, is zero too. The
  * listing has no free-tier flag, so the price is the signal.
  */

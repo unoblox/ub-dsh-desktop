@@ -1,11 +1,11 @@
 {
   "name": "dsh-desktop",
   "version": "0.1.1",
-  "description": "unoblox works: a desktop AI agent for macOS, Windows and Linux on the Unoblox unified AI gateway.",
+  "description": "unoblox works: a desktop AI agent for macOS, Windows and Linux on the unoblox unified AI gateway.",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
-  "author": "Unoblox",
+  "author": "unoblox",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -482,7 +482,7 @@
       "icon": "build/app-icon.png",
       "category": "Development",
       "executableName": "unoblox-works",
-      "synopsis": "Desktop AI agent workbench on the Unoblox gateway",
+      "synopsis": "Desktop AI agent workbench on the unoblox gateway",
       "target": [
         {
           "target": "AppImage",

@@ -221,11 +221,11 @@ describe('DSH Desktop onboarding wizard', () => {
     )
     expect(source).toContain("const WIZARD_ACK_FIELD = 'wizardVersion'")
     // "Configure a model" duplicated the key field (the Models page holds only
-    // the Unoblox row), so the dialog offers Connect and Not now.
+    // the unoblox row), so the dialog offers Connect and Not now.
     expect(source).not.toContain('configureModel')
     expect(source).not.toContain('OnboardingSurface')
     expect(source).not.toContain('ModelsSection')
-    // Unoblox branding: its own links and mark, none of upstream's.
+    // unoblox branding: its own links and mark, none of upstream's.
     expect(source).toContain("officialSiteUrl: 'https://unoblox.ai/'")
     expect(source).toContain("docsUrl: 'https://unoblox.ai/docs'")
     expect(source).not.toMatch(/dataelem|dshdesktop\.com|DSH Desktop'/iu)
@@ -299,7 +299,7 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(en.unobloxKeyLater).toContain('Settings › Models')
   })
 
-  it('shows exactly when the credential store reports no Unoblox key', () => {
+  it('shows exactly when the credential store reports no unoblox key', () => {
     const { plugin } = loadPlugin()
     expect(plugin.onboardingDecision({ eligible: false }, 'missing')).toBe('show')
     expect(plugin.onboardingDecision({ eligible: true, wizardVersion: 'v' }, 'missing')).toBe('show')
@@ -313,7 +313,7 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(plugin.onboardingDecision({})).toBe('complete')
   })
 
-  it('reads only whether the Unoblox key is configured', async () => {
+  it('reads only whether the unoblox key is configured', async () => {
     const { plugin } = loadPlugin()
     const describe = vi.fn(async (refs: string[]) => ({ ok: true, value: { [refs[0]!]: { configured: true, writable: true } } }))
     expect(await plugin.unobloxKeyState({ describe })).toBe('configured')
@@ -470,7 +470,7 @@ describe('DSH Desktop onboarding host eligibility', () => {
   })
 })
 
-describe('Unoblox key entry', () => {
+describe('unoblox key entry', () => {
   const t = (key: string) => key
 
   it('stores the trimmed key under the route credential reference', async () => {

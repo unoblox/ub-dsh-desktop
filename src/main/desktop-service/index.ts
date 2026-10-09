@@ -15,7 +15,7 @@ export function initializeDesktopService(): void {
       stateDir: join(app.getPath('userData'), 'desktop-service'),
       logPath: join(app.getPath('logs'), 'harness.log'),
       version: app.getVersion(), platform: process.platform, arch: process.arch,
-      // Unoblox collects nothing from the user's machine. The inherited
+      // unoblox collects nothing from the user's machine. The inherited
       // service reported crashes and update checks, with an installation ID,
       // to upstream's dshdesktop.com; here it has no network at all. Crashes
       // are still captured locally for this app's own recovery prompts, and

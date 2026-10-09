@@ -20,7 +20,7 @@ function compose(desktopPatch: string): Entry[] {
   return composeEntries(layers, () => {})
 }
 
-// Rows that send data off the machine to anyone but Unoblox (see the privacy
+// Rows that send data off the machine to anyone but unoblox (see the privacy
 // block in build/dsh-desktop.patch.yml).
 const SILENCED = [
   'session-telemetry-otel', 'otel', 'product-analytics', 'desktop-product-telemetry',

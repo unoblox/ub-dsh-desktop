@@ -1,9 +1,9 @@
 /**
- * Unoblox has no update server yet. The inherited feed and update-policy
+ * unoblox has no update server yet. The inherited feed and update-policy
  * endpoints belong to upstream (dshdesktop.com): checking them would send the
  * installation ID and version there and offer upstream's builds, which lack
- * Unoblox. Until an Unoblox feed exists, no update path touches the network;
- * users update by installing the latest Unoblox installer.
+ * unoblox. Until an unoblox feed exists, no update path touches the network;
+ * users update by installing the latest unoblox installer.
  */
 export const UNOBLOX_UPDATE_FEED_CONFIGURED: boolean = false
 

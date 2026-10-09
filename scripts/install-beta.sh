@@ -66,8 +66,8 @@ if [ "$(uname -s)" = Darwin ]; then
   ditto "$source_app" "$target"
   # Belt and braces: the copy has no quarantine mark, but clear any inherited one.
   xattr -dr com.apple.quarantine "$target" 2>/dev/null || true
-  if [ -d "/Applications/Unoblox.app" ]; then
-    say "Note: the earlier beta, /Applications/Unoblox.app, is still installed. You can delete it; your data is kept."
+  if [ -d "/Applications/unoblox.app" ]; then
+    say "Note: the earlier beta, /Applications/unoblox.app, is still installed. You can delete it; your data is kept."
   fi
   say "Opening $APP_NAME…"
   open "$target"

@@ -1,5 +1,5 @@
 diff --git a/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
-index c5252c1..7fdf0a0 100644
+index c5252c1..2e263fb 100644
 --- a/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
 +++ b/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
 @@ -64,6 +64,38 @@ window.__ModuleLoader__.load({
@@ -744,7 +744,7 @@ index c5252c1..7fdf0a0 100644
 +			"together"
 +		];
 +		const SETTINGS_PROVIDER_RANK = new Map(SETTINGS_PROVIDER_PRIORITY.map((provider, index) => [provider, index]));
-+		// DSH Desktop serves models only through its Unoblox route, which the
++		// DSH Desktop serves models only through its unoblox route, which the
 +		// desktop overlay pins as the whole llm-pi-ai provider set. Adding a
 +		// provider would be refused at write time, so the entry is not offered.
 +		const DESKTOP_PROVIDER_SET_LOCKED = true;

@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 /**
  * When the phone bridge listens on the local network.
  *
- * Unoblox opens no port and talks to nothing unless the user asks for it
+ * unoblox opens no port and talks to nothing unless the user asks for it
  * (docs/privacy.md). The bridge therefore starts when the user opens
  * Connect Phone, keeps running after that only while a phone is paired, and
  * starts with the app only when the user turned on "Keep Phone Connected".

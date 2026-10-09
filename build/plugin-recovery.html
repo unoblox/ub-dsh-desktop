@@ -673,7 +673,7 @@
           <span id="community-label"></span>
           <span class="community-links">
             <a id="community-discord" href="https://unoblox.ai/docs" target="_blank" rel="noopener noreferrer">
-              <span id="community-docs-label">Unoblox docs</span>
+              <span id="community-docs-label">unoblox docs</span>
               <svg class="external-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M4 12 12 4M5 4h7v7" />
               </svg>
@@ -800,10 +800,10 @@
       setText('show-log', model.logLabel)
       setText('quit', model.quitLabel)
       setText('community-label', model.locale === 'zh' ? '遇到问题？' : 'Need help?')
-      setText('community-docs-label', model.locale === 'zh' ? 'Unoblox 文档' : 'Unoblox docs')
+      setText('community-docs-label', model.locale === 'zh' ? 'unoblox 文档' : 'unoblox docs')
       document.getElementById('community-discord').title = model.locale === 'zh'
-        ? '在浏览器中打开 Unoblox 文档'
-        : 'Open the Unoblox docs in your browser'
+        ? '在浏览器中打开 unoblox 文档'
+        : 'Open the unoblox docs in your browser'
       // No plugin to repair: the primary action itself enters Safe Mode, so the
       // row collapses to that button and its note, centered together.
       const safeModeOnly = model.safeModeOnly ?? (!model.canUninstall && !model.upgradeCandidate && !model.marketPrimary)

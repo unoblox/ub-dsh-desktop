@@ -1,5 +1,5 @@
 diff --git a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
-index 0c74b3a..6dc4c77 100644
+index 0c74b3a..b138d9f 100644
 --- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 @@ -1378,8 +1378,9 @@ function mapUsage(usage) {
@@ -182,9 +182,9 @@ index 0c74b3a..6dc4c77 100644
  		const credentials = ctx.get("credentials");
  		const hit = credentials !== void 0 ? (await credentials.resolve(ref))?.value : launchEnvironmentOf(ctx).get(ref)?.value;
  		if (hit !== void 0 && hit.length > 0) return assertUsableApiKey(hit, "llm-pi-ai", ref);
-+		// Unoblox desktop: this text reaches the conversation as the turn's
++		// unoblox desktop: this text reaches the conversation as the turn's
 +		// error, so say what the user can do rather than how the seam works.
-+		if (ref === "UNOBLOX_API_KEY") throw new LlmError("Add your Unoblox API key to start: open Settings › Models, or paste it in the welcome dialog that opens when Unoblox starts.", "MISSING_CREDENTIAL");
++		if (ref === "UNOBLOX_API_KEY") throw new LlmError("Add your unoblox API key to start: open Settings › Models, or paste it in the welcome dialog that opens when unoblox starts.", "MISSING_CREDENTIAL");
  		throw new LlmError(`llm-pi-ai: no credential for provider route "${provider}"; its profile resolves ${ref}, which is not set — store ${ref} through the credentials service (the web Models page writes it) or export it, and remove apiKeyEnv only if this provider should authenticate from pi-ai's own environment discovery`, "MISSING_CREDENTIAL");
  	};
  	const auth = {

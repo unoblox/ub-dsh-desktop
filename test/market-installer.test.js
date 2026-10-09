@@ -430,7 +430,7 @@ describe('desktop plugin market installer', () => {
     expect(isTrustedRequest(request({}, '192.168.1.5'))).toBe(false)
   })
 
-  it('refuses to install the third-party market (Unoblox does not offer it)', async () => {
+  it('refuses to install the third-party market (unoblox does not offer it)', async () => {
     expect(MARKET_OFFERED).toBe(false)
     const home = await mkdtemp(join(tmpdir(), 'dsh-market-offer-'))
     vi.stubEnv('DSH_HOME', home)

@@ -2,7 +2,7 @@
 
 unoblox works beta is free to install on macOS, Windows and Linux. The beta is not yet signed with paid Apple or Microsoft certificates, so your computer asks you to confirm it once on first open. After that it opens like any other app.
 
-You need an Unoblox API key. The app asks for it on first launch.
+You need an unoblox API key. The app asks for it on first launch.
 
 ## Install from the command line (no first-open prompt)
 

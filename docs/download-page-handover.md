@@ -33,7 +33,7 @@ Limits to state on the page and keep in mind:
 - Anyone who downloads the `.dmg` or `.exe` with a browser still gets the prompt. Only paid signing fixes that: Apple Developer ID plus notarization, and a Windows code-signing certificate.
 - **Windows Smart App Control** (on by default on some clean Windows 11 installs) blocks unsigned apps whatever their origin. The script cannot get around it: detect it and say so (section 6.3).
 - Company-managed Macs and PCs (MDM, AppLocker, WDAC) may block unsigned apps. Apple or Microsoft can tighten these rules in future OS releases. Signing is the durable fix; this is the beta's free route.
-- A script piped into a shell is only as trustworthy as its host. Serve everything over HTTPS from a domain Unoblox controls, verify SHA-256 checksums, and keep the scripts short and readable.
+- A script piped into a shell is only as trustworthy as its host. Serve everything over HTTPS from a domain unoblox controls, verify SHA-256 checksums, and keep the scripts short and readable.
 
 ## 3. What exists today
 
@@ -49,7 +49,7 @@ Limits to state on the page and keep in mind:
 | Windows | Unsigned NSIS installer (`oneClick: false`). A silent install (`/S`) installs for the current user under `%LOCALAPPDATA%\Programs\unoblox works\unoblox works.exe`; verify this on a runner. |
 | Linux | `.deb` package `unoblox-works` (conflicts with and replaces the first betas' `unoblox`). Installs to `/opt/unoblox works/`, links the command `unoblox-works`, adds a menu entry and the AppArmor profile. Depends on libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1 and libsecret-1-0. The AppImage needs FUSE 2 and cannot use Chromium's sandbox on Ubuntu 24.04+. |
 | User data | Kept across reinstalls and renames. macOS `~/Library/Application Support/dsh-desktop`, Windows `%APPDATA%\dsh-desktop`, Linux `~/.config/dsh-desktop`. Installers and scripts must never delete it. |
-| Earlier betas | Installed as "Unoblox" (`/Applications/Unoblox.app`, Windows app "Unoblox", deb `unoblox`). The scripts should mention they can be removed, never remove them silently. |
+| Earlier betas | Installed as "unoblox" (`/Applications/unoblox.app`, Windows app "unoblox", deb `unoblox`). The scripts should mention they can be removed, never remove them silently. |
 | Reference scripts | `scripts/install-beta.sh` and `scripts/install-beta.ps1` install from Actions artifacts through the GitHub CLI. They are internal only, but their install steps (DMG mount, `ditto`, quitting the running app, silent NSIS, apt) are the starting point for the public scripts. |
 | Privacy rule | The app collects no usage data and contacts nothing but `api.unoblox.ai` on its own (`docs/privacy.md`). The install scripts and download page must keep that promise: no analytics calls, install pings or third-party trackers, unless the owner decides otherwise for the web page. |
 
@@ -117,7 +117,7 @@ Shared rules:
 5. Install to `/Applications/unoblox works.app`. Remove the old bundle, then `ditto` the new one in, which keeps signatures and symlinks. If `/Applications` isn't writable (a standard user account), install to `~/Applications` instead and say so; do not use `sudo` on macOS.
 6. Run `xattr -dr com.apple.quarantine` on the installed app, then `codesign --verify --deep --strict` on it. If the check fails, say the download is damaged.
 7. Detach the DMG in a cleanup trap, then `open` the app (unless NO_LAUNCH).
-8. If `/Applications/Unoblox.app` exists, print that the old beta can be deleted and that data is kept.
+8. If `/Applications/unoblox.app` exists, print that the old beta can be deleted and that data is kept.
 
 ### 6.2 `install.sh`: Linux
 
@@ -143,7 +143,7 @@ Shared rules:
 4. Download with `Invoke-WebRequest -UseBasicParsing -OutFile`. For speed on 5.1, set `$ProgressPreference = 'SilentlyContinue'` during the download. Verify with `Get-FileHash -Algorithm SHA256`, then `Unblock-File`.
 5. Stop a running `unoblox works` process (`Get-Process -Name 'unoblox works'`).
 6. Run the installer silently with `Start-Process -Wait -PassThru -ArgumentList '/S'` and check the exit code. Confirm on a runner that `/S` installs for the current user without a UAC prompt.
-7. Launch `%LOCALAPPDATA%\Programs\unoblox works\unoblox works.exe` (unless NO_LAUNCH). Mention that the old "Unoblox" beta can be uninstalled in Settings › Apps.
+7. Launch `%LOCALAPPDATA%\Programs\unoblox works\unoblox works.exe` (unless NO_LAUNCH). Mention that the old "unoblox" beta can be uninstalled in Settings › Apps.
 8. Never reference the script's own path: `irm | iex` runs it from memory. Execution policy does not apply to `iex`, but the Command Prompt form passes `-ExecutionPolicy Bypass` anyway.
 
 ## 7. Download page
@@ -158,7 +158,7 @@ Content:
   - macOS: Apple Silicon (M1 or later), macOS 12+ (confirm).
   - Windows: 10 or 11, 64-bit.
   - Linux: x64, Ubuntu 22.04+/Debian 12 for the `.deb`, AppImage elsewhere.
-  - Everywhere: an Unoblox API key from the developer portal, which the app asks for on first launch.
+  - Everywhere: an unoblox API key from the developer portal, which the app asks for on first launch.
 - **Manual downloads:** direct links to the DMG, setup `.exe`, `.deb` and AppImage, with sizes and SHA-256. Under each, show the one-time confirmation that browser downloads still need:
   - macOS: open the app, click **Done**, then System Settings › Privacy & Security › **Open Anyway**.
   - Windows: **More info** › **Run anyway**.

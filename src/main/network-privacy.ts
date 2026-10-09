@@ -2,8 +2,8 @@ import type { Session } from 'electron'
 import { PRODUCT_NAME } from '../shared/brand'
 
 /**
- * Unoblox makes no silent network calls: the only host the app contacts on
- * its own is the Unoblox API. Everything else must be something the user
+ * unoblox makes no silent network calls: the only host the app contacts on
+ * its own is the unoblox API. Everything else must be something the user
  * asked for in the moment (a web page an agent fetches, a plugin they
  * install, phone pairing they start).
  */
@@ -31,7 +31,7 @@ export function disableSpellcheckDownloads(
 /**
  * Stand-in for the plugin-recovery registry lookup. When a plugin breaks
  * startup, upstream asked registry.npmmirror.com / registry.npmjs.org for a
- * newer version on its own. Unoblox does not: recovery offers its local
+ * newer version on its own. unoblox does not: recovery offers its local
  * actions (Safe Mode, removing the plugin) and the check reports itself as
  * not run.
  */

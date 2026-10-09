@@ -42,7 +42,7 @@ const DOCS_RESULT = {
   publishedDate: '2026-01-31'
 }
 
-describe('Unoblox search provider', () => {
+describe('unoblox search provider', () => {
   it('sends the query with the stored key, an idempotency key, and a clamped result count', async () => {
     const { provider, calls } = createProvider([json(200, { requestId: 'srch_1', results: [DOCS_RESULT] })])
     const result = await provider.search({ query: 'tokio select macro', maxResults: 50 })
@@ -93,7 +93,7 @@ describe('Unoblox search provider', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('shows Unoblox error text verbatim with its code and does not retry billing or policy refusals', async () => {
+  it('shows unoblox error text verbatim with its code and does not retry billing or policy refusals', async () => {
     for (const [status, code, error] of [
       [402, 'UB-GW-306', 'Your balance cannot cover one search. Top up on the Credits page.'],
       [400, 'UB-GW-311', 'Your workspace guardrail forbids sending queries outside India.'],
@@ -111,7 +111,7 @@ describe('Unoblox search provider', () => {
 
   it('explains a rejected key when the 401 has no body', async () => {
     const { provider } = createProvider([new Response('', { status: 401 })])
-    await expect(provider.search({ query: 'q' })).rejects.toThrow('Unoblox rejected the API key')
+    await expect(provider.search({ query: 'q' })).rejects.toThrow('unoblox rejected the API key')
   })
 
   it('retries a per-key rate limit once after Retry-After, reusing the idempotency key', async () => {
@@ -152,7 +152,7 @@ describe('Unoblox search provider', () => {
   })
 })
 
-describe('Unoblox search plugin', () => {
+describe('unoblox search plugin', () => {
   it('registers with the web seam and reads the key from the credential store on every search', async () => {
     let stored: string | undefined
     const resolve = vi.fn(async (ref: string) => (stored === undefined ? undefined : { value: stored, source: 'file', ref }))
@@ -190,7 +190,7 @@ describe('Unoblox search plugin', () => {
   })
 })
 
-describe('Unoblox search packaging', () => {
+describe('unoblox search packaging', () => {
   it('is declared, locked, and reachable from the Harness dependency closure', async () => {
     const [manifest, lock, dshPatch] = await Promise.all([
       readFile(path.join(projectRoot, 'package.json'), 'utf8'),

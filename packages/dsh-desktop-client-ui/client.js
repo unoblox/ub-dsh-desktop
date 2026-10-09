@@ -8,7 +8,7 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const { MenuItemButton } = require('@deepseek-ai/dsh-client-ui-primitives')
 
-    // Unoblox mark (build/brand/unoblox-mark.svg without its tile): a "u" in
+    // unoblox mark (build/brand/unoblox-mark.svg without its tile): a "u" in
     // currentColor, so it follows the text colour in both themes, and the gold
     // dot. The gold is the brand asset's own colour, not a theme colour.
     const BRAND_GOLD = '#D9A64A'

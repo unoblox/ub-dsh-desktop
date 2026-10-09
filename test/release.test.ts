@@ -255,7 +255,7 @@ describe('GitHub release contract', () => {
     expect(packageJson.build.detectUpdateChannel).toBe(false)
   })
 
-  it('ships no update feed until Unoblox has one, keeping the release workflow assets', async () => {
+  it('ships no update feed until unoblox has one, keeping the release workflow assets', async () => {
     const packageJson = JSON.parse(
       await readFile(path.join(projectRoot, 'package.json'), 'utf8')
     ) as {
@@ -271,7 +271,7 @@ describe('GitHub release contract', () => {
     )
 
     expect(packageJson.dependencies['electron-updater']).toBeTruthy()
-    // Unoblox has no update server yet (UNOBLOX_UPDATE_FEED_CONFIGURED), so
+    // unoblox has no update server yet (UNOBLOX_UPDATE_FEED_CONFIGURED), so
     // installers carry no feed, and the Windows publisher comes from the
     // signing certificate rather than upstream's company name.
     expect(packageJson.build.publish).toBeNull()
@@ -380,7 +380,7 @@ describe('GitHub release contract', () => {
     expect(beta.mac).toMatchObject({ identity: '-', hardenedRuntime: false, target: ['dmg'] })
     // Ubuntu 24.04+ needs the .deb's AppArmor profile for Chromium's sandbox.
     expect(beta.linux.target.map((entry) => entry.target)).toEqual(['AppImage', 'deb'])
-    expect(beta.linux.maintainer).toBe('Unoblox <hello@unoblox.ai>')
+    expect(beta.linux.maintainer).toBe('unoblox <hello@unoblox.ai>')
     expect(beta.deb.packageName).toBe('unoblox-works')
     expect(workflow).toContain('sudo apt-get install -y xvfb ./dist-beta/*.deb')
     expect(beta.dmg.background).toBe('build/dmg-background.png')
@@ -541,7 +541,7 @@ describe('GitHub release contract', () => {
     expect(installer).not.toMatch(/Add-MpPreference|HKLM|ExecShell\s+"runas"/)
   })
 
-  it('points readers at the Unoblox beta install guide, not upstream downloads', async () => {
+  it('points readers at the unoblox beta install guide, not upstream downloads', async () => {
     const readme = await readFile(path.join(projectRoot, 'README.md'), 'utf8')
     expect(readme).toContain('docs/install.md')
     expect(readme).toContain('https://unoblox.ai')

@@ -55,7 +55,7 @@ try {
   } else {
     Write-Host "Installed. Open $appName from the Start menu."
   }
-  Write-Host 'If the earlier "Unoblox" beta is installed, you can uninstall it in Settings > Apps; your data is kept.'
+  Write-Host 'If the earlier "unoblox" beta is installed, you can uninstall it in Settings > Apps; your data is kept.'
 } finally {
   Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 }

@@ -39,7 +39,7 @@ const SSE = [
   { choices: [], id: 'c1', model: 'google/gemma-4-26b-a4b-it', object: 'chat.completion.chunk', usage: { completion_tokens: 2, prompt_tokens: 20, prompt_tokens_details: { cached_tokens: 19 }, total_tokens: 22 } }
 ].map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n'
 
-describe('Unoblox response parsing', () => {
+describe('unoblox response parsing', () => {
   it('reads billing and routing from a streamed chat response', () => {
     expect(turnFromHeaders(CHAT_HEADERS)).toEqual({
       billing: {
@@ -59,7 +59,7 @@ describe('Unoblox response parsing', () => {
     expect(parseBilling({ ...block, balance_inr: 'lots' })).toBeUndefined()
   })
 
-  it('keeps routing when the billing header is malformed, and ignores responses without Unoblox headers', () => {
+  it('keeps routing when the billing header is malformed, and ignores responses without unoblox headers', () => {
     expect(turnFromHeaders({ ...CHAT_HEADERS, 'x-unoblox-freemium': '{not json' })).toEqual({ routing: expect.objectContaining({ servedModel: 'google/gemma-4-26b-a4b-it' }) })
     expect(turnFromHeaders({ 'content-type': 'text/event-stream', 'x-generation-id': 'g' })).toBeUndefined()
   })
@@ -278,16 +278,16 @@ describe('info strip client', () => {
     expect(row.props.className).toBe('dshUbxInfo')
     expect(pills(row).map((pill) => pill.text)).toEqual(['₹250.50', 'gemma-4-26b-a4b-it'])
     const [balance, model] = pills(row)
-    expect(balance!.description).toContain('Unoblox balance ₹250.50. Charged ₹0.00 at standard rates')
+    expect(balance!.description).toContain('unoblox balance ₹250.50. Charged ₹0.00 at standard rates')
     expect(model!.description).toBe('Model google/gemma-4-26b-a4b-it. unoblox/auto -> google/gemma-4-26b-a4b-it (best value: quality-per-price over capable models)')
     expect(text(row)).not.toMatch(/\$|Search|Last reply|Details/u)
   })
 
-  it('renders nothing before Unoblox has reported anything, and flags a missing key', () => {
+  it('renders nothing before unoblox has reported anything, and flags a missing key', () => {
     expect(client.UnobloxInfoStrip({ view: undefined, t })).toBeNull()
     expect(client.UnobloxInfoStrip({ view: view({ key: 'set', billing: null, turn: null }), t })).toBeNull()
     const missing = client.UnobloxInfoStrip({ view: view({ key: 'missing', billing: null, turn: null }), t })
-    expect(pills(missing)).toEqual([{ text: 'Add API key', description: 'No Unoblox API key yet. Click to open Settings › Models and add it.' }])
+    expect(pills(missing)).toEqual([{ text: 'Add API key', description: 'No unoblox API key yet. Click to open Settings › Models and add it.' }])
     // Balance known from another conversation, no reply here yet: balance only.
     expect(pills(client.UnobloxInfoStrip({ view: view({ ...routeBody, turn: null }), t })).map((pill) => pill.text)).toEqual(['₹250.50'])
   })

@@ -9,12 +9,12 @@
  *
  * Linux needs a display (e.g. xvfb-run) and runs with a throwaway HOME. On
  * macOS and Windows Electron resolves its data folder from the OS, not from
- * HOME, so the app uses the machine's real Unoblox profile there; the script
+ * HOME, so the app uses the machine's real unoblox profile there; the script
  * therefore runs only on CI (CI=true) or with --real-profile.
  *
  * Stages checked, in order: Harness ready (URL line in harness.log) → token
  * login → HTML with the client bootstrap → bootstrap registers the module
- * system → workspace and session creation → the Unoblox info route. A model
+ * system → workspace and session creation → the unoblox info route. A model
  * call is not made; that needs a key and belongs to a keyed live check.
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -28,7 +28,7 @@ const appDirectory = resolve(process.argv[2] ?? 'dist-dev/linux-unpacked')
 const READY_TIMEOUT_MS = 120_000
 
 if (process.platform !== 'linux' && process.env.CI !== 'true' && !process.argv.includes('--real-profile')) {
-  console.error('smoke: on macOS and Windows the app uses the real Unoblox profile; run on CI or pass --real-profile')
+  console.error('smoke: on macOS and Windows the app uses the real unoblox profile; run on CI or pass --real-profile')
   process.exit(2)
 }
 

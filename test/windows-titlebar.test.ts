@@ -47,7 +47,7 @@ describe('Windows caption menus', () => {
     expect(new Set(run)).toEqual(new Set(desktopMenuCommands.filter((command) => !editing.has(command))))
   })
 
-  it('offers no update check while Unoblox has no update feed', () => {
+  it('offers no update check while unoblox has no update feed', () => {
     const { run, actions } = record()
     clickAll(windowsMenuTemplate('application', 'en', 1, actions))
     expect(run).not.toContain('check-for-updates')

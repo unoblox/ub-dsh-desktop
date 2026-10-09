@@ -1,8 +1,8 @@
 /**
- * Host half of the Unoblox info strip under the composer.
+ * Host half of the unoblox info strip under the composer.
  *
  * - Listens to `llm-pi-ai/response` (a seam added by the dsh-llm-pi-ai patch)
- *   and keeps what Unoblox reported on the latest chat call per session:
+ *   and keeps what unoblox reported on the latest chat call per session:
  *   balance, charge and the model `unoblox/auto` routed to.
  * - Serves it to the renderer on one same-origin route. The API key never
  *   leaves this process; the route only says whether one is stored.

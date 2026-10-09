@@ -108,7 +108,7 @@ describe('bundled workbench development guide', () => {
 
   it('renders a reading page that escapes the document and links its Markdown source', () => {
     const page = renderDocumentPage('# 标题\n\n| a | b |\n|---|---|\n| `<x>` | **粗** |\n\n- [ ] 任务\n\n<script>alert(1)</script>', { markdownUrl: 'https://dshdesktop.com/workbench/docs/development.md' })
-    expect(page).toContain('<title>标题 — Unoblox</title>')
+    expect(page).toContain('<title>标题 — unoblox</title>')
     expect(page).toContain('<td><code>&lt;x&gt;</code></td><td><strong>粗</strong></td>')
     expect(page).toContain('<input type="checkbox" disabled> 任务')
     expect(page).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')

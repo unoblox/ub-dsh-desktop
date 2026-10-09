@@ -60,7 +60,7 @@ async function cachePath(): Promise<string> {
   return join(home, 'harness', 'unoblox-models.json')
 }
 
-describe('Unoblox model listing', () => {
+describe('unoblox model listing', () => {
   it('maps entries to picker rows', () => {
     expect(modelRow(FABLE)).toEqual({ id: 'anthropic/claude-fable-5-1', name: 'Claude Fable 5.1', contextWindow: 1000000, input: ['text', 'image'] })
     expect(modelRow(GEMINI)).toEqual({ id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', contextWindow: 1048576, maxTokens: 65536, input: ['text', 'image'] })
@@ -84,7 +84,7 @@ describe('Unoblox model listing', () => {
   it('lists free models right after Auto, labelled as free', () => {
     const rows = catalogFromListing({ object: 'list', data: [LLAMA, QWEN, FABLE, GEMMA, GEMINI] })
     expect(rows?.map((row) => row.name)).toEqual([
-      'Unoblox Auto · best value',
+      'unoblox Auto · best value',
       'Gemma 4 26B A4B Instruct · free',
       'Qwen3.8-27B · free',
       'Claude Fable 5.1',
@@ -123,7 +123,7 @@ describe('catalog resolution', () => {
   it('keeps free models first and labelled once when read back from the cache', async () => {
     const path = await cachePath()
     const live = await refreshUnobloxCatalog({ cachePath: path, fetch: reply({ object: 'list', data: [LLAMA, QWEN, FABLE] }) })
-    expect(live.rows.map((row) => row.name)).toEqual(['Unoblox Auto · best value', 'Qwen3.8-27B · free', 'Claude Fable 5.1', 'Llama 3.3 70B Instruct Turbo'])
+    expect(live.rows.map((row) => row.name)).toEqual(['unoblox Auto · best value', 'Qwen3.8-27B · free', 'Claude Fable 5.1', 'Llama 3.3 70B Instruct Turbo'])
     expect(parseCachedCatalog(await readFile(path, 'utf8'))).toEqual(live.rows)
   })
 
@@ -169,6 +169,6 @@ describe('catalog resolution', () => {
   })
 
   it('hands the rows to the patch files as JSON', () => {
-    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"Unoblox Auto · best value"}]' })
+    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"unoblox Auto · best value"}]' })
   })
 })

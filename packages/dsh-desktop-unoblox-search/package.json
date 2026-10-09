@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop-unoblox-search",
   "version": "0.1.0",
-  "description": "Web search through the Unoblox gateway (POST /v1/search) with the user's stored Unoblox API key.",
+  "description": "Web search through the unoblox gateway (POST /v1/search) with the user's stored unoblox API key.",
   "private": true,
   "type": "module",
   "main": "./index.js",

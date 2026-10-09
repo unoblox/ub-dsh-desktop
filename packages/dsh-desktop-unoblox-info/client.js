@@ -31,27 +31,27 @@ window.__ModuleLoader__.load({
     `
 
     const en = {
-      label: 'Unoblox',
-      balance: 'Unoblox balance {amount}',
+      label: 'unoblox',
+      balance: 'unoblox balance {amount}',
       model: 'Model {model}',
       modelRouted: 'Model {model}. {reason}',
       keyMissing: 'Add API key',
-      keyMissingHint: 'No Unoblox API key yet. Click to open Settings › Models and add it.'
+      keyMissingHint: 'No unoblox API key yet. Click to open Settings › Models and add it.'
     }
     const zh = {
-      label: 'Unoblox',
-      balance: 'Unoblox 余额 {amount}',
+      label: 'unoblox',
+      balance: 'unoblox 余额 {amount}',
       model: '模型 {model}',
       modelRouted: '模型 {model}。{reason}',
       keyMissing: '添加 API 密钥',
-      keyMissingHint: '尚未设置 Unoblox API 密钥。点击打开“设置 › 模型”添加。'
+      keyMissingHint: '尚未设置 unoblox API 密钥。点击打开“设置 › 模型”添加。'
     }
 
     // ---------- formatting (pure) ----------
 
     const RUPEES = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-    /** Rupees as Unoblox reports them (INR), always with the ₹ sign. */
+    /** Rupees as unoblox reports them (INR), always with the ₹ sign. */
     function formatInr(amount) {
       return `₹${RUPEES.format(amount)}`
     }
@@ -101,7 +101,7 @@ window.__ModuleLoader__.load({
 
     /**
      * Load on mount and session change, then again whenever a turn ends
-     * (running true → false), when Unoblox has just reported a new balance.
+     * (running true → false), when unoblox has just reported a new balance.
      * A newer load aborts the older one; results after unmount are dropped.
      * A failed refresh keeps the last values rather than blanking the row.
      */
@@ -187,7 +187,7 @@ window.__ModuleLoader__.load({
 
     /**
      * Presentational row: balance and model as icon pills, or a missing-key
-     * pill. Renders nothing until Unoblox has reported a value, so the row
+     * pill. Renders nothing until unoblox has reported a value, so the row
      * never shows placeholders.
      */
     function UnobloxInfoStrip({ view, t }) {

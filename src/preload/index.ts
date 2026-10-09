@@ -33,7 +33,7 @@ setupDesktopStoragePersistence()
 const ROOT_ID = 'dsh-desktop-update-root'
 const MOBILE_BUTTON_ID = 'dsh-desktop-mobile-button'
 const SAFE_MODE_BANNER_ID = 'dsh-desktop-safe-mode-banner'
-// Unoblox is English-only (see src/main/application-locale.ts).
+// unoblox is English-only (see src/main/application-locale.ts).
 const locale: UpdateLocale = 'en'
 
 let host: HTMLDivElement | undefined
@@ -54,7 +54,7 @@ interface AboutInfo {
   desktopVersion: string
   harnessVersion: string
   locale: 'en' | 'zh'
-  /** False while Unoblox has no update feed: no version picker or check. */
+  /** False while unoblox has no update feed: no version picker or check. */
   updatesAvailable?: boolean
 }
 let aboutHost: HTMLElement | null = null

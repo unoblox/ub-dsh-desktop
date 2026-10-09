@@ -3344,7 +3344,7 @@ async function bootstrap(): Promise<void> {
     }
   })
   createWindow()
-  // The live Unoblox model list for the picker (see unoblox/model-catalog.ts).
+  // The live unoblox model list for the picker (see unoblox/model-catalog.ts).
   // Fetched alongside startup; each launch takes it if ready in time, else the
   // cached list, and the next launch starts a fresh fetch.
   const unobloxCatalogCache = join(dshHome, 'unoblox-models.json')
@@ -3360,7 +3360,7 @@ async function bootstrap(): Promise<void> {
       const catalog = await catalogForLaunch(pending, unobloxCatalogCache, 2_500)
       return {
         environment: catalogEnvironment(catalog),
-        note: `Unoblox model catalog: ${String(catalog.rows.length)} models (${catalog.source}${catalog.detail === undefined ? '' : `: ${catalog.detail}`})`
+        note: `unoblox model catalog: ${String(catalog.rows.length)} models (${catalog.source}${catalog.detail === undefined ? '' : `: ${catalog.detail}`})`
       }
     },
     // A packaged app's stdout may be a closed pipe; only mirror logs in development.

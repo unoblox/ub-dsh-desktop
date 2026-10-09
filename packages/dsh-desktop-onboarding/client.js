@@ -30,7 +30,7 @@ window.__ModuleLoader__.load({
     // schema; the value object the mirror hands back has exactly this shape.
     const WIZARD_ACK_FIELD = 'wizardVersion'
 
-    // Unoblox mark without its tile (build/brand/unoblox-mark.svg): the "u"
+    // unoblox mark without its tile (build/brand/unoblox-mark.svg): the "u"
     // in currentColor so it follows the header text colour in both themes,
     // and the brand's gold dot.
     const BRAND_GOLD = '#D9A64A'
@@ -88,7 +88,7 @@ window.__ModuleLoader__.load({
       brandName: 'unoblox works',
       brandBy: 'Beta',
       step0Title: 'Welcome to unoblox works',
-      declarationBody: 'unoblox works runs AI agents on your computer. In the workspace folders you choose, they can read and write files, run commands, search the web, and create documents, spreadsheets and slides. You stay in control: risky actions ask for your approval first.\n\nModels are served through the Unoblox gateway. Pick Unoblox Auto to let the router choose the best-value model for each request, or choose a specific model per conversation. Usage is billed to your prepaid ₹ balance.',
+      declarationBody: 'unoblox works runs AI agents on your computer. In the workspace folders you choose, they can read and write files, run commands, search the web, and create documents, spreadsheets and slides. You stay in control: risky actions ask for your approval first.\n\nModels are served through the unoblox gateway. Pick unoblox Auto to let the router choose the best-value model for each request, or choose a specific model per conversation. Usage is billed to your prepaid ₹ balance.',
       desktopIntroTitle: 'About unoblox works',
       desktopIntroBody: 'unoblox works is built on the open-source DeepSeek Harness and runs locally on Windows, macOS and Linux.',
       officialSite: 'unoblox.ai',
@@ -98,14 +98,14 @@ window.__ModuleLoader__.load({
       desktopIntroFeedback: 'Questions or feedback? See the docs or reach us through unoblox.ai.',
       later: 'Not now',
       unobloxKeyLater: 'You can add the key later in Settings › Models. Until then, unoblox works asks again each time it starts.',
-      unobloxKeyLabel: 'Connect Unoblox',
+      unobloxKeyLabel: 'Connect unoblox',
       unobloxKeyPlaceholder: 'ub-gw-…',
-      unobloxKeyHint: 'Paste a workspace API key from the Unoblox developer portal (API Keys). Requests draw from your prepaid ₹ balance.',
-      unobloxSearchPrivacy: 'Web search sends only the search query text to Unoblox, which runs it on Perplexity (United States). Nothing else from the session is sent, and Unoblox does not store queries. Each successful search is billed to your ₹ balance.',
+      unobloxKeyHint: 'Paste a workspace API key from the unoblox developer portal (API Keys). Requests draw from your prepaid ₹ balance.',
+      unobloxSearchPrivacy: 'Web search sends only the search query text to unoblox, which runs it on Perplexity (United States). Nothing else from the session is sent, and unoblox does not store queries. Each successful search is billed to your ₹ balance.',
       unobloxKeyLink: 'Get an API key',
       unobloxConnect: 'Connect and continue',
       unobloxConnecting: 'Connecting…',
-      unobloxKeyRequired: 'Enter your Unoblox API key to continue, or choose Not now.',
+      unobloxKeyRequired: 'Enter your unoblox API key to continue, or choose Not now.',
       unobloxKeyFailed: 'The API key could not be saved: {message}'
     }
 
@@ -113,7 +113,7 @@ window.__ModuleLoader__.load({
       brandName: 'unoblox works',
       brandBy: '测试版',
       step0Title: '欢迎使用 unoblox works',
-      declarationBody: 'unoblox works 在你的电脑上运行 AI 智能体。在你选择的工作区文件夹中，智能体可以读写文件、运行命令、搜索网页，并制作文档、表格和演示文稿。一切由你掌控：有风险的操作会先征求你的同意。\n\n模型通过 Unoblox 网关提供。选择 Unoblox Auto 可让路由为每个请求挑选性价比最高的模型，也可以为每个对话指定模型。用量从你的预付 ₹ 余额中扣费。',
+      declarationBody: 'unoblox works 在你的电脑上运行 AI 智能体。在你选择的工作区文件夹中，智能体可以读写文件、运行命令、搜索网页，并制作文档、表格和演示文稿。一切由你掌控：有风险的操作会先征求你的同意。\n\n模型通过 unoblox 网关提供。选择 unoblox Auto 可让路由为每个请求挑选性价比最高的模型，也可以为每个对话指定模型。用量从你的预付 ₹ 余额中扣费。',
       desktopIntroTitle: '关于 unoblox works',
       desktopIntroBody: 'unoblox works 基于开源的 DeepSeek Harness 构建，可在 Windows、macOS 和 Linux 上本地运行。',
       officialSite: 'unoblox.ai',
@@ -123,14 +123,14 @@ window.__ModuleLoader__.load({
       desktopIntroFeedback: '有问题或建议？请查看文档，或通过 unoblox.ai 联系我们。',
       later: '暂不',
       unobloxKeyLater: '也可以稍后在“设置 › 模型”中添加。在此之前，unoblox works 每次启动都会再次询问。',
-      unobloxKeyLabel: '接入 Unoblox',
+      unobloxKeyLabel: '接入 unoblox',
       unobloxKeyPlaceholder: 'ub-gw-…',
-      unobloxKeyHint: '粘贴在 Unoblox 开发者门户（API Keys）创建的工作区 API Key。请求按 token 从预付 ₹ 余额中扣费。',
-      unobloxSearchPrivacy: '网页搜索仅将搜索词发送给 Unoblox，并由其交给 Perplexity（美国）执行。会话中的其他内容不会被发送，Unoblox 不保存搜索词。每次成功的搜索从 ₹ 余额中扣费。',
+      unobloxKeyHint: '粘贴在 unoblox 开发者门户（API Keys）创建的工作区 API Key。请求按 token 从预付 ₹ 余额中扣费。',
+      unobloxSearchPrivacy: '网页搜索仅将搜索词发送给 unoblox，并由其交给 Perplexity（美国）执行。会话中的其他内容不会被发送，unoblox 不保存搜索词。每次成功的搜索从 ₹ 余额中扣费。',
       unobloxKeyLink: '获取 API Key',
       unobloxConnect: '接入并继续',
       unobloxConnecting: '接入中…',
-      unobloxKeyRequired: '请输入 Unoblox API Key 后继续，或选择“暂不”。',
+      unobloxKeyRequired: '请输入 unoblox API Key 后继续，或选择“暂不”。',
       unobloxKeyFailed: 'API Key 保存失败：{message}'
     }
 
@@ -161,7 +161,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // What Unoblox does and how it bills, the attribution to DeepSeek Harness,
+    // What unoblox does and how it bills, the attribution to DeepSeek Harness,
     // and the public links. External links open in the system browser via the
     // main process's window-open handler.
     function NoticeBody({ t }) {
@@ -198,7 +198,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // Unoblox API-key entry. Presentational: the parent owns the draft, busy
+    // unoblox API-key entry. Presentational: the parent owns the draft, busy
     // state, and the failure message.
     function UnobloxKeyField({ t, value, busy, failure, onChange, onSubmit, inputRef }) {
       return React.createElement(
@@ -234,7 +234,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // Store the key under the reference the Unoblox route resolves per request.
+    // Store the key under the reference the unoblox route resolves per request.
     // Returns a failure message, or undefined once the key is stored.
     async function storeUnobloxKey(credentials, t, draft) {
       const key = draft.trim()
@@ -256,8 +256,8 @@ window.__ModuleLoader__.load({
     const ignoreImplicitDismiss = () => {}
 
     /**
-     * Show the notice exactly when the credential store says no Unoblox key is
-     * stored: Unoblox is the only model provider, so without a key nothing
+     * Show the notice exactly when the credential store says no unoblox key is
+     * stored: unoblox is the only model provider, so without a key nothing
      * works, and with one the notice has nothing left to do. Dismissing it is
      * per launch; it returns until a key is set.
      *
@@ -278,7 +278,7 @@ window.__ModuleLoader__.load({
     const KEY_STATE_TIMEOUT_MS = 5000
 
     /**
-     * Whether the credential store holds the Unoblox key. Never reads the
+     * Whether the credential store holds the unoblox key. Never reads the
      * value; any failure is 'unknown', which defers to install eligibility.
      */
     async function unobloxKeyState(credentials) {

@@ -57,7 +57,7 @@ describe('sign-windows-unpacked', () => {
   })
 
   it('finds every PE by content, including nested and extensionless binaries', async () => {
-    writeFileSync(join(tempDir, 'Unoblox.exe'), minimalPe())
+    writeFileSync(join(tempDir, 'unoblox.exe'), minimalPe())
     writeFileSync(join(tempDir, 'ffmpeg.dll'), minimalPe())
     writeFileSync(join(tempDir, 'LICENSE.electron.txt'), 'ignore me')
 
@@ -81,7 +81,7 @@ describe('sign-windows-unpacked', () => {
 
     const binaries = await findSignableBinaries(tempDir)
 
-    expect(binaries).toContain(join(tempDir, 'Unoblox.exe'))
+    expect(binaries).toContain(join(tempDir, 'unoblox.exe'))
     expect(binaries).toContain(join(tempDir, 'ffmpeg.dll'))
     expect(binaries).toContain(join(nodeBinDir, 'node.exe'))
     expect(binaries).toContain(join(koffiDir, 'koffi.node'))
@@ -91,7 +91,7 @@ describe('sign-windows-unpacked', () => {
   })
 
   it('fails on damaged PE content instead of skipping it', async () => {
-    writeFileSync(join(tempDir, 'Unoblox.exe'), minimalPe())
+    writeFileSync(join(tempDir, 'unoblox.exe'), minimalPe())
     writeFileSync(join(tempDir, 'bad.exe'), Buffer.from('MZbroken'))
     await expect(findSignableBinaries(tempDir)).rejects.toThrow('Invalid PE header')
   })

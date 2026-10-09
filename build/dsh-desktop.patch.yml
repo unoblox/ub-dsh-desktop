@@ -22,7 +22,7 @@
 - id: ui-settings-account
   disabled: true
 
-# Unoblox is the only model provider. Its gateway speaks the OpenAI Chat
+# unoblox is the only model provider. Its gateway speaks the OpenAI Chat
 # Completions API (https://unoblox.ai/docs/quickstart), so it is one
 # hand-declared llm-pi-ai route rather than a new adapter.
 #
@@ -35,16 +35,16 @@
   config:
     providers:
       unoblox:
-        displayName: Unoblox
+        displayName: unoblox
         apiKeyEnv: UNOBLOX_API_KEY
         api: openai-completions
         baseURL: https://api.unoblox.ai/v1
-        # The live Unoblox catalog, `unoblox/auto` first: the Desktop main
+        # The live unoblox catalog, `unoblox/auto` first: the Desktop main
         # process fills DSH_DESKTOP_UNOBLOX_MODELS per launch from
         # GET /v1/models (src/main/unoblox/model-catalog.ts), falling back to
         # its cached copy. Missing or malformed, only Auto is offered: the
-        # Unoblox router picks the best-value model and fails over.
-        models: !!js "(() => { try { const rows = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_MODELS || '[]'); if (Array.isArray(rows) && rows.length > 0) return rows } catch {} return [{ id: 'unoblox/auto', name: 'Unoblox Auto · best value' }] })()"
+        # unoblox router picks the best-value model and fails over.
+        models: !!js "(() => { try { const rows = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_MODELS || '[]'); if (Array.isArray(rows) && rows.length > 0) return rows } catch {} return [{ id: 'unoblox/auto', name: 'unoblox Auto · best value' }] })()"
 
 # The official DeepSeek API-key and account routes.
 - id: llm-deepseek
@@ -58,8 +58,8 @@
     provider: unoblox
     model: unoblox/auto
 
-# Privacy: Unoblox collects nothing from the user's machine and talks to no
-# server on its own except the Unoblox API. Upstream rows that would send data
+# Privacy: unoblox collects nothing from the user's machine and talks to no
+# server on its own except the unoblox API. Upstream rows that would send data
 # elsewhere are switched off here, not left to a profile-name check:
 # - session-telemetry-otel / otel: a Like/Dislike (or /feedback) uploaded the
 #   whole session log with an anonymous user id to DeepSeek's OTel collector.
@@ -118,11 +118,11 @@
   config:
     registryProbeEnabled: false
 
-# Web search runs through Unoblox (POST /v1/search, Perplexity Search API) with
+# Web search runs through unoblox (POST /v1/search, Perplexity Search API) with
 # the same stored UNOBLOX_API_KEY as chat. Only the query text is sent: to
-# Unoblox and on to Perplexity (United States). The stock DeepSeek backend
+# unoblox and on to Perplexity (United States). The stock DeepSeek backend
 # called DeepSeek directly with a DeepSeek key, so it stays off. web_fetch runs
-# locally and is not billed by Unoblox.
+# locally and is not billed by unoblox.
 - id: web-search-deepseek
   disabled: true
 
@@ -130,7 +130,7 @@
     - id: dsh-desktop-unoblox-search
       name: dsh-desktop-unoblox-search
 
-# The strip under the composer shows what Unoblox reports: the public search
+# The strip under the composer shows what unoblox reports: the public search
 # price, and the balance, charge and routed model from the latest chat
 # response (published by the dsh-llm-pi-ai patch as `llm-pi-ai/response`).
 # The key stays host-side; the strip only learns whether one is stored.
@@ -153,9 +153,9 @@
     - id: dsh-desktop-client-ui
       name: dsh-desktop-client-ui
 
-    # Off for the Unoblox beta: its panel is Chinese-only and lists the
+    # Off for the unoblox beta: its panel is Chinese-only and lists the
     # upstream community catalog. Kept as a row so it can return with a
-    # Unoblox catalog and English copy.
+    # unoblox catalog and English copy.
     - id: dsh-desktop-workbenches
       name: dsh-desktop-workbenches
       disabled: true
@@ -166,7 +166,7 @@
       name: dsh-desktop-onboarding
 
     # Provides the Desktop profile, pnpm and plugin-package services that
-    # plugin installs use. Unoblox does not offer its dsh-market install
+    # plugin installs use. unoblox does not offer its dsh-market install
     # entry (MARKET_OFFERED in the package).
     - id: dsh-desktop-market-installer
       name: dsh-desktop-market-installer

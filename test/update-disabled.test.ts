@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 
-// Without an Unoblox update feed, no update path may reach the network: the
+// Without an unoblox update feed, no update path may reach the network: the
 // inherited endpoints belong to upstream and would receive the installation ID.
 const mocks = vi.hoisted(() => ({ policy: vi.fn(), check: vi.fn(), download: vi.fn() }))
 vi.mock('electron', () => ({
@@ -13,7 +13,7 @@ vi.mock('electron-updater', () => ({ default: { autoUpdater: { on: vi.fn(), setF
 vi.mock('../src/main/desktop-service', () => ({ checkDesktopUpdate: mocks.policy }))
 vi.mock('../src/main/update/update-policy', async importOriginal => ({ ...await importOriginal<object>(), supportsAutoUpdates: () => true }))
 
-it('never checks, lists or installs updates while no Unoblox feed is configured', async () => {
+it('never checks, lists or installs updates while no unoblox feed is configured', async () => {
   const manager = await import('../src/main/update/update-manager')
   manager.startUpdateManager({ prepareToInstall: async () => {} })
   const status = await manager.checkForUpdates(true)

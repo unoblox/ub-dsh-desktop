@@ -116,7 +116,7 @@ describe('DSH Desktop client slot occupants', () => {
     expect((stop as Node).props.children).toEqual(['.'])
     expect(((stop as Node).props.style as { color: string }).color).toBe('#D9A64A')
 
-    // Unoblox glyph: "u" in currentColor (follows the theme), gold dot.
+    // unoblox glyph: "u" in currentColor (follows the theme), gold dot.
     const sidebarMark = render(registrations.find(
       ({ config }) => config.name === 'sidebar.brand.mark'
     )!.component({ size: 24 }) as Node)

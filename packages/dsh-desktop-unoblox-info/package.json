@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop-unoblox-info",
   "version": "0.1.0",
-  "description": "Shows the Unoblox balance and routed model, as the gateway reports them, below the chat composer.",
+  "description": "Shows the unoblox balance and routed model, as the gateway reports them, below the chat composer.",
   "private": true,
   "type": "module",
   "main": "./index.js",

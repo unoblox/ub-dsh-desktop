@@ -1,17 +1,17 @@
 /**
- * Pure parsing and state for the Unoblox info strip.
+ * Pure parsing and state for the unoblox info strip.
  *
- * Every value shown comes from what Unoblox itself returns; nothing here is a
+ * Every value shown comes from what unoblox itself returns; nothing here is a
  * guessed balance:
  * - balance and charge: the `x-unoblox-freemium` header on each chat
  *   completion (`balance_inr`, `charged_inr`, `charged_estimated` when
- *   streaming, `tier`, `stage`, `note`). Unoblox has no balance endpoint, so
+ *   streaming, `tier`, `stage`, `note`). unoblox has no balance endpoint, so
  *   the strip only knows the balance after a chat call this process made;
  * - routing: `x-unoblox-selector`, `x-unoblox-selected-model`,
  *   `x-unoblox-served-model` and `x-unoblox-selection-reason`.
  */
 
-// One entry per conversation that talked to Unoblox; old ones fall off first.
+// One entry per conversation that talked to unoblox; old ones fall off first.
 export const MAX_TRACKED_SESSIONS = 200
 // Gateway text is shown as text, never markup; a bound keeps one odd header
 // from flooding the composer.
@@ -36,7 +36,7 @@ function defined(entries) {
 }
 
 /**
- * Normalize the billing block Unoblox reports per chat call, from the
+ * Normalize the billing block unoblox reports per chat call, from the
  * `x-unoblox-freemium` header (a JSON object) or the identical `unoblox` body
  * block of a non-streaming response.
  * @param {unknown} block - parsed object.
@@ -61,7 +61,7 @@ export function parseBilling(block) {
 
 /**
  * Undo fetch's Latin-1 view of a header value. Header values are bytes, and
- * Unoblox sends UTF-8 (the note contains ₹ and —), which `Headers` exposes one
+ * unoblox sends UTF-8 (the note contains ₹ and —), which `Headers` exposes one
  * byte per character. A value that already has a character above U+00FF was
  * decoded by someone else and is returned as is.
  */
@@ -83,7 +83,7 @@ export function utf8HeaderValue(value) {
 /**
  * Read what one chat response says about billing and routing.
  * @param {Readonly<Record<string, string>>} headers - lowercase response headers.
- * @returns {{ billing?: object, routing?: object } | undefined} undefined when no Unoblox header is present.
+ * @returns {{ billing?: object, routing?: object } | undefined} undefined when no unoblox header is present.
  */
 export function turnFromHeaders(headers) {
   if (!isRecord(headers)) return undefined
@@ -110,7 +110,7 @@ export function turnFromHeaders(headers) {
 }
 
 /**
- * Per-session record of the latest Unoblox chat response, plus the latest
+ * Per-session record of the latest unoblox chat response, plus the latest
  * billing block from any session (the balance is per account, not per chat).
  */
 export function createTurnStore({ maxSessions = MAX_TRACKED_SESSIONS, now = Date.now } = {}) {

@@ -70,7 +70,7 @@ const EMPTY_CATALOG = Object.freeze({ schemaVersion: 2, kind: 'catalog', categor
  * @param {boolean} [options.fetchOnlyWhenForced] - never touch the network
  *   unless the caller forces a refresh (the user opened the market or pressed
  *   refresh); plain reads serve the in-memory or on-disk copy, or an empty
- *   catalog marked `offline`. Unoblox makes no silent network calls.
+ *   catalog marked `offline`. unoblox makes no silent network calls.
  */
 export function createCatalogReader({ fetch: fetchCatalog = globalThis.fetch, url = DEFAULT_CATALOG_URL, now = Date.now, cachePath, fetchOnlyWhenForced = false } = {}) {
   let cached

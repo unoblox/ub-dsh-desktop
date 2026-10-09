@@ -16,8 +16,8 @@ import {
 
 describe('Safe Mode', () => {
   it('is opt-in through an exact command-line switch', () => {
-    expect(shouldStartInSafeMode(['Unoblox', '--safe-mode'])).toBe(true)
-    expect(shouldStartInSafeMode(['Unoblox', '--safe-mode=false'])).toBe(false)
+    expect(shouldStartInSafeMode(['unoblox', '--safe-mode'])).toBe(true)
+    expect(shouldStartInSafeMode(['unoblox', '--safe-mode=false'])).toBe(false)
   })
 
   it('marks plugins as still being checked until the market check answers', () => {

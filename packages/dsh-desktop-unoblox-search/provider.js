@@ -1,7 +1,7 @@
 /**
- * `WebSearchProvider` over the Unoblox search endpoint (`POST {baseURL}/search`).
+ * `WebSearchProvider` over the unoblox search endpoint (`POST {baseURL}/search`).
  *
- * Unoblox runs the search on Perplexity's Search API and answers in an
+ * unoblox runs the search on Perplexity's Search API and answers in an
  * Exa-compatible shape: `results[]` with `url`, `title`, `snippet`,
  * `highlights` and an optional `publishedDate`. There is no generated answer,
  * so results carry sources only.
@@ -18,7 +18,7 @@ export const UNOBLOX_DEFAULT_BASE_URL = 'https://api.unoblox.ai/v1'
 const MIN_RESULTS = 1
 const MAX_RESULTS = 20
 const DEFAULT_RESULTS = 8
-// One bounded retry for the failures Unoblox documents as transient and
+// One bounded retry for the failures unoblox documents as transient and
 // unbilled; anything slower is better reported than hidden behind a wait.
 const MAX_RETRY_DELAY_MS = 2_000
 const BACKEND_RETRY_DELAY_MS = 500
@@ -50,7 +50,7 @@ export function resultCount(maxResults) {
 }
 
 /**
- * Map one Unoblox result to a normalized source, or undefined when it has no
+ * Map one unoblox result to a normalized source, or undefined when it has no
  * usable http(s) URL. The snippet prefers `snippet`, then the first highlight.
  */
 export function mapUnobloxResult(result) {
@@ -70,7 +70,7 @@ export function mapUnobloxResult(result) {
 /** Map a 200 response body to a normalized search result. */
 export function mapUnobloxResponse(body) {
   if (!isRecord(body) || !Array.isArray(body.results)) {
-    throw new WebError('Unoblox search returned a response without a results list', 'WEB_PROVIDER_ERROR')
+    throw new WebError('unoblox search returned a response without a results list', 'WEB_PROVIDER_ERROR')
   }
   return {
     sources: body.results.map(mapUnobloxResult).filter((source) => source !== undefined),
@@ -88,7 +88,7 @@ function retryAfterMs(response) {
 
 /**
  * The wait before the single retry, or undefined when the failure is not one
- * Unoblox documents as worth retrying immediately (daily caps, a switched-off
+ * unoblox documents as worth retrying immediately (daily caps, a switched-off
  * service, policy refusals and billing problems are reported instead).
  */
 export function retryDelayMs(status, errorCode, retryAfter) {
@@ -114,12 +114,12 @@ async function readError(response) {
 }
 
 function failureMessage(status, detail) {
-  // Unoblox error text names the cause and the next step; show it verbatim.
+  // unoblox error text names the cause and the next step; show it verbatim.
   if (detail.message !== undefined) {
     return detail.code === undefined ? detail.message : `${detail.message} (${detail.code})`
   }
-  if (status === 401) return 'Unoblox rejected the API key. Update it in Settings → Models.'
-  return `Unoblox search failed (HTTP ${String(status)})`
+  if (status === 401) return 'unoblox rejected the API key. Update it in Settings → Models.'
+  return `unoblox search failed (HTTP ${String(status)})`
 }
 
 function sleep(ms, signal) {
@@ -162,7 +162,7 @@ export class UnobloxSearchProvider {
   async search(request, signal) {
     const apiKey = await this.options.resolveApiKey()
     if (apiKey === undefined || apiKey.length === 0) {
-      throw new WebError('No Unoblox API key is set. Add it in Settings → Models to use web search.', 'WEB_PROVIDER_CREDENTIAL_MISSING')
+      throw new WebError('No unoblox API key is set. Add it in Settings → Models to use web search.', 'WEB_PROVIDER_CREDENTIAL_MISSING')
     }
     const doFetch = this.options.fetch ?? fetch
     const wait = this.options.sleep ?? sleep
@@ -186,8 +186,8 @@ export class UnobloxSearchProvider {
           ...(signal === undefined ? {} : { signal })
         })
       } catch (error) {
-        if (isAbortError(error)) throw new WebError('Unoblox search aborted', 'WEB_ABORTED', { cause: error })
-        throw new WebError(`Unoblox search request failed: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
+        if (isAbortError(error)) throw new WebError('unoblox search aborted', 'WEB_ABORTED', { cause: error })
+        throw new WebError(`unoblox search request failed: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
       }
 
       try {
@@ -203,8 +203,8 @@ export class UnobloxSearchProvider {
         })
       } catch (error) {
         if (error instanceof WebError) throw error
-        if (isAbortError(error) || signal?.aborted) throw new WebError('Unoblox search aborted', 'WEB_ABORTED', { cause: error })
-        throw new WebError(`Unoblox returned an unprocessable response body: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
+        if (isAbortError(error) || signal?.aborted) throw new WebError('unoblox search aborted', 'WEB_ABORTED', { cause: error })
+        throw new WebError(`unoblox returned an unprocessable response body: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
       }
     }
   }

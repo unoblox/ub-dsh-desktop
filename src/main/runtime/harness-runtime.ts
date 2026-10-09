@@ -33,7 +33,7 @@ export interface HarnessRuntimeOptions {
   /** Mirror log lines to the console (development builds only). */
   echoLogs?: boolean
   /**
-   * Extra variables for this launch (e.g. the live Unoblox model catalog the
+   * Extra variables for this launch (e.g. the live unoblox model catalog the
    * patch files read). Resolved per start; a failure launches without them.
    */
   launchEnvironment?: () => Promise<{ environment: Record<string, string>; note?: string }>
@@ -328,7 +328,7 @@ export function buildHarnessSpawnOptions(
       DSH_HOME: dshHome,
       NO_COLOR: '1',
       // Belt and braces with the patch rows: Harness itself skips session
-      // telemetry for any non-empty value. Unoblox sends no telemetry.
+      // telemetry for any non-empty value. unoblox sends no telemetry.
       DSH_TELEMETRY_DISABLED: '1',
       // package-import-method/child-concurrency are left at pnpm's defaults
       // (hardlink, auto concurrency): forcing clone-or-copy made every

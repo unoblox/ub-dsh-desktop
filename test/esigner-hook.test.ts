@@ -1,10 +1,12 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error -- plain-JS electron-builder hook without type declarations
 import { sign } from '../scripts/esigner-windows-hook.mjs'
 
+// The stand-in "java" is a shell script, so this runs where /bin/sh does.
+describe.runIf(process.platform !== 'win32')('eSigner sign hook', () => {
 // A stand-in "java" that answers like CodeSignTool, chosen by FAKE_RESULT.
 let dir = ''
 beforeEach(() => {
@@ -56,4 +58,5 @@ it('keeps the TOTP secret out of the error it raises', async () => {
 it('refuses to run without the installed tool', async () => {
   vi.stubEnv('CODESIGNTOOL_DIR', '')
   await expect(sign({ path: 'setup.exe' })).rejects.toThrow('CODESIGNTOOL_DIR is not set')
+})
 })

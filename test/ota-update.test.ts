@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash, generateKeyPairSync } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -16,6 +16,8 @@ const keys = generateKeyPairSync('ed25519')
 const privateKeyPem = keys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
 const publicKeyPem = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString()
 const LOCAL = ['127.0.0.1']
+// The macOS swap script is POSIX sh; Windows CI has no /bin/sh to run it with.
+const posix = process.platform !== 'win32'
 
 const temps: string[] = []
 function temp(): string {
@@ -175,7 +177,7 @@ describe('installing an update', () => {
     expect(shellQuote("it's")).toBe(`'it'\\''s'`)
   })
 
-  it('swaps the macOS bundle after the app exits, keeping names with spaces and quotes intact', () => {
+  it.runIf(posix)('swaps the macOS bundle after the app exits, keeping names with spaces and quotes intact', () => {
     const dir = temp()
     const target = join(dir, "Apps it's", 'unoblox works.app')
     const staged = join(dir, 'staged', 'unoblox works.app')
@@ -207,7 +209,7 @@ describe('installing an update', () => {
     expect(readFileSync(join(dir, 'log'), 'utf8')).toContain('update installed')
   })
 
-  it('leaves the installed bundle in place when the copy fails', () => {
+  it.runIf(posix)('leaves the installed bundle in place when the copy fails', () => {
     const dir = temp()
     const target = join(dir, 'unoblox works.app')
     mkdirSync(target)
@@ -231,7 +233,7 @@ describe('installing an update', () => {
     writeFileSync(downloaded, 'new')
     await replaceAppImage(appImage, downloaded)
     expect(readFileSync(appImage, 'utf8')).toBe('new')
-    expect(execFileSync('stat', ['-c', '%a', appImage]).toString().trim()).toBe('755')
+    if (posix) expect(statSync(appImage).mode & 0o777).toBe(0o755)
     expect(readdirSync(dir).sort()).toEqual(['download.AppImage', 'unoblox-works.AppImage'])
   })
 })

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Build and sign the over-the-air update manifest (`latest.json`) for one
  * beta release. Read by src/main/update/ota-manifest.ts.
@@ -15,7 +14,8 @@
 import { createHash, createPrivateKey, sign } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { readdir, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 export const PLATFORM_PATTERNS = {
@@ -64,7 +64,7 @@ export async function makeUpdateManifest(options) {
   return `${JSON.stringify({ format: 1, payload, signature }, null, 2)}\n`
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const { values } = parseArgs({
     options: {
       version: { type: 'string' },

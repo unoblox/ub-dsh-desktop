@@ -61,7 +61,12 @@ afterAll(() => {
 
 let home = ''
 let manager: typeof import('../src/main/update/update-manager')
+const realPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+const realArch = Object.getOwnPropertyDescriptor(process, 'arch')
 beforeEach(async () => {
+  // These cases exercise the Linux AppImage path on every CI runner.
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+  Object.defineProperty(process, 'arch', { value: 'x64', configurable: true })
   home = mkdtempSync(join(tmpdir(), 'ota-home-'))
   electron.userData = join(home, 'userData')
   electron.sent = []
@@ -76,6 +81,8 @@ beforeEach(async () => {
   manager = await import('../src/main/update/update-manager')
 })
 afterEach(() => {
+  if (realPlatform) Object.defineProperty(process, 'platform', realPlatform)
+  if (realArch) Object.defineProperty(process, 'arch', realArch)
   manager.stopUpdateManager()
   vi.useRealTimers()
   vi.unstubAllEnvs()

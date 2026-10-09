@@ -145,10 +145,10 @@ describe('what a widget cannot reach', () => {
 })
 
 describe('repeated widgets', () => {
-  it('shows a widget the model repeated once, at its latest call', () => {
+  it('shows a widget the model repeated or revised once, at its latest call', () => {
     const w = (title: string, html = '<p>x</p>') => ({ title, html, height: 240 })
-    const shown = client.uniqueWidgets([{ callId: 'a', widget: w('Loan') }, { callId: 'b', widget: w('Chart') }, { callId: 'c', widget: w('Loan') }, { callId: 'd', widget: w('Loan', '<p>y</p>') }])
-    expect(shown.map((entry) => entry.callId)).toEqual(['b', 'c', 'd'])
+    const shown = client.uniqueWidgets([{ callId: 'a', widget: w('Loan') }, { callId: 'b', widget: w('Chart') }, { callId: 'c', widget: w('Loan') }, { callId: 'd', widget: w('loan', '<p>y</p>') }])
+    expect(shown.map((entry) => entry.callId)).toEqual(['b', 'd'])
   })
 })
 

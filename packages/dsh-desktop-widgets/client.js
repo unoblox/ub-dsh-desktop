@@ -50,12 +50,14 @@ window.__ModuleLoader__.load({
       chartsUnavailable: '图表库不可用，小组件可能显示不完整。'
     }
 
-    // Light and dark palettes the widget sees as CSS variables; the accent is
-    // the unoblox gold, deepened in light mode to stay readable on white
-    // (5.3:1), with text on it that keeps 4.5:1 or more in both modes.
+    // Light and dark palettes the widget sees as CSS variables. The accent is
+    // the unoblox gold: for text and highlights it is a richer gold in light
+    // mode (4.9:1 on white); fills such as buttons keep the bright brand gold
+    // in both modes, with dark text on it (8:1). `page` is the chat behind
+    // the frame, for the contrast check below.
     const THEMES = {
-      light: { fg: '#18191c', muted: '#5f636a', bg: 'transparent', surface: '#f6f6f4', border: '#dcdcd7', accent: '#8f6318', onAccent: '#ffffff' },
-      dark: { fg: '#f2f2f3', muted: '#a3a6ad', bg: 'transparent', surface: '#202023', border: '#3a3a40', accent: '#D9A64A', onAccent: '#18191c' }
+      light: { fg: '#18191c', muted: '#5f636a', bg: 'transparent', surface: '#f6f6f4', border: '#dcdcd7', accent: '#b8801f', accentFill: '#D9A64A', onAccent: '#18191c', page: '#ffffff' },
+      dark: { fg: '#f2f2f3', muted: '#a3a6ad', bg: 'transparent', surface: '#202023', border: '#3a3a40', accent: '#D9A64A', accentFill: '#D9A64A', onAccent: '#18191c', page: '#1b1b1c' }
     }
 
     // ---------- pure helpers (exported for tests) ----------
@@ -92,9 +94,10 @@ window.__ModuleLoader__.load({
     }
 
     // Runs first inside the frame: the only channel to the app.
-    function bootstrap(token) {
+    function bootstrap(token, page) {
       return `(function () {
   var token = ${JSON.stringify(token)};
+  var pageColor = ${JSON.stringify(page ?? '#ffffff')};
   function post(message) { message.__unobloxWidget = token; parent.postMessage(message, '*'); }
   function measure() {
     var d = document.documentElement, b = document.body;
@@ -247,7 +250,65 @@ window.__ModuleLoader__.load({
   }, true);
   window.addEventListener('error', function (event) { post({ kind: 'error', message: String(event.message || 'error') }); });
   window.addEventListener('unhandledrejection', function (event) { post({ kind: 'error', message: String(event.reason && event.reason.message || event.reason) }); });
+  // Readability: models pick their own colours (white on a gold button,
+  // black text on the dark theme). Any text below WCAG AA against what is
+  // actually behind it is switched to the dark or light ink that reads best.
+  function rgb(value) {
+    if (typeof value !== 'string' || value.slice(0, 3) !== 'rgb') return null;
+    var parts = value.slice(value.indexOf('(') + 1, value.indexOf(')')).split(/[ ,/]+/).filter(Boolean).map(Number);
+    return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+  }
+  function hexColor(value) { return { r: parseInt(value.slice(1, 3), 16), g: parseInt(value.slice(3, 5), 16), b: parseInt(value.slice(5, 7), 16), a: 1 }; }
+  function blend(top, under) { return { r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 }; }
+  function lum(c) {
+    function f(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+  }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  var INKS = [hexColor('#18191c'), hexColor('#ffffff')];
+  function behind(el) {
+    var layers = [];
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+      var style = getComputedStyle(n);
+      if (style.backgroundImage && style.backgroundImage !== 'none') return null;
+      var c = rgb(style.backgroundColor);
+      if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; }
+    }
+    var color = hexColor(pageColor);
+    for (var i = layers.length - 1; i >= 0; i--) color = blend(layers[i], color);
+    return color;
+  }
+  function ownText(el) {
+    if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(el.tagName)) return true;
+    for (var n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.nodeValue.trim() !== '') return true;
+    return false;
+  }
+  var fixing = false;
+  function fixContrast() {
+    if (fixing || !document.body) return;
+    fixing = true;
+    try {
+      var all = document.body.getElementsByTagName('*');
+      for (var i = 0; i < all.length && i < 3000; i++) {
+        var el = all[i];
+        if (!ownText(el) || /^(SCRIPT|STYLE|SVG|CANVAS)$/i.test(el.tagName)) continue;
+        var style = getComputedStyle(el);
+        var fg = rgb(style.color);
+        var bg = fg && behind(el);
+        if (!bg) continue;
+        var size = parseFloat(style.fontSize), bold = Number(style.fontWeight) >= 600;
+        var need = size >= 24 || (size >= 18.66 && bold) ? 3 : 4.5;
+        if (ratio(blend(fg, bg), bg) >= need) continue;
+        var ink = ratio(INKS[0], bg) >= ratio(INKS[1], bg) ? '#18191c' : '#ffffff';
+        el.style.setProperty('color', ink, 'important');
+      }
+    } finally { fixing = false; }
+  }
+  var pendingFix = 0;
+  function scheduleFix() { if (!pendingFix) pendingFix = setTimeout(function () { pendingFix = 0; fixContrast(); }, 60); }
   window.addEventListener('load', function () {
+    fixContrast();
+    new MutationObserver(scheduleFix).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
     measure();
     if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(document.documentElement);
   });
@@ -255,7 +316,7 @@ window.__ModuleLoader__.load({
     }
 
     const CHART_COLORS = {
-      light: ['#8f6318', '#2f62d0', '#1f8a70', '#c2410c', '#7c3aed', '#5f6b7a'],
+      light: ['#c8922f', '#2f62d0', '#1f8a70', '#c2410c', '#7c3aed', '#5f6b7a'],
       dark: ['#D9A64A', '#7aaaff', '#4fd1a5', '#fb923c', '#a78bfa', '#94a3b8']
     }
 
@@ -266,7 +327,7 @@ window.__ModuleLoader__.load({
      * options a widget passes.
      */
     function chartTheme(theme, dark) {
-      const vars = { '--uw-fg': theme.fg, '--uw-muted': theme.muted, '--uw-bg': 'transparent', '--uw-surface': theme.surface, '--uw-border': theme.border, '--uw-accent': theme.accent, '--uw-on-accent': theme.onAccent }
+      const vars = { '--uw-fg': theme.fg, '--uw-muted': theme.muted, '--uw-bg': 'transparent', '--uw-surface': theme.surface, '--uw-border': theme.border, '--uw-accent': theme.accent, '--uw-accent-fill': theme.accentFill, '--uw-on-accent': theme.onAccent }
       const axis = { axisLine: { lineStyle: { color: theme.border } }, axisTick: { lineStyle: { color: theme.border } }, axisLabel: { color: theme.muted }, splitLine: { lineStyle: { color: theme.border } }, nameTextStyle: { color: theme.muted } }
       const config = {
         color: CHART_COLORS[dark ? 'dark' : 'light'],
@@ -326,12 +387,12 @@ window.__ModuleLoader__.load({
     function buildWidgetDocument(html, options) {
       const theme = THEMES[options.dark ? 'dark' : 'light']
       const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'"
-      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-on-accent:${theme.onAccent}}
+      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-accent-fill:${theme.accentFill};--uw-on-accent:${theme.onAccent}}
 html,body{margin:0;background:transparent}
 body{padding:4px;color:var(--uw-fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;overflow-wrap:anywhere}
 input,select,textarea,button{font:inherit;color:inherit}
 input,select,textarea{background:var(--uw-surface);border:1px solid var(--uw-border);border-radius:8px;padding:6px 10px}
-button{background:var(--uw-accent);color:var(--uw-on-accent);border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
+button{background:var(--uw-accent-fill);color:var(--uw-on-accent);border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--uw-accent);outline-offset:2px}
 table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);padding:6px 8px;text-align:left}`
       return [
@@ -339,7 +400,7 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
         `<meta http-equiv="Content-Security-Policy" content="${csp}">`,
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         `<style>${style}</style>`,
-        `<script>${inlineScript(bootstrap(options.token))}</script>`,
+        `<script>${inlineScript(bootstrap(options.token, theme.page))}</script>`,
         typeof options.library === 'string' ? `<script>${inlineScript(options.library)}</script><script>${inlineScript(chartTheme(theme, options.dark))}</script>` : '',
         '</head><body>',
         neutraliseShadowRoots(html),
@@ -552,13 +613,14 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
     }
 
     /**
-     * Models sometimes show the same widget twice in a turn; show it once, in
-     * the place of its latest call.
+     * Models sometimes show a widget again in the same turn, unchanged or
+     * revised. A later widget with the same title replaces the earlier one,
+     * in the place of the latest call.
      */
     function uniqueWidgets(entries) {
       const last = new Map()
-      entries.forEach((entry, index) => last.set(`${entry.widget.title}\u0000${entry.widget.html}`, index))
-      return entries.filter((entry, index) => last.get(`${entry.widget.title}\u0000${entry.widget.html}`) === index)
+      entries.forEach((entry, index) => last.set(entry.widget.title.toLowerCase(), index))
+      return entries.filter((entry, index) => last.get(entry.widget.title.toLowerCase()) === index)
     }
 
     /** The turn's widgets, after its reply. */
@@ -577,7 +639,7 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
       .dshWidgetRow{font-size:13px;padding:2px 0;color:var(--dsw-alias-label-secondary, inherit)}
       .dshWidget{margin:0;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.25));border-radius:12px;overflow:hidden;background:var(--dsw-alias-bg-base, transparent)}
       .dshWidgetHeader{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));font-size:13px}
-      .dshWidgetLabel{color:#8f6318;font-weight:600;text-transform:lowercase}
+      .dshWidgetLabel{color:#a16207;font-weight:600;text-transform:lowercase}
       [data-ds-dark-theme] .dshWidgetLabel{color:#D9A64A}
       .dshWidgetTitle{font-weight:600;color:var(--dsw-alias-label-primary, inherit)}
       .dshWidgetFrame{display:block;width:100%;border:0;background:transparent;color-scheme:normal}

@@ -38,6 +38,7 @@ Beta installers are built by the **Build beta installers** workflow in this repo
 
 - **Agents that act:** file edits, shell commands (with your approval policy), web search and web fetch, inside the workspaces you add with the system folder picker.
 - **One gateway, many models:** unoblox Auto or any tool-capable model from the live unoblox catalog. The composer shows your balance and the model that served the last reply.
+- **Interactive widgets:** the agent can show charts, forms and calculators right in the chat. They run in a sandboxed frame with no network access; a submitted form comes back to the agent as your next message.
 - **Documents:** offline DOCX, PPTX and XLSX skills with a bundled Python runtime, and a PPT mode that turns source material into editable PPTX decks from 16 templates.
 - **Phone access:** continue sessions from your phone on the same Wi-Fi, or through a temporary Cloudflare Quick Tunnel (Pinggy as fallback) when you choose internet mode. The bridge listens only while you pair, while a paired phone is attached, or when **Harness › Keep Phone Connected** is on.
 - **Recovery:** startup and plugin failures are detected and logged to `harness.log`, with a guided recovery screen and a non-destructive Safe Mode that blocks third-party plugins. If the normal interface cannot open, start with `--safe-mode` (macOS: `open -a "unoblox works" --args --safe-mode`).

@@ -52,6 +52,10 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 
 The phone bridge listens on the local network only while the user is pairing, while a phone paired this session, or when Keep Phone Connected is on (PIN-protected, inbound only, no advertising). It sends nothing out by itself.
 
+## Chat widgets
+
+Widgets the agent shows in the chat (charts, forms, calculators) run in a sandboxed frame whose content security policy blocks every network request, frame and navigation. The chart library is bundled with the app and served by the local Harness. A widget can send data only by the user submitting its form, which becomes the user's next message in the conversation. `test/widgets.test.ts` checks the policy.
+
 ## Keeping it this way
 
 `test/network-privacy.test.ts` composes the real upstream bundles with each Desktop patch and asserts every row above stays disabled. It also checks the Harness environment flag, the spell-check guard and the no-fetch-at-startup catalog. `test/update-manager.test.ts` checks that no update request is made while automatic checks are off and that only a correctly signed manifest is acted on, `test/mobile-bridge-demand.test.ts` covers when the phone bridge runs, and `test/market-installer.test.js` checks the market install is refused. When upgrading Harness, check new upstream rows against the two rules above.

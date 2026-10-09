@@ -138,6 +138,13 @@
     - id: dsh-desktop-unoblox-info
       name: dsh-desktop-unoblox-info
 
+# Interactive widgets in the chat (packages/dsh-desktop-widgets): the agent's
+# show_widget tool, rendered in a sandboxed frame with no network. Safe Mode
+# leaves it out.
+- insert:
+    - id: dsh-desktop-widgets
+      name: dsh-desktop-widgets
+
 - id: web
   config:
     searchProvider: unoblox

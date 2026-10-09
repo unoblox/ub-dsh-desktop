@@ -172,7 +172,7 @@ describe('widgets packaging', () => {
     const packages = (JSON.parse(lock) as { packages: Record<string, unknown> }).packages
     expect(packages['node_modules/dsh-desktop-widgets']).toEqual({ resolved: 'packages/dsh-desktop-widgets', link: true })
     expect(dshPatch).toContain('+    "dsh-desktop-widgets": "0.1.0"')
-    expect(normal).toMatch(/- id: dsh-desktop-widgets\n\s+name: dsh-desktop-widgets/u)
+    expect(normal).toMatch(/- id: dsh-desktop-widgets\r?\n\s+name: dsh-desktop-widgets/u)
     expect(safe).not.toContain('dsh-desktop-widgets')
     expect(client.inject).toContain('uiConversation')
   })

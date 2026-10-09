@@ -44,7 +44,8 @@ function windowsSigning() {
     return {
       signtoolOptions: null,
       azureSignOptions: {
-        publisherName: process.env.AZURE_SIGNING_PUBLISHER || 'unoblox',
+        // Must match the certificate's subject: the legal entity, not the brand.
+        publisherName: process.env.AZURE_SIGNING_PUBLISHER || 'OGMA CONSULTING PRIVATE LIMITED',
         endpoint: process.env.AZURE_SIGNING_ENDPOINT,
         codeSigningAccountName: process.env.AZURE_SIGNING_ACCOUNT,
         certificateProfileName: process.env.AZURE_SIGNING_PROFILE

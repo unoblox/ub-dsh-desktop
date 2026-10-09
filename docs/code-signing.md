@@ -1,6 +1,6 @@
 # Code signing and release secrets
 
-Signed installers open with a double-click: no "cannot verify" step on macOS and a named publisher on Windows. The beta builds sign themselves as soon as the secrets below exist in **Settings › Secrets and variables › Actions** of this repository. Until then they stay ad-hoc signed (macOS) and unsigned (Windows), as today. Nothing else changes: the same workflow, **Build beta installers**, builds both.
+Signed installers open with a double-click: no "cannot verify" step on macOS and a named publisher on Windows. Certificates carry the legal entity, so Windows shows **OGMA CONSULTING PRIVATE LIMITED** as the verified publisher; certificate authorities do not issue them in a brand or trading name. The beta builds sign themselves as soon as the secrets below exist in **Settings › Secrets and variables › Actions** of this repository. Until then they stay ad-hoc signed (macOS) and unsigned (Windows), as today. Nothing else changes: the same workflow, **Build beta installers**, builds both.
 
 Never paste a certificate, password or key into an issue, chat, log or commit. Add them only as repository secrets.
 
@@ -26,7 +26,7 @@ With these, `electron-builder.beta.cjs` signs with hardened runtime, notarizes a
 
 ## Windows: an OV code-signing certificate
 
-Since 2024 EV certificates no longer skip SmartScreen's reputation check, so an OV certificate is enough. Signed installers show "unoblox" as the publisher; SmartScreen may still warn for the first few weeks while downloads build reputation. Pick one of:
+Since 2024 EV certificates no longer skip SmartScreen's reputation check, so an OV certificate is enough. Signed installers show the company as the publisher; SmartScreen may still warn for the first few weeks while downloads build reputation. Pick one of:
 
 ### SSL.com OV with eSigner (recommended)
 
@@ -44,7 +44,7 @@ Works from GitHub Actions with no hardware token. Roughly US$130–250 a year pl
 | `ESIGNER_CREDENTIAL_ID` | the eSigner credential ID |
 | `ESIGNER_TOTP_SECRET` | the eSigner TOTP secret |
 
-CI installs SSL.com CodeSignTool, and `scripts/esigner-windows-hook.mjs` signs the app, its helpers, the uninstaller and the setup `.exe`. CI then checks every signature with `Get-AuthenticodeSignature`.
+eSigner bills per signature, so only builds run with **publish** ticked are signed (about four signatures each); test builds stay unsigned. CI installs SSL.com CodeSignTool, and `scripts/esigner-windows-hook.mjs` signs the app, its helpers, the uninstaller and the setup `.exe`. CI then checks every signature with `Get-AuthenticodeSignature`.
 
 ### Azure Artifact Signing (formerly Trusted Signing)
 

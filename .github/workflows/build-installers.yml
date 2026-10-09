@@ -82,7 +82,8 @@ jobs:
     env:
       MAC_SIGNING: ${{ secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' }}
       MAC_NOTARIZING: ${{ secrets.MAC_CSC_LINK != '' && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
-      ESIGNER_SIGNING: ${{ secrets.ESIGNER_USERNAME != '' && secrets.ESIGNER_PASSWORD != '' && secrets.ESIGNER_CREDENTIAL_ID != '' && secrets.ESIGNER_TOTP_SECRET != '' }}
+      # eSigner bills per signature, so only published builds are signed with it.
+      ESIGNER_SIGNING: ${{ inputs.publish && secrets.ESIGNER_USERNAME != '' && secrets.ESIGNER_PASSWORD != '' && secrets.ESIGNER_CREDENTIAL_ID != '' && secrets.ESIGNER_TOTP_SECRET != '' }}
       AZURE_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_SIGNING_PROFILE != '' }}
     steps:
       - uses: actions/checkout@v4
@@ -137,10 +138,10 @@ jobs:
           # Each platform sees only its own signing secrets.
           CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
-          ESIGNER_USERNAME: ${{ matrix.platform == 'win32' && secrets.ESIGNER_USERNAME || '' }}
-          ESIGNER_PASSWORD: ${{ matrix.platform == 'win32' && secrets.ESIGNER_PASSWORD || '' }}
-          ESIGNER_CREDENTIAL_ID: ${{ matrix.platform == 'win32' && secrets.ESIGNER_CREDENTIAL_ID || '' }}
-          ESIGNER_TOTP_SECRET: ${{ matrix.platform == 'win32' && secrets.ESIGNER_TOTP_SECRET || '' }}
+          ESIGNER_USERNAME: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_USERNAME || '' }}
+          ESIGNER_PASSWORD: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_PASSWORD || '' }}
+          ESIGNER_CREDENTIAL_ID: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_CREDENTIAL_ID || '' }}
+          ESIGNER_TOTP_SECRET: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_TOTP_SECRET || '' }}
           AZURE_TENANT_ID: ${{ matrix.platform == 'win32' && secrets.AZURE_TENANT_ID || '' }}
           AZURE_CLIENT_ID: ${{ matrix.platform == 'win32' && secrets.AZURE_CLIENT_ID || '' }}
           AZURE_CLIENT_SECRET: ${{ matrix.platform == 'win32' && secrets.AZURE_CLIENT_SECRET || '' }}

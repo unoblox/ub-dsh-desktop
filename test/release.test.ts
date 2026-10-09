@@ -426,7 +426,7 @@ describe('GitHub release contract', () => {
     const esigner = { ESIGNER_USERNAME: 'u', ESIGNER_PASSWORD: 'p', ESIGNER_CREDENTIAL_ID: 'c', ESIGNER_TOTP_SECRET: 't' }
     expect(load(esigner).win.signtoolOptions?.sign).toBe('./scripts/esigner-windows-hook.mjs')
     const azure = { AZURE_TENANT_ID: 't', AZURE_CLIENT_ID: 'c', AZURE_CLIENT_SECRET: 's', AZURE_SIGNING_ENDPOINT: 'https://eus.codesigning.azure.net', AZURE_SIGNING_ACCOUNT: 'a', AZURE_SIGNING_PROFILE: 'p' }
-    expect(load(azure).win).toMatchObject({ signtoolOptions: null, azureSignOptions: { publisherName: 'unoblox', codeSigningAccountName: 'a', certificateProfileName: 'p' } })
+    expect(load(azure).win).toMatchObject({ signtoolOptions: null, azureSignOptions: { publisherName: 'OGMA CONSULTING PRIVATE LIMITED', codeSigningAccountName: 'a', certificateProfileName: 'p' } })
     // eSigner wins when both are configured.
     expect(load({ ...azure, ...esigner }).win.azureSignOptions).toBeUndefined()
   })

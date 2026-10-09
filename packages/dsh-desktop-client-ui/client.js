@@ -149,6 +149,62 @@ window.__ModuleLoader__.load({
             outline:2px solid var(--dsw-alias-state-business-primary); outline-offset:2px;
             background:var(--dsw-alias-bg-base);
           }
+          /* Readability. Upstream's light theme draws tertiary and caption
+             text at 3.7:1 and 2.1:1 against white, below WCAG AA (4.5:1), and
+             dark captions fall to 3.3:1 on raised surfaces. Settings
+             descriptions, section labels, placeholders and icon buttons all
+             use them. These keep the same order (primary, secondary,
+             tertiary, caption) at 4.7:1 or more on every surface. */
+          body:not([data-ds-dark-theme]) {
+            --dsw-alias-label-secondary:#50555c;
+            --dsw-alias-label-tertiary:#5a5f66;
+            --dsw-alias-label-caption:#646970;
+          }
+          body[data-ds-dark-theme] {
+            --dsw-alias-label-caption:#a3a8b0;
+          }
+          /* Links and the blue accent were 4.2:1 on white and 3.6:1 on tinted
+             badges; one step deeper reads at 4.8:1 or more. */
+          body:not([data-ds-dark-theme]) { --dsw-alias-state-business-primary:#2f62d0; --dsw-alias-link:#2f62d0; }
+          /* Session times and status tags were 10px. */
+          [class*="_sessionRow"] [class*="_time"], [class*="_statusTag"] { font-size:11px; }
+          /* The latest reply keeps its actions (copy, branch, usage) in view;
+             upstream shows them only on hover, so they went unnoticed. Older
+             turns still reveal theirs on hover. */
+          [data-chat-flow-kind]:not(:has(~ [data-chat-flow-kind])) [class*="_actions"] { opacity:1; }
+          /* Menus were 58% (light) and 45% (dark) see-through, relying on a
+             backdrop blur many Linux and remote setups do not render, so the
+             page showed through the options. Keep a hint of the material. */
+          body:not([data-ds-dark-theme]) { --dsw-menu-surface-fill:#f8f9faf5; }
+          body[data-ds-dark-theme] { --dsw-menu-surface-fill:#2e2f33f7; }
+          /* Font size: the only way to change it was two 9px arrows shown on
+             hover. Show them always, at a size that can be hit. Marker from
+             the dsh-client-ui-theme patch. */
+          [data-dsh-font-stepper] { min-width:96px; padding-right:28px; box-sizing:border-box; }
+          [data-dsh-font-stepper] > span:last-child { opacity:1; right:6px; gap:3px; }
+          [data-dsh-font-stepper] > span:last-child > button { width:22px; height:15px; background:var(--dsw-alias-bg-layer-1); border:1px solid var(--dsw-alias-border-l2); }
+          [data-dsh-font-stepper] > span:last-child > button svg { width:11px; height:11px; }
+          /* Model picker search. Upstream draws it with no border or icon,
+             so it read as a caption and people missed it. Marker from the
+             dsh-client-ui-model-selection patch; the field is an <input>
+             inside the primitive's wrapper span. */
+          [data-menu-material] span:has(> input[data-dsh-model-search]) {
+            position:relative; box-sizing:border-box; min-height:34px; align-items:center;
+            border:1px solid var(--dsw-alias-border-l2); border-radius:9px;
+            background:var(--dsw-alias-bg-module-platform);
+            padding:6px 10px 6px 32px;
+          }
+          [data-menu-material] span:has(> input[data-dsh-model-search])::before {
+            content:''; position:absolute; left:11px; top:50%; width:14px; height:14px; transform:translateY(-50%);
+            background:var(--dsw-alias-label-secondary);
+            -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='5' fill='none' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M11 11l3.5 3.5' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='5' fill='none' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M11 11l3.5 3.5' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+          }
+          [data-menu-material] span:has(> input[data-dsh-model-search]):focus-within {
+            border-color:#D9A64A; box-shadow:0 0 0 3px rgba(217,166,74,.22); background:var(--dsw-alias-bg-base);
+          }
+          [data-menu-material] span > input[data-dsh-model-search] { font-size:13px; color:var(--dsw-alias-label-primary); }
+          [data-menu-material] span > input[data-dsh-model-search]::placeholder { color:var(--dsw-alias-label-secondary); }
           /* macOS dark: upstream draws the sidebar half-transparent over the
              window's sidebar vibrancy, which reads as a flat grey wash. Use
              the sidebar fill other platforms get, one step lighter than the

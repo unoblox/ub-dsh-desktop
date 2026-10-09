@@ -1,0 +1,27 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-model-selection/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-model-selection/lib/client.js
+index 29c1b1c..899476e 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-model-selection/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-model-selection/lib/client.js
+@@ -676,8 +676,12 @@ window.__ModuleLoader__.load({
+ 				triggerRef.current?.focus();
+ 				setQuery("");
+ 				setHighlightedIndex(null);
+-				if (state.current === null) paneFocus.current = "drill";
+-				setPane(state.current === null ? "model" : "root");
++				// DSH Desktop: with no effort choice the root pane holds only the
++				// Model cell, an extra click that kept the list and its search
++				// out of sight. Open the model list directly then.
++				const modelsFirst = state.current === null || reasoning === void 0;
++				if (modelsFirst) paneFocus.current = "drill";
++				setPane(modelsFirst ? "model" : "root");
+ 				setOpen(true);
+ 				reload();
+ 			};
+@@ -924,6 +928,7 @@ window.__ModuleLoader__.load({
+ 										className: clsx(ModelSelect_module_css_default.search, query !== "" && ModelSelect_module_css_default.searchWithQuery),
+ 										type: "text",
+ 										role: "searchbox",
++										"data-dsh-model-search": "",
+ 										"aria-label": t("search.placeholder"),
+ 										"aria-controls": `${id}-models`,
+ 										"aria-activedescendant": activeModelIndex < 0 ? void 0 : `${id}-model-${activeModelIndex}`,

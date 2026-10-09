@@ -1,0 +1,12 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-theme/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-theme/lib/client.js
+index 577bf3d..d954b48 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-theme/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-theme/lib/client.js
+@@ -1064,6 +1064,7 @@ window.__ModuleLoader__.load({
+ 					className: FontSizeRow_module_css_default.control,
+ 					children: [(0, react_jsx_runtime.jsxs)("div", {
+ 						className: FontSizeRow_module_css_default.stepper,
++						"data-dsh-font-stepper": "",
+ 						children: [(0, react_jsx_runtime.jsx)("span", {
+ 							className: FontSizeRow_module_css_default.value,
+ 							children: fontSize

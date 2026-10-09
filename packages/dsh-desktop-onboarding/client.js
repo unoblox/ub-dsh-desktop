@@ -256,18 +256,22 @@ window.__ModuleLoader__.load({
     const ignoreImplicitDismiss = () => {}
 
     /**
-     * Show the notice to a new, unacknowledged install, and to any install
-     * without a stored Unoblox key: Unoblox is the only model provider, so
-     * without a key nothing works. That also covers installs classified as
-     * existing (development builds, upgrades from DSH Desktop) and a key
-     * removed later. Dismissing it is per launch; it returns until a key is set.
-     * @param value - the wizard settings section.
+     * Show the notice exactly when the credential store says no Unoblox key is
+     * stored: Unoblox is the only model provider, so without a key nothing
+     * works, and with one the notice has nothing left to do. Dismissing it is
+     * per launch; it returns until a key is set.
+     *
+     * The key state alone decides. The acknowledgement field is a volatile
+     * plugin setting that Harness does not persist, so after a restart every
+     * new install looked unacknowledged and the notice reappeared over a
+     * working session even with the key stored. An unknown state (the store
+     * never answered) also stays quiet: the composer's "Add API key" pill
+     * still points a keyless user at Settings › Models.
+     * @param _value - the wizard settings section (kept for callers; unused).
      * @param keyState - 'configured' | 'missing' | 'unknown' (default).
      */
-    function onboardingDecision(value, keyState = 'unknown') {
-      if (keyState === 'missing') return 'show'
-      const acknowledged = typeof value?.wizardVersion === 'string' && value.wizardVersion.length > 0
-      return value?.eligible === true && !acknowledged ? 'show' : 'complete'
+    function onboardingDecision(_value, keyState = 'unknown') {
+      return keyState === 'missing' ? 'show' : 'complete'
     }
 
     // Long enough for a slow Host, short enough not to hold boot hostage.
@@ -377,7 +381,7 @@ window.__ModuleLoader__.load({
         return () => { if (unsubscribe) unsubscribe() }
       }, [wizardScope, keyState])
 
-      // Ineligible installs and every prior acknowledgement skip straight on.
+      // A stored key (or no answer from the store) skips straight on.
       useEffect(() => {
         if (decision === 'complete' && !finishedRef.current) {
           finishedRef.current = true

@@ -299,20 +299,18 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(en.unobloxKeyLater).toContain('Settings › Models')
   })
 
-  it('shows only an eligible install with no acknowledgement', () => {
-    const { plugin } = loadPlugin()
-    expect(plugin.onboardingDecision({ eligible: true })).toBe('show')
-    expect(plugin.onboardingDecision({ eligible: false })).toBe('complete')
-    expect(plugin.onboardingDecision({})).toBe('complete')
-  })
-
-  it('shows whenever no Unoblox key is stored, even for acknowledged or existing installs', () => {
+  it('shows exactly when the credential store reports no Unoblox key', () => {
     const { plugin } = loadPlugin()
     expect(plugin.onboardingDecision({ eligible: false }, 'missing')).toBe('show')
     expect(plugin.onboardingDecision({ eligible: true, wizardVersion: 'v' }, 'missing')).toBe('show')
+    // A stored key wins over install eligibility: the acknowledgement field is
+    // volatile and lost on restart, which re-showed the notice on every launch.
+    expect(plugin.onboardingDecision({ eligible: true }, 'configured')).toBe('complete')
     expect(plugin.onboardingDecision({ eligible: false }, 'configured')).toBe('complete')
-    expect(plugin.onboardingDecision({ eligible: true }, 'configured')).toBe('show')
-    expect(plugin.onboardingDecision({ eligible: false }, 'unknown')).toBe('complete')
+    // No answer from the store never nags; the composer pill covers a missing key.
+    expect(plugin.onboardingDecision({ eligible: true }, 'unknown')).toBe('complete')
+    expect(plugin.onboardingDecision({ eligible: true })).toBe('complete')
+    expect(plugin.onboardingDecision({})).toBe('complete')
   })
 
   it('reads only whether the Unoblox key is configured', async () => {
@@ -350,11 +348,6 @@ describe('DSH Desktop onboarding wizard', () => {
     expect(await plugin.settledUnobloxKeyState(undefined, { attempts: 3, retryMs: 1 })).toBe('unknown')
   })
 
-  it('treats every non-empty wizard version as acknowledgement', () => {
-    const { plugin } = loadPlugin()
-    expect(plugin.onboardingDecision({ eligible: true, wizardVersion: 'old-version' })).toBe('complete')
-    expect(plugin.onboardingDecision({ eligible: true, wizardVersion: '  ' })).toBe('complete')
-  })
 })
 
 describe('DSH Desktop onboarding composition', () => {

@@ -1,23 +1,22 @@
 # Code signing and release secrets
 
-Signed installers open with a double-click: no "cannot verify" step on macOS and a named publisher on Windows. Certificates carry the legal entity, so Windows shows **OGMA CONSULTING PRIVATE LIMITED** as the verified publisher; certificate authorities do not issue them in a brand or trading name. Builds run with **publish** ticked sign themselves as soon as the secrets below exist in the `release` environment. Until then, and in every test build, they stay ad-hoc signed (macOS) and unsigned (Windows). Nothing else changes: the same workflow, **Build beta installers**, builds both.
+Signed installers open with a double-click: no "cannot verify" step on macOS and a named publisher on Windows. Certificates carry the legal entity, so Windows shows **OGMA CONSULTING PRIVATE LIMITED** as the verified publisher; certificate authorities do not issue them in a brand or trading name. Builds run with **publish** ticked sign themselves as soon as the secrets below exist. Until then, and in every test build, they stay ad-hoc signed (macOS) and unsigned (Windows). Nothing else changes: the same workflow, **Build beta installers**, builds both.
 
-Never paste a certificate, password or key into an issue, chat, log or commit. Add them only as `release` environment secrets.
+Never paste a certificate, password or key into an issue, chat, log or commit.
 
-## Where the secrets go: the `release` environment
+## Where the secrets go
 
-Together these secrets can sign any program as the company and push an update to every installed copy, so they are not repository secrets: anyone who can change a workflow could read those. They live in a GitHub environment that hands them to a job only after a reviewer approves it.
+Together these secrets can sign any program as the company and push an update to every installed copy. Where they can live depends on the GitHub plan:
 
-One-time setup, by a repository admin:
+| Plan, private repository | Where the secrets go | Protection |
+| --- | --- | --- |
+| Free | Repository secrets (**Settings › Secrets and variables › Actions**) | Encrypted, masked in logs, never given to fork pull requests. Anyone with write access can still reach them: keep write access to yourself, use two-factor sign-in, and avoid personal access tokens with repository rights. |
+| Team | A `release` environment (**Settings › Environments**) limited to the `main` branch, with `main` protected | Only reviewed code on `main` can reach the secrets. |
+| Enterprise, or a public repository | A `release` environment with **Required reviewers** | Each publish build waits for your approval before signing, and again before publishing. |
 
-1. **Settings › Environments › New environment**, name it `release`.
-2. Tick **Required reviewers** and add yourself (and anyone else allowed to release). Leave **Prevent self-review** off if you release alone.
-3. Under **Deployment branches and tags**, choose **Selected branches and tags** and add `main` once the release work is merged there. Until then **No restriction** lets a branch build be published.
-4. Under **Environment secrets**, add each secret below. Do not add them under **Settings › Secrets and variables › Actions** as repository secrets; if any are there already, delete them.
+With an environment: create it, add the secrets under **Environment secrets** (not as repository secrets), then set the repository variable `RELEASE_ENVIRONMENT` to its name (**Settings › Secrets and variables › Actions › Variables**). The workflow then runs the build and publish jobs of a publish build in that environment. Without the variable it reads repository secrets. Test builds (publish unticked) never see a secret.
 
-How a release then runs: start **Build beta installers** with **publish** ticked. The three platform builds wait with **Review pending deployments**; approving once releases all three. When they pass, the publish job waits again: check the build, then approve to publish. Test builds (publish unticked) never enter the environment, never see a secret and start without approval.
-
-Also keep two-factor sign-in on for everyone with write access, keep that list short, and protect `main`. If a secret might have leaked: revoke the certificate at the issuer, change the password, and replace `UPDATE_SIGNING_KEY` (see below).
+If a secret might have leaked: revoke the certificate at the issuer, change the password, and replace `UPDATE_SIGNING_KEY` (see below).
 
 ## macOS: Apple Developer ID and notarization
 
@@ -27,7 +26,7 @@ Cost: Apple Developer Program, US$99 a year (or the local equivalent).
 2. **Enrol as an organisation** at <https://developer.apple.com/programs/enroll/> with an Apple ID that has two-factor authentication. You need the legal entity name, the D-U-N-S number, a website on the company domain (unoblox.ai) and the authority to sign for the company.
 3. **Developer ID Application certificate.** On a Mac: Keychain Access › Certificate Assistant › Request a Certificate From a Certificate Authority, saved to disk. Then <https://developer.apple.com/account/resources/certificates> › **+** › **Developer ID Application**, upload the request, download the certificate and double-click it. In Keychain Access, find "Developer ID Application: …", right-click › Export as `.p12` with a strong password.
 4. **Notarization key.** App Store Connect › Users and Access › Integrations › App Store Connect API › Team Keys › **+**, role **Developer**. Download the `.p8` file (only once) and note the **Key ID** and the **Issuer ID**.
-5. **Secrets** in the `release` environment (macOS Terminal for the base64 step):
+5. **Secrets** (macOS Terminal for the base64 step):
 
 | Secret | Value |
 | --- | --- |
@@ -80,7 +79,7 @@ Nothing to buy. The `.deb` and AppImage install without prompts.
 
 ## Over-the-air update publishing
 
-Separate from code signing, two more `release` environment secrets let **Build beta installers** with **publish** ticked release a build to installed apps (see `docs/installers.md`):
+Separate from code signing, two more secrets let **Build beta installers** with **publish** ticked release a build to installed apps (see `docs/installers.md`):
 
 | Secret | Value |
 | --- | --- |

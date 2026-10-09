@@ -697,12 +697,12 @@ describe('AI-organized GitHub release body', () => {
 })
 
 describe('release secrets stay behind an approval', () => {
-  it('reads secrets only in jobs that enter the release environment, and only for publish builds', async () => {
+  it('reads secrets only in jobs that can enter the release environment, and only for publish builds', async () => {
     const text = await readFile(path.join(projectRoot, '.github', 'workflows', 'build-installers.yml'), 'utf8')
     const workflow = parse(text) as { jobs: Record<string, { environment?: string }> }
     const jobsWithSecrets = Object.entries(workflow.jobs).filter(([, job]) => JSON.stringify(job).includes('secrets.')).map(([name]) => name)
     expect(jobsWithSecrets.sort()).toEqual(['installers', 'publish'])
-    expect(workflow.jobs.installers?.environment).toBe("${{ inputs.publish && 'release' || '' }}")
-    expect(workflow.jobs.publish?.environment).toBe('release')
+    expect(workflow.jobs.installers?.environment).toBe("${{ inputs.publish && vars.RELEASE_ENVIRONMENT || '' }}")
+    expect(workflow.jobs.publish?.environment).toBe("${{ vars.RELEASE_ENVIRONMENT || '' }}")
   })
 })

@@ -14,11 +14,13 @@ name: Build beta installers
 #   UPDATE_SIGNING_KEY  Ed25519 private key (PEM) matching UPDATE_PUBLIC_KEY
 #   RELEASES_TOKEN      token allowed to create releases in the releases repo
 #
-# Every secret below lives in the "release" environment, not the repository,
-# and that environment requires a reviewer's approval: a publish build waits
-# for approval before the installers are built and signed, and again before
-# anything is published. Test builds (publish unticked) do not enter the
-# environment, so they never see a secret and need no approval
+# Where the plan allows it, every secret below lives in a protected
+# environment named by the repository variable RELEASE_ENVIRONMENT (for
+# example "release", with required reviewers): a publish build then waits for
+# approval before the installers are built and signed, and again before
+# anything is published. With the variable unset (GitHub Free on a private
+# repository has no environments) the jobs read repository secrets. Test
+# builds (publish unticked) never enter an environment and need no approval
 # (docs/code-signing.md).
 #
 # Code signing turns on when its secrets exist (docs/code-signing.md):
@@ -87,7 +89,7 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.include) }}
     runs-on: ${{ matrix.runner }}
     # Signing secrets only for publish builds, and only once approved.
-    environment: ${{ inputs.publish && 'release' || '' }}
+    environment: ${{ inputs.publish && vars.RELEASE_ENVIRONMENT || '' }}
     env:
       MAC_SIGNING: ${{ secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' }}
       MAC_NOTARIZING: ${{ secrets.MAC_CSC_LINK != '' && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
@@ -238,7 +240,7 @@ jobs:
     needs: installers
     if: inputs.publish && inputs.target == 'all'
     runs-on: ubuntu-24.04
-    environment: release
+    environment: ${{ vars.RELEASE_ENVIRONMENT || '' }}
     env:
       RELEASES_REPOSITORY: unoblox/unoblox-works-releases
     steps:

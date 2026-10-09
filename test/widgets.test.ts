@@ -21,6 +21,10 @@ type Client = {
   buildWidgetDocument: (html: string, options: { dark: boolean; token: string; library?: string }) => string
   formatSubmission: (title: string, data: unknown) => string
   inlineScript: (source: string) => string
+  neutraliseShadowRoots: (html: string) => string
+  uniqueWidgets: (entries: Array<{ callId: string; widget: Widget }>) => Array<{ callId: string; widget: Widget }>
+  chartTheme: (theme: Record<string, string>, dark: boolean) => string
+  isWebLink: (value: string) => boolean
   usesCharts: (html: string) => boolean
   clampHeight: (value: number) => number
   widgetsDefinition: Definition
@@ -32,7 +36,8 @@ function loadClient(): Client {
   const source = readFileSync(path.join(projectRoot, 'packages', 'dsh-desktop-widgets', 'client.js'), 'utf8')
   let factory: ((require: (id: string) => unknown) => Client) | undefined
   vm.runInNewContext(source, {
-    window: { __ModuleLoader__: { load: (definition: { factory: typeof factory }) => { factory = definition.factory } } }
+    window: { __ModuleLoader__: { load: (definition: { factory: typeof factory }) => { factory = definition.factory } } },
+    URL
   })
   const react = { createElement: () => null, useEffect: () => {}, useMemo: (fn: () => unknown) => fn(), useRef: () => ({}), useState: (v: unknown) => [v, () => {}], Fragment: 'f' }
   return factory!((id) => id === 'react' ? react : {})
@@ -83,6 +88,67 @@ describe('widget sandbox document', () => {
     expect(client.inlineScript('a</SCRIPT>b')).toBe('a<\\/SCRIPT>b')
     expect(client.usesCharts('echarts.init(el)')).toBe(true)
     expect(client.usesCharts('<p>charts</p>')).toBe(false)
+  })
+})
+
+describe('what a widget cannot reach', () => {
+  it('turns off declarative shadow roots in the agent markup', () => {
+    expect(client.neutraliseShadowRoots('<template shadowrootmode="closed"><b></b></template>')).toBe('<template data-shadowrootmode="closed"><b></b></template>')
+    expect(client.neutraliseShadowRoots('<template SHADOWROOTMODE = open>')).toBe('<template data-shadowrootMODE = open>')
+    expect(client.neutraliseShadowRoots('<p>shadowrootmode is a word</p>')).toBe('<p>shadowrootmode is a word</p>')
+    expect(client.buildWidgetDocument('<template shadowrootmode="open"></template>', { dark: false, token: 't' })).not.toMatch(/<template shadowrootmode/u)
+  })
+
+  it('builds bootstrap code that parses', () => {
+    const doc = client.buildWidgetDocument('<p>x</p>', { dark: false, token: 't' })
+    const scripts = [...doc.matchAll(/<script>([\s\S]*?)<\/script>/gu)].map((match) => match[1] ?? '')
+    expect(scripts.length).toBeGreaterThan(0)
+    for (const script of scripts) expect(() => new vm.Script(script)).not.toThrow()
+  })
+
+  it('parses with the chart library and its theme', () => {
+    const doc = client.buildWidgetDocument('<div>echarts</div>', { dark: true, token: 't', library: 'window.echarts = {}' })
+    const scripts = [...doc.matchAll(/<script>([\s\S]*?)<\/script>/gu)].map((match) => match[1] ?? '')
+    expect(scripts).toHaveLength(3)
+    for (const script of scripts) expect(() => new vm.Script(script)).not.toThrow()
+  })
+
+  it('resolves theme variables in chart options, which a canvas cannot read', () => {
+    let registered: unknown
+    let applied: unknown
+    const echarts = {
+      registerTheme: (_name: string, theme: unknown) => { registered = theme },
+      init: (_el: unknown, name: unknown) => ({ name, setOption: (option: unknown) => { applied = option } })
+    }
+    vm.runInNewContext(client.chartTheme({ fg: '#f2f2f3', muted: '#aaa', surface: '#222', border: '#333', accent: '#D9A64A', onAccent: '#18191c' }, true), { window: { echarts } })
+    const chart = (echarts.init as unknown as (el: unknown) => { name: string; setOption: (option: unknown) => void })({})
+    expect(chart.name).toBe('unoblox')
+    chart.setOption({ legend: { textStyle: { color: 'var(--uw-fg)' } }, series: [{ color: ' var(--uw-accent) ' }] })
+    expect(applied).toEqual({ legend: { textStyle: { color: '#f2f2f3' } }, series: [{ color: '#D9A64A' }] })
+    expect(registered).toMatchObject({ legend: { textStyle: { color: '#f2f2f3' } } })
+  })
+
+  it('opens only plain web links', () => {
+    expect(client.isWebLink('https://example.com/a')).toBe(true)
+    expect(client.isWebLink('javascript:alert(1)')).toBe(false)
+    expect(client.isWebLink('https://user:pw@example.com/')).toBe(false)
+    expect(client.isWebLink('file:///etc/passwd')).toBe(false)
+  })
+
+  it('runs its guards before any widget code', () => {
+    const doc = client.buildWidgetDocument('<script>widget()</script>', { dark: false, token: 't' })
+    const bootstrap = doc.indexOf('RTCPeerConnection')
+    expect(bootstrap).toBeGreaterThan(-1)
+    expect(doc.indexOf('new MutationObserver')).toBeGreaterThan(-1)
+    expect(bootstrap).toBeLessThan(doc.indexOf('widget()'))
+  })
+})
+
+describe('repeated widgets', () => {
+  it('shows a widget the model repeated once, at its latest call', () => {
+    const w = (title: string, html = '<p>x</p>') => ({ title, html, height: 240 })
+    const shown = client.uniqueWidgets([{ callId: 'a', widget: w('Loan') }, { callId: 'b', widget: w('Chart') }, { callId: 'c', widget: w('Loan') }, { callId: 'd', widget: w('Loan', '<p>y</p>') }])
+    expect(shown.map((entry) => entry.callId)).toEqual(['b', 'c', 'd'])
   })
 })
 
@@ -144,7 +210,7 @@ describe('widgets host plugin', () => {
     await expect(tool.execute({ title: 'Loan', html: 'x'.repeat(MAX_WIDGET_HTML + 1) }, {})).rejects.toThrow()
     await expect(tool.execute({ title: 'Loan', html: '<p>x</p>', height: 5 }, {})).rejects.toThrow()
     await expect(tool.execute({ title: ' ', html: '<p>x</p>' }, {})).rejects.toThrow()
-    expect(tool.output.render({ title: 'Loan' }, { shown: true })[0]!.text).toContain('"Loan" is shown to the user')
+    expect(tool.output.render({ title: 'Loan' }, { shown: true })[0]!.text).toContain('"Loan" is now shown to the user')
   })
 
   it('serves the bundled chart library from its own route', async () => {

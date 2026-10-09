@@ -54,7 +54,14 @@ The phone bridge listens on the local network only while the user is pairing, wh
 
 ## Chat widgets
 
-Widgets the agent shows in the chat (charts, forms, calculators) run in a sandboxed frame whose content security policy blocks every network request, frame and navigation. The chart library is bundled with the app and served by the local Harness. A widget can send data only by the user submitting its form, which becomes the user's next message in the conversation. `test/widgets.test.ts` checks the policy.
+Widgets the agent shows in the chat (charts, forms, calculators) run in a sandboxed frame with no network access. The chart library is bundled with the app and served by the local Harness. Several layers enforce this, because a content security policy alone does not stop every route:
+
+- The frame's content security policy blocks requests, sockets, workers, nested pages, form posts and `<base>`.
+- The main process records each widget frame when it is created and refuses any navigation of it, or of a frame inside it, away from its own document (`location`, meta refresh, links). A policy cannot block a frame navigating itself.
+- WebRTC (STUN/TURN), which no policy covers, is removed from the widget, and the app window may not open UDP sockets for it.
+- Nested frames, which would start with a fresh, unrestricted window, are removed as soon as a widget adds them.
+
+A widget sends data only when the user submits it, and the submission becomes the user's next message in the conversation. A web link in a widget opens in the system browser only when the user clicks it. `test/widgets.test.ts` and `test/widget-frame-guard.test.ts` cover these rules. Over 100 escape attempts were also run against real Electron during development (fetch, images, CSS, sockets, beacons, navigation, WebRTC, nested frames, shadow DOM, tampering with built-ins), and none reached the network.
 
 ## Keeping it this way
 

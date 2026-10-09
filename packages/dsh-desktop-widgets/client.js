@@ -51,10 +51,11 @@ window.__ModuleLoader__.load({
     }
 
     // Light and dark palettes the widget sees as CSS variables; the accent is
-    // the unoblox gold.
+    // the unoblox gold, deepened in light mode to stay readable on white
+    // (5.3:1), with text on it that keeps 4.5:1 or more in both modes.
     const THEMES = {
-      light: { fg: '#18191c', muted: '#6b6f76', bg: 'transparent', surface: '#f6f6f4', border: '#e3e3df', accent: '#b9832b' },
-      dark: { fg: '#f2f2f3', muted: '#9a9ca2', bg: 'transparent', surface: '#202023', border: '#34343a', accent: '#D9A64A' }
+      light: { fg: '#18191c', muted: '#5f636a', bg: 'transparent', surface: '#f6f6f4', border: '#dcdcd7', accent: '#8f6318', onAccent: '#ffffff' },
+      dark: { fg: '#f2f2f3', muted: '#a3a6ad', bg: 'transparent', surface: '#202023', border: '#3a3a40', accent: '#D9A64A', onAccent: '#18191c' }
     }
 
     // ---------- pure helpers (exported for tests) ----------
@@ -102,7 +103,79 @@ window.__ModuleLoader__.load({
   function plain(value) {
     try { return JSON.parse(JSON.stringify(value)); } catch (e) { return String(value); }
   }
-  window.unoblox = { submit: function (values) { post({ kind: 'submit', data: plain(values == null ? {} : values) }); } };
+  // WebRTC talks to STUN/TURN servers outside the CSP; a widget has no use
+  // for it. The main process also blocks its UDP (src/main/security.ts).
+  ['RTCPeerConnection', 'webkitRTCPeerConnection'].forEach(function (name) {
+    try { Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+  });
+  // No nested frames: one would start with a fresh window that the lines
+  // above do not reach. Each frame element is removed as soon as it is added,
+  // before its document can load. This script runs before the widget's, so
+  // it keeps its own copies of what it relies on, and shadow roots, which the
+  // observer cannot see into from the document, are watched as they are made.
+  var call = Function.prototype.call;
+  function method(proto, name) { return call.bind(proto[name]); }
+  function getter(proto, name) { return call.bind(Object.getOwnPropertyDescriptor(proto, name).get); }
+  function seal(proto, name, value) { Object.defineProperty(proto, name, { value: value, writable: false, configurable: false }); }
+  var FRAMES = 'iframe,frame,frameset,object,embed,fencedframe,portal';
+  var nodeType = getter(Node.prototype, 'nodeType');
+  var matches = method(Element.prototype, 'matches');
+  var queryAll = method(Element.prototype, 'querySelectorAll');
+  var removeNode = method(Element.prototype, 'remove');
+  var listLength = getter(NodeList.prototype, 'length');
+  var addedNodes = getter(MutationRecord.prototype, 'addedNodes');
+  var observe = method(MutationObserver.prototype, 'observe');
+  var attach = method(Element.prototype, 'attachShadow');
+  var toText = String;
+  var lower = method(String.prototype, 'toLowerCase');
+  var indexOf = method(String.prototype, 'indexOf');
+  function sweep(node) {
+    if (nodeType(node) !== 1) return;
+    if (matches(node, FRAMES)) { removeNode(node); return; }
+    var found = queryAll(node, FRAMES);
+    for (var i = listLength(found) - 1; i >= 0; i--) removeNode(found[i]);
+  }
+  var observer = new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) {
+      var nodes = addedNodes(records[i]);
+      for (var j = 0, n = listLength(nodes); j < n; j++) sweep(nodes[j]);
+    }
+  });
+  function watch(root) { observe(observer, root, { childList: true, subtree: true }); }
+  watch(document);
+  seal(Element.prototype, 'attachShadow', function (init) {
+    var options = init == null ? init : { mode: init.mode, delegatesFocus: init.delegatesFocus, slotAssignment: init.slotAssignment, clonable: false, serializable: false };
+    var root = attach(this, options);
+    watch(root);
+    return root;
+  });
+  // Declarative shadow roots come from the parser, not attachShadow; refuse
+  // markup that asks for one on the paths that would make it.
+  function refuseShadowRoots(args) {
+    var text = '';
+    for (var i = 0; i < args.length; i++) text += toText(args[i]);
+    if (indexOf(lower(text), 'shadowroot') !== -1) throw new TypeError('declarative shadow roots are not available in widgets');
+    return text;
+  }
+  var write = method(Document.prototype, 'write'), writeln = method(Document.prototype, 'writeln');
+  seal(Document.prototype, 'write', function () { return write(this, refuseShadowRoots(arguments)); });
+  seal(Document.prototype, 'writeln', function () { return writeln(this, refuseShadowRoots(arguments)); });
+  if (Element.prototype.setHTMLUnsafe) {
+    var setElement = method(Element.prototype, 'setHTMLUnsafe'), setShadow = method(ShadowRoot.prototype, 'setHTMLUnsafe');
+    seal(Element.prototype, 'setHTMLUnsafe', function (html) { return setElement(this, refuseShadowRoots([html])); });
+    seal(ShadowRoot.prototype, 'setHTMLUnsafe', function (html) { return setShadow(this, refuseShadowRoots([html])); });
+  }
+  if (Document.parseHTMLUnsafe) {
+    var parseUnsafe = Document.parseHTMLUnsafe;
+    seal(Document, 'parseHTMLUnsafe', function (html) { return call.call(parseUnsafe, Document, refuseShadowRoots([html])); });
+  }
+  var parseFromString = method(DOMParser.prototype, 'parseFromString');
+  seal(DOMParser.prototype, 'parseFromString', function (html, type) { return parseFromString(this, refuseShadowRoots([html]), type); });
+  window.unoblox = { submit: function (values) {
+    var data = values == null ? null : plain(values);
+    if (data === null || (typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0)) data = pageFields();
+    post({ kind: 'submit', data: data });
+  } };
   function add(data, key, text) {
     if (Object.prototype.hasOwnProperty.call(data, key)) data[key] = [].concat(data[key], text); else data[key] = text;
   }
@@ -113,18 +186,64 @@ window.__ModuleLoader__.load({
     var text = label ? label.textContent.trim() : '';
     return text || field.getAttribute('aria-label') || field.id || field.getAttribute('placeholder') || field.type || 'field';
   }
-  document.addEventListener('submit', function (event) {
-    event.preventDefault();
-    var form = event.target, data = {};
-    new FormData(form, event.submitter || undefined).forEach(function (value, key) {
+  var FIELDS = 'input, select, textarea';
+  var SKIP = { submit: 1, button: 1, reset: 1, image: 1 };
+  function readField(data, field, key) {
+    if (field.disabled || SKIP[field.type]) return;
+    if (field.type === 'file') { add(data, key, '[file]'); return; }
+    if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) return;
+    if (field.tagName === 'SELECT' && field.multiple) {
+      Array.prototype.forEach.call(field.selectedOptions, function (option) { add(data, key, option.value); });
+      return;
+    }
+    add(data, key, field.value);
+  }
+  function isField(field) { return /^(INPUT|SELECT|TEXTAREA)$/.test(field.tagName) && !SKIP[field.type]; }
+  // Every field on the page: for a form with no fields of its own (inputs
+  // laid out beside it) and for unoblox.submit() called without values.
+  function pageFields() {
+    var data = {};
+    Array.prototype.forEach.call(document.querySelectorAll(FIELDS), function (field) { readField(data, field, field.name || fieldKey(field)); });
+    return data;
+  }
+  function formFields(form, submitter) {
+    if (!Array.prototype.some.call(form.elements, isField)) return pageFields();
+    var data = {};
+    new FormData(form, submitter || undefined).forEach(function (value, key) {
       add(data, key, typeof value === 'string' ? value : '[file]');
     });
-    Array.prototype.forEach.call(form.querySelectorAll('input:not([name]), select:not([name]), textarea:not([name])'), function (field) {
-      if (field.disabled || field.type === 'submit' || field.type === 'button' || field.type === 'reset' || field.type === 'file') return;
-      if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) return;
-      add(data, fieldKey(field), field.value);
+    Array.prototype.forEach.call(form.elements, function (field) {
+      if (isField(field) && !field.name) readField(data, field, fieldKey(field));
     });
-    post({ kind: 'submit', data: data, form: form.getAttribute('aria-label') || form.getAttribute('name') || '' });
+    return data;
+  }
+  function sendForm(form, submitter) {
+    post({ kind: 'submit', data: formFields(form, submitter), form: form.getAttribute('aria-label') || form.getAttribute('name') || '' });
+  }
+  document.addEventListener('submit', function (event) {
+    event.preventDefault();
+    sendForm(event.target, event.submitter);
+  }, true);
+  // form.submit() skips the submit event and would try to navigate.
+  seal(HTMLFormElement.prototype, 'submit', function () { sendForm(this, null); });
+  // Links. A srcdoc document resolves "#part" against the chat's address,
+  // so following it would load the chat into the frame: in-page links scroll
+  // here instead. A web link the user clicks opens in their browser (the
+  // chat checks the click was real); nothing else navigates.
+  window.addEventListener('click', function (event) {
+    var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+    if (!link) return;
+    var href = link.getAttribute('href') || '';
+    event.preventDefault();
+    if (href.charAt(0) === '#') {
+      var id = href.slice(1);
+      try { id = decodeURIComponent(id); } catch (e) {}
+      var target = id === '' ? document.body : document.getElementById(id) || document.getElementsByName(id)[0];
+      if (target) target.scrollIntoView();
+      return;
+    }
+    var scheme = href.slice(0, 8).toLowerCase();
+    if (event.isTrusted && (scheme === 'https://' || scheme.slice(0, 7) === 'http://')) post({ kind: 'open', url: href });
   }, true);
   window.addEventListener('error', function (event) { post({ kind: 'error', message: String(event.message || 'error') }); });
   window.addEventListener('unhandledrejection', function (event) { post({ kind: 'error', message: String(event.reason && event.reason.message || event.reason) }); });
@@ -135,20 +254,84 @@ window.__ModuleLoader__.load({
 })();`
     }
 
+    const CHART_COLORS = {
+      light: ['#8f6318', '#2f62d0', '#1f8a70', '#c2410c', '#7c3aed', '#5f6b7a'],
+      dark: ['#D9A64A', '#7aaaff', '#4fd1a5', '#fb923c', '#a78bfa', '#94a3b8']
+    }
+
+    /**
+     * Charts draw on a canvas, which cannot read CSS variables: a chart that
+     * asks for "var(--uw-fg)" would draw black on the dark theme. Give
+     * ECharts a matching default theme, and resolve --uw-* variables in the
+     * options a widget passes.
+     */
+    function chartTheme(theme, dark) {
+      const vars = { '--uw-fg': theme.fg, '--uw-muted': theme.muted, '--uw-bg': 'transparent', '--uw-surface': theme.surface, '--uw-border': theme.border, '--uw-accent': theme.accent, '--uw-on-accent': theme.onAccent }
+      const axis = { axisLine: { lineStyle: { color: theme.border } }, axisTick: { lineStyle: { color: theme.border } }, axisLabel: { color: theme.muted }, splitLine: { lineStyle: { color: theme.border } }, nameTextStyle: { color: theme.muted } }
+      const config = {
+        color: CHART_COLORS[dark ? 'dark' : 'light'],
+        backgroundColor: 'transparent',
+        textStyle: { color: theme.fg },
+        title: { textStyle: { color: theme.fg }, subtextStyle: { color: theme.muted } },
+        legend: { textStyle: { color: theme.fg, fontSize: 12 } },
+        tooltip: { backgroundColor: theme.surface, borderColor: theme.border, textStyle: { color: theme.fg } },
+        categoryAxis: axis, valueAxis: axis, logAxis: axis, timeAxis: axis,
+        pie: { label: { color: theme.fg } }
+      }
+      return `(function () {
+  var e = window.echarts;
+  if (!e || typeof e.registerTheme !== 'function') return;
+  var vars = ${JSON.stringify(vars)};
+  e.registerTheme('unoblox', ${JSON.stringify(config)});
+  function resolve(value, depth) {
+    if (depth > 12) return value;
+    if (typeof value === 'string') {
+      var m = /^\\s*var\\((--uw-[a-z-]+)[^)]*\\)\\s*$/.exec(value);
+      return m && vars[m[1]] ? vars[m[1]] : value;
+    }
+    if (Array.isArray(value)) return value.map(function (item) { return resolve(item, depth + 1); });
+    var proto = value && typeof value === 'object' ? Object.getPrototypeOf(value) : undefined;
+    if (proto !== undefined && (proto === null || Object.getPrototypeOf(proto) === null)) {
+      var out = {};
+      for (var key in value) if (Object.prototype.hasOwnProperty.call(value, key)) out[key] = resolve(value[key], depth + 1);
+      return out;
+    }
+    return value;
+  }
+  var init = e.init;
+  e.init = function (el, name, opts) {
+    var chart = init.call(e, el, name == null ? 'unoblox' : name, opts);
+    var setOption = chart.setOption;
+    chart.setOption = function (option) {
+      var args = Array.prototype.slice.call(arguments);
+      args[0] = resolve(option, 0);
+      return setOption.apply(chart, args);
+    };
+    return chart;
+  };
+})();`
+    }
+
     /**
      * The frame document: a strict CSP (scripts and styles inline only, no
      * network, no navigation), the theme variables, the bridge, the chart
      * library when the widget uses it, then the agent's HTML.
      */
+    // The agent's markup must not open declarative shadow roots: the frame's
+    // bootstrap cannot see inside one created by the parser.
+    function neutraliseShadowRoots(html) {
+      return html.replace(/shadowroot(mode)?(\s*=)/giu, 'data-shadowroot$1$2')
+    }
+
     function buildWidgetDocument(html, options) {
       const theme = THEMES[options.dark ? 'dark' : 'light']
       const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'"
-      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent}}
+      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-on-accent:${theme.onAccent}}
 html,body{margin:0;background:transparent}
 body{padding:4px;color:var(--uw-fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;overflow-wrap:anywhere}
 input,select,textarea,button{font:inherit;color:inherit}
 input,select,textarea{background:var(--uw-surface);border:1px solid var(--uw-border);border-radius:8px;padding:6px 10px}
-button{background:var(--uw-accent);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
+button{background:var(--uw-accent);color:var(--uw-on-accent);border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--uw-accent);outline-offset:2px}
 table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);padding:6px 8px;text-align:left}`
       return [
@@ -157,9 +340,9 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         `<style>${style}</style>`,
         `<script>${inlineScript(bootstrap(options.token))}</script>`,
-        typeof options.library === 'string' ? `<script>${inlineScript(options.library)}</script>` : '',
+        typeof options.library === 'string' ? `<script>${inlineScript(options.library)}</script><script>${inlineScript(chartTheme(theme, options.dark))}</script>` : '',
         '</head><body>',
-        html,
+        neutraliseShadowRoots(html),
         '</body></html>'
       ].join('')
     }
@@ -182,6 +365,15 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
         lines.push(clip(typeof data === 'string' ? data : JSON.stringify(data), MAX_FIELD))
       }
       return clip(lines.join('\n'), MAX_SUBMISSION)
+    }
+
+    function isWebLink(value) {
+      try {
+        const url = new URL(value)
+        return (url.protocol === 'https:' || url.protocol === 'http:') && url.username === '' && url.password === ''
+      } catch {
+        return false
+      }
     }
 
     // ---------- chart library ----------
@@ -247,6 +439,11 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
             setHeight(clampHeight(data.height + 2))
           } else if (data.kind === 'error') {
             setNotice({ kind: 'error', text: t('scriptError', { message: String(data.message).slice(0, 200) }) })
+          } else if (data.kind === 'open' && typeof data.url === 'string') {
+            // Only right after the user clicked: the widget's script can post
+            // this message too, but it cannot give the chat a user activation.
+            if (navigator.userActivation?.isActive !== true || !isWebLink(data.url)) return
+            window.open(data.url, '_blank', 'noopener,noreferrer')
           } else if (data.kind === 'submit') {
             const now = Date.now()
             if (now - lastSubmit.current < SUBMIT_INTERVAL_MS) return
@@ -268,6 +465,9 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
       return h(React.Fragment, null,
         h('iframe', {
           ref: frameRef,
+          // The main process recognises widget frames by this name and keeps
+          // them from navigating anywhere (src/main/security.ts).
+          name: 'unoblox-widget',
           className: 'dshWidgetFrame',
           title: t('frameTitle', { title: widget.title }),
           sandbox: 'allow-scripts allow-forms',
@@ -351,13 +551,23 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
       }
     }
 
+    /**
+     * Models sometimes show the same widget twice in a turn; show it once, in
+     * the place of its latest call.
+     */
+    function uniqueWidgets(entries) {
+      const last = new Map()
+      entries.forEach((entry, index) => last.set(`${entry.widget.title}\u0000${entry.widget.html}`, index))
+      return entries.filter((entry, index) => last.get(`${entry.widget.title}\u0000${entry.widget.html}`) === index)
+    }
+
     /** The turn's widgets, after its reply. */
     function WidgetsTail(props) {
       const { turn, t, sendText } = props
       const recorded = turn?.data?.get(DATA_KEY)?.widgets
-      const widgets = useMemo(() => (recorded ?? [])
+      const widgets = useMemo(() => uniqueWidgets((recorded ?? [])
         .map((entry) => ({ callId: entry.callId, widget: parseWidgetArgs(entry.argsRaw) }))
-        .filter((entry) => entry.widget !== undefined), [recorded])
+        .filter((entry) => entry.widget !== undefined)), [recorded])
       if (widgets.length === 0) return null
       return h('div', { className: 'dshWidgets' }, ...widgets.map((entry) => h(WidgetCard, { key: entry.callId, widget: entry.widget, t, sendText })))
     }
@@ -367,7 +577,8 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
       .dshWidgetRow{font-size:13px;padding:2px 0;color:var(--dsw-alias-label-secondary, inherit)}
       .dshWidget{margin:0;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.25));border-radius:12px;overflow:hidden;background:var(--dsw-alias-bg-base, transparent)}
       .dshWidgetHeader{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));font-size:13px}
-      .dshWidgetLabel{color:#D9A64A;font-weight:600;text-transform:lowercase}
+      .dshWidgetLabel{color:#8f6318;font-weight:600;text-transform:lowercase}
+      [data-ds-dark-theme] .dshWidgetLabel{color:#D9A64A}
       .dshWidgetTitle{font-weight:600;color:var(--dsw-alias-label-primary, inherit)}
       .dshWidgetFrame{display:block;width:100%;border:0;background:transparent;color-scheme:normal}
       .dshWidgetStatus{padding:12px;font-size:13px;color:var(--dsw-alias-label-secondary, inherit)}
@@ -417,8 +628,12 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
     exports.buildWidgetDocument = buildWidgetDocument
     exports.formatSubmission = formatSubmission
     exports.inlineScript = inlineScript
+    exports.neutraliseShadowRoots = neutraliseShadowRoots
     exports.usesCharts = usesCharts
     exports.clampHeight = clampHeight
+    exports.isWebLink = isWebLink
+    exports.chartTheme = chartTheme
+    exports.uniqueWidgets = uniqueWidgets
     exports.WidgetToolView = WidgetToolView
     exports.WidgetsTail = WidgetsTail
     exports.widgetsDefinition = widgetsDefinition

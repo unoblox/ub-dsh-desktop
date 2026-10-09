@@ -31,7 +31,7 @@ export const TOOL_DESCRIPTION = [
   'Pass one self-contained HTML fragment or document with inline <style> and <script>. It runs in a sandbox with no network:',
   'no external scripts, stylesheets, fonts, images or fetch/XHR; use inline SVG or data: URLs.',
   'Charts: the ECharts 6 library is preloaded as window.echarts when the HTML mentions "echarts"; give each chart a sized container, e.g. <div id="c" style="height:320px"></div> and echarts.init(document.getElementById("c")).',
-  'Match the app theme with CSS variables: --uw-fg (text), --uw-muted (secondary text), --uw-bg (page), --uw-surface (cards, inputs), --uw-border, --uw-accent (highlights). They follow light and dark mode.',
+  'Match the app theme with CSS variables: --uw-fg (text), --uw-muted (secondary text), --uw-bg (page), --uw-surface (cards, inputs), --uw-border, --uw-accent (highlights, button backgrounds) and --uw-on-accent (text on the accent). They follow light and dark mode; keep text readable against them and do not use font sizes below 12px.',
   'Forms: when a <form> is submitted, its fields are sent back to you as the user\'s next message; give every input a name attribute. From script you can also call unoblox.submit({ ...values }).',
   'The widget resizes to its content. Keep it focused and accessible: label inputs, use buttons for actions, and keep text readable.'
 ].join(' ')
@@ -66,7 +66,7 @@ export function apply(ctx) {
       },
       render: (args) => [{
         type: 'text',
-        text: `The widget "${String(args.title)}" is shown to the user in the chat. If it has a form, what the user submits arrives as their next message.`
+        text: `The widget "${String(args.title)}" is now shown to the user in the chat; do not show it again unless it changes. If it has a form, what the user submits arrives as their next message.`
       }]
     },
     isConcurrencySafe: () => true,

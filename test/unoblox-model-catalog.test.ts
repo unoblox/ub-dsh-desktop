@@ -9,6 +9,7 @@ import {
   catalogEnvironment,
   catalogForLaunch,
   catalogFromListing,
+  isFreeModel,
   modelRow,
   parseCachedCatalog,
   refreshUnobloxCatalog
@@ -35,6 +36,17 @@ const OCR = {
 const LLAMA = {
   id: 'meta-llama/llama-3.3-70b-instruct-turbo', name: 'Llama 3.3 70B Instruct Turbo', object: 'model', context_length: 131072,
   max_completion_tokens: null, input_modalities: ['text'], output_modalities: ['text'], capabilities: { tools: true }
+}
+// Listed at ₹0 on 2026-10-09 (prompt and completion "0").
+const QWEN = {
+  id: 'qwen/qwen3.8-27b', name: 'Qwen3.8-27B', object: 'model', context_length: 262144,
+  max_completion_tokens: null, input_modalities: ['text'], output_modalities: ['text'], capabilities: { tools: true },
+  pricing: { prompt: '0', completion: '0', request: '0', currency: 'INR' }
+}
+const GEMMA = {
+  id: 'google/gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B Instruct', object: 'model', context_length: 262144,
+  max_completion_tokens: null, input_modalities: ['text', 'image'], output_modalities: ['text'], capabilities: { tools: true },
+  pricing: { prompt: '0', completion: '0', currency: 'INR' }
 }
 const LISTING = { object: 'list', data: [LLAMA, FABLE, OCR, GEMINI] }
 
@@ -68,6 +80,31 @@ describe('Unoblox model listing', () => {
     ])
     expect(catalogFromListing({ error: 'x' })).toBeUndefined()
   })
+
+  it('lists free models right after Auto, labelled as free', () => {
+    const rows = catalogFromListing({ object: 'list', data: [LLAMA, QWEN, FABLE, GEMMA, GEMINI] })
+    expect(rows?.map((row) => row.name)).toEqual([
+      'Unoblox Auto · best value',
+      'Gemma 4 26B A4B Instruct · free',
+      'Qwen3.8-27B · free',
+      'Claude Fable 5.1',
+      'Gemini 3.8 Flash',
+      'Llama 3.3 70B Instruct Turbo'
+    ])
+    // Rows stay plain model config: no extra field reaches Harness.
+    expect(Object.keys(rows?.[1] ?? {}).sort()).toEqual(['contextWindow', 'id', 'input', 'name'])
+  })
+
+  it('counts a model as free only when prompt, completion and request cost nothing', () => {
+    expect(isFreeModel(QWEN)).toBe(true)
+    expect(isFreeModel(GEMMA)).toBe(true)
+    expect(isFreeModel(FABLE)).toBe(false)
+    expect(isFreeModel(GEMINI)).toBe(false)
+    expect(isFreeModel({ ...QWEN, pricing: { prompt: '0', completion: '0.000001' } })).toBe(false)
+    expect(isFreeModel({ ...QWEN, pricing: { prompt: '0', completion: '0', request: '0.5' } })).toBe(false)
+    expect(isFreeModel({ ...QWEN, pricing: { prompt: '', completion: '0' } })).toBe(false)
+    expect(isFreeModel({ ...QWEN, pricing: { prompt: 0, completion: 0 } })).toBe(true)
+  })
 })
 
 describe('catalog resolution', () => {
@@ -80,6 +117,13 @@ describe('catalog resolution', () => {
     expect(seen).toEqual([UNOBLOX_MODELS_URL])
     expect(live.source).toBe('live')
     expect(live.rows).toHaveLength(4)
+    expect(parseCachedCatalog(await readFile(path, 'utf8'))).toEqual(live.rows)
+  })
+
+  it('keeps free models first and labelled once when read back from the cache', async () => {
+    const path = await cachePath()
+    const live = await refreshUnobloxCatalog({ cachePath: path, fetch: reply({ object: 'list', data: [LLAMA, QWEN, FABLE] }) })
+    expect(live.rows.map((row) => row.name)).toEqual(['Unoblox Auto · best value', 'Qwen3.8-27B · free', 'Claude Fable 5.1', 'Llama 3.3 70B Instruct Turbo'])
     expect(parseCachedCatalog(await readFile(path, 'utf8'))).toEqual(live.rows)
   })
 

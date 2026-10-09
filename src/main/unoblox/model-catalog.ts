@@ -13,7 +13,8 @@ import { dirname } from 'node:path'
  * Harness reads configuration once at launch, so the catalog is resolved per
  * launch: a fresh listing when it arrives in time, otherwise the last good
  * listing cached on disk, otherwise Auto alone. `unoblox/auto` is always the
- * first row (and the overlay's default model).
+ * first row (and the overlay's default model), then the free models (named
+ * "… · free"), then the rest by name.
  */
 
 export const UNOBLOX_MODELS_URL = 'https://api.unoblox.ai/v1/models'
@@ -29,6 +30,10 @@ export interface UnobloxModelRow {
 
 // The picker shows names only, so the name says what Auto does.
 export const UNOBLOX_AUTO_ROW: UnobloxModelRow = { id: 'unoblox/auto', name: 'Unoblox Auto · best value' }
+
+// The picker shows names only, so a free model says so in its name. Rows
+// carry no other fields: they go to Harness's model config as they are.
+export const FREE_MODEL_SUFFIX = ' · free'
 
 // A listing far beyond today's 65 models is not a catalog a picker can use.
 const MAX_MODELS = 300
@@ -49,10 +54,27 @@ function text(value: unknown): string | undefined {
   return trimmed.length === 0 ? undefined : trimmed.slice(0, MAX_TEXT)
 }
 
+/** A price field that is present and exactly zero ("0", "0.0", 0). */
+function zeroPrice(value: unknown): boolean {
+  if (typeof value === 'number') return value === 0
+  return typeof value === 'string' && value.trim().length > 0 && Number(value) === 0
+}
+
+/**
+ * Whether Unoblox lists the model at no charge: its prompt and completion
+ * prices are both zero, and a per-request price, if any, is zero too. The
+ * listing has no free-tier flag, so the price is the signal.
+ */
+export function isFreeModel(entry: unknown): boolean {
+  if (!isRecord(entry) || !isRecord(entry.pricing)) return false
+  const { prompt, completion, request } = entry.pricing
+  return zeroPrice(prompt) && zeroPrice(completion) && (request === undefined || zeroPrice(request))
+}
+
 /**
  * Map one `/v1/models` entry to a model row, or undefined when the entry is
  * unusable here: no id, not a text model, or (the agent needs tools) no tool
- * support.
+ * support. A free model's name ends in {@link FREE_MODEL_SUFFIX}.
  */
 export function modelRow(entry: unknown): UnobloxModelRow | undefined {
   if (!isRecord(entry)) return undefined
@@ -68,7 +90,7 @@ export function modelRow(entry: unknown): UnobloxModelRow | undefined {
     ?? (isRecord(entry.top_provider) ? positiveInteger(entry.top_provider.max_completion_tokens) : undefined)
   return {
     id,
-    name: text(entry.name) ?? id,
+    name: `${text(entry.name) ?? id}${isFreeModel(entry) ? FREE_MODEL_SUFFIX : ''}`,
     ...(contextWindow === undefined ? {} : { contextWindow }),
     ...(maxTokens === undefined ? {} : { maxTokens }),
     ...(input.includes('text') ? { input } : {})
@@ -76,8 +98,9 @@ export function modelRow(entry: unknown): UnobloxModelRow | undefined {
 }
 
 /**
- * Turn a `/v1/models` body into picker rows: Auto first, then the usable
- * models by name. Undefined when the body is not a listing.
+ * Turn a `/v1/models` body into picker rows: Auto first, then the free
+ * models, then the other usable models, each group by name. Undefined when
+ * the body is not a listing.
  */
 export function catalogFromListing(body: unknown): UnobloxModelRow[] | undefined {
   if (!isRecord(body) || !Array.isArray(body.data)) return undefined
@@ -89,7 +112,8 @@ export function catalogFromListing(body: unknown): UnobloxModelRow[] | undefined
     seen.add(row.id)
     rows.push(row)
   }
-  rows.sort((left, right) => left.name.localeCompare(right.name, 'en'))
+  const free = (row: UnobloxModelRow) => row.name.endsWith(FREE_MODEL_SUFFIX) ? 0 : 1
+  rows.sort((left, right) => free(left) - free(right) || left.name.localeCompare(right.name, 'en'))
   return [UNOBLOX_AUTO_ROW, ...rows]
 }
 
@@ -105,7 +129,10 @@ export function parseCachedCatalog(raw: string): UnobloxModelRow[] | undefined {
   const rows = catalogFromListing({
     data: value.models.map((row: unknown) => isRecord(row) ? {
       id: row.id,
-      name: row.name,
+      // Cached rows keep the display name; give the suffix back as a price
+      // so the row is grouped and labelled exactly as when it was fetched.
+      name: typeof row.name === 'string' && row.name.endsWith(FREE_MODEL_SUFFIX) ? row.name.slice(0, -FREE_MODEL_SUFFIX.length) : row.name,
+      ...(typeof row.name === 'string' && row.name.endsWith(FREE_MODEL_SUFFIX) ? { pricing: { prompt: '0', completion: '0' } } : {}),
       context_length: row.contextWindow,
       max_completion_tokens: row.maxTokens,
       input_modalities: Array.isArray(row.input) ? row.input : ['text'],

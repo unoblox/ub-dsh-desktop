@@ -22,6 +22,38 @@ const packageJson = require('./package.json')
 // Shared with the background generator, which draws the targets under these.
 const DMG_WINDOW = require('./build/brand/dmg-layout.json')
 
+/*
+ * Real signing switches on when CI provides the secrets (see
+ * docs/code-signing.md); without them the build stays as described above.
+ * - macOS: CSC_LINK (Developer ID Application .p12) signs with hardened
+ *   runtime; APPLE_API_KEY (+ _ID, _ISSUER) notarizes and staples the app.
+ * - Windows: SSL.com eSigner (ESIGNER_*) through a sign hook, or Azure
+ *   Artifact Signing (AZURE_* plus the account settings below).
+ */
+const MAC_SIGNED = Boolean(process.env.CSC_LINK)
+const MAC_NOTARIZED = MAC_SIGNED && Boolean(process.env.APPLE_API_KEY && process.env.APPLE_API_KEY_ID && process.env.APPLE_API_ISSUER)
+const ESIGNER = Boolean(process.env.ESIGNER_USERNAME && process.env.ESIGNER_PASSWORD && process.env.ESIGNER_CREDENTIAL_ID && process.env.ESIGNER_TOTP_SECRET)
+const AZURE = !ESIGNER && Boolean(process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET &&
+  process.env.AZURE_SIGNING_ENDPOINT && process.env.AZURE_SIGNING_ACCOUNT && process.env.AZURE_SIGNING_PROFILE)
+
+function windowsSigning() {
+  if (ESIGNER) {
+    return { signtoolOptions: { ...packageJson.build.win.signtoolOptions, sign: './scripts/esigner-windows-hook.mjs' } }
+  }
+  if (AZURE) {
+    return {
+      signtoolOptions: null,
+      azureSignOptions: {
+        publisherName: process.env.AZURE_SIGNING_PUBLISHER || 'unoblox',
+        endpoint: process.env.AZURE_SIGNING_ENDPOINT,
+        codeSigningAccountName: process.env.AZURE_SIGNING_ACCOUNT,
+        certificateProfileName: process.env.AZURE_SIGNING_PROFILE
+      }
+    }
+  }
+  return {}
+}
+
 module.exports = {
   ...packageJson.build,
   directories: {
@@ -34,8 +66,13 @@ module.exports = {
     // The dmg is for people; the zip is what over-the-air updates download
     // (src/main/update/ota-install.ts unpacks it with ditto).
     target: ['dmg', 'zip'],
-    identity: '-',
-    hardenedRuntime: false
+    ...(MAC_SIGNED
+      ? { hardenedRuntime: true, notarize: MAC_NOTARIZED }
+      : { identity: '-', hardenedRuntime: false })
+  },
+  win: {
+    ...packageJson.build.win,
+    ...windowsSigning()
   },
   linux: {
     ...packageJson.build.linux,
@@ -59,7 +96,8 @@ module.exports = {
   dmg: {
     ...packageJson.build.dmg,
     title: 'unoblox works beta',
-    background: 'build/dmg-background.png',
+    // A notarized app opens without the first-open steps the beta panel explains.
+    background: MAC_NOTARIZED ? 'build/dmg-background-signed.png' : 'build/dmg-background.png',
     iconSize: 96,
     window: { width: DMG_WINDOW.width, height: DMG_WINDOW.height },
     contents: [

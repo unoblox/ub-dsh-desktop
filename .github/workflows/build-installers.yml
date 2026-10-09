@@ -13,6 +13,15 @@ name: Build beta installers
 # from (src/main/update). That needs two repository secrets:
 #   UPDATE_SIGNING_KEY  Ed25519 private key (PEM) matching UPDATE_PUBLIC_KEY
 #   RELEASES_TOKEN      token allowed to create releases in the releases repo
+#
+# Code signing turns on when its secrets exist (docs/code-signing.md):
+#   macOS    MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD (Developer ID Application .p12)
+#            APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER (notarization)
+#   Windows  ESIGNER_USERNAME, ESIGNER_PASSWORD, ESIGNER_CREDENTIAL_ID,
+#            ESIGNER_TOTP_SECRET (SSL.com eSigner), or AZURE_TENANT_ID,
+#            AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SIGNING_ENDPOINT,
+#            AZURE_SIGNING_ACCOUNT, AZURE_SIGNING_PROFILE (Azure signing)
+# Without them macOS stays ad-hoc signed and Windows unsigned.
 
 on:
   workflow_dispatch:
@@ -70,6 +79,11 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.include) }}
     runs-on: ${{ matrix.runner }}
+    env:
+      MAC_SIGNING: ${{ secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' }}
+      MAC_NOTARIZING: ${{ secrets.MAC_CSC_LINK != '' && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+      ESIGNER_SIGNING: ${{ secrets.ESIGNER_USERNAME != '' && secrets.ESIGNER_PASSWORD != '' && secrets.ESIGNER_CREDENTIAL_ID != '' && secrets.ESIGNER_TOTP_SECRET != '' }}
+      AZURE_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_SIGNING_PROFILE != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -87,25 +101,86 @@ jobs:
         run: |
           base="$(node -p "require('./package.json').version")"
           npm version --no-git-tag-version --allow-same-version "$base-beta.${{ github.run_number }}"
+      - name: Prepare the Apple notarization key
+        if: matrix.platform == 'darwin' && env.MAC_NOTARIZING == 'true'
+        shell: bash
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+          chmod 600 "$key_path"
+          {
+            echo "APPLE_API_KEY=$key_path"
+            echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
+            echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+          } >> "$GITHUB_ENV"
+      - name: Install SSL.com CodeSignTool
+        if: matrix.platform == 'win32' && env.ESIGNER_SIGNING == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/codesigntool"
+          mkdir -p "$dir"
+          curl -fsSL -o "$RUNNER_TEMP/codesigntool.zip" https://www.ssl.com/download/codesigntool-for-windows/
+          unzip -q "$RUNNER_TEMP/codesigntool.zip" -d "$dir"
+          # The archive may hold the tool in a top-level folder.
+          tool="$(dirname "$(find "$dir" -type d -name jar -print -quit)")"
+          test -d "$tool/jar"
+          echo "CODESIGNTOOL_DIR=$tool" >> "$GITHUB_ENV"
       - name: Package
         shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Each platform sees only its own signing secrets.
+          CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          ESIGNER_USERNAME: ${{ matrix.platform == 'win32' && secrets.ESIGNER_USERNAME || '' }}
+          ESIGNER_PASSWORD: ${{ matrix.platform == 'win32' && secrets.ESIGNER_PASSWORD || '' }}
+          ESIGNER_CREDENTIAL_ID: ${{ matrix.platform == 'win32' && secrets.ESIGNER_CREDENTIAL_ID || '' }}
+          ESIGNER_TOTP_SECRET: ${{ matrix.platform == 'win32' && secrets.ESIGNER_TOTP_SECRET || '' }}
+          AZURE_TENANT_ID: ${{ matrix.platform == 'win32' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'win32' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'win32' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ matrix.platform == 'win32' && secrets.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ matrix.platform == 'win32' && secrets.AZURE_SIGNING_ACCOUNT || '' }}
+          AZURE_SIGNING_PROFILE: ${{ matrix.platform == 'win32' && secrets.AZURE_SIGNING_PROFILE || '' }}
         run: node scripts/verify-target.mjs ${{ matrix.platform }} ${{ matrix.arch }} && ${{ matrix.builder }} --publish never --config electron-builder.beta.cjs
       - name: Check the macOS signature users get
         if: matrix.platform == 'darwin'
         shell: bash
-        # The app inside the disk image must carry a valid ad-hoc seal: a broken
-        # one is what Gatekeeper reports as "damaged" on Apple Silicon.
+        # The app inside the disk image must carry a valid seal: a broken one is
+        # what Gatekeeper reports as "damaged" on Apple Silicon. Ad-hoc without
+        # signing secrets; Developer ID (and notarized, stapled) with them.
         run: |
           mount="$(mktemp -d)"
           hdiutil attach -nobrowse -readonly -mountpoint "$mount" dist-beta/*.dmg
           app="$(ls -d "$mount"/*.app)"
           codesign --verify --deep --strict --verbose=2 "$app"
-          codesign -dv "$app" 2>&1 | tee /dev/stderr | grep -q 'Signature=adhoc'
+          if [ "$MAC_SIGNING" = true ]; then
+            codesign -dvv "$app" 2>&1 | tee /dev/stderr | grep -q 'Authority=Developer ID Application'
+            if [ "$MAC_NOTARIZING" = true ]; then
+              xcrun stapler validate "$app"
+              spctl --assess --type execute --verbose=4 "$app"
+            fi
+          else
+            codesign -dv "$app" 2>&1 | tee /dev/stderr | grep -q 'Signature=adhoc'
+          fi
           test -L "$mount/Applications"
           ls -la "$mount" "$mount/.background" || true
           hdiutil detach "$mount"
+      - name: Check the Windows signature users get
+        if: matrix.platform == 'win32' && (env.ESIGNER_SIGNING == 'true' || env.AZURE_SIGNING == 'true')
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem dist-beta/*-setup.exe) + @(Get-ChildItem "dist-beta/win-unpacked/*.exe")
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature $file.FullName
+            Write-Host "$($file.Name): $($signature.Status) $($signature.SignerCertificate.Subject)"
+            if ($signature.Status -ne 'Valid') { throw "$($file.Name) is not validly signed" }
+          }
       - name: Install the .deb (Linux)
         if: matrix.platform == 'linux'
         # The smoke test runs the installed package, as users get it. On this

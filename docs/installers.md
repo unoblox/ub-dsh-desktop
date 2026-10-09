@@ -62,7 +62,7 @@ Output goes to `dist-dev/`. The `package:dev:*` scripts use `electron-builder.de
 
 ## Not done by these builds
 
-- **Signing.** Beta macOS builds are ad-hoc signed but not notarized, so Gatekeeper asks once (System Settings › Privacy & Security › Open Anyway). Windows builds are unsigned, so SmartScreen shows "Windows protected your PC" (More info › Run anyway). Removing both prompts needs an Apple Developer ID with notarization and a Windows code-signing certificate; see `release.yml` and `docs/release-runbook.md`.
+- **Signing.** Beta builds sign themselves when the signing secrets exist: Developer ID plus notarization on macOS, SSL.com eSigner or Azure Artifact Signing on Windows. Without them macOS builds are ad-hoc signed (Gatekeeper asks once) and Windows builds are unsigned (SmartScreen asks once). Accounts, costs and the exact secrets are in [code signing](code-signing.md).
 - **Release identity.** The product is "unoblox works", always lowercase (`src/shared/brand.ts`; "unoblox" alone names the company and its gateway): product name "unoblox works" ("unoblox works dev" for development builds), icons generated from `build/brand/unoblox-mark.svg` by `scripts/generate-brand-assets.mjs`, the window and page titles, the sidebar wordmark, the splash and the first-run dialog. These internal identifiers deliberately stay as they were, so existing installs keep their data:
   - app id `ai.unoblox.works` (development `ai.unoblox.works.dev`). It replaced upstream's `io.dsh.desktop` before any signed release, so Windows treats the first betas, installed as "unoblox", as a separate app: uninstall that one;
   - the `dsh-desktop` user-data folder;

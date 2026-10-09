@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -396,6 +397,38 @@ describe('GitHub release contract', () => {
     expect(workflow).toContain('node scripts/smoke-packaged.mjs')
     // The beta ships Apple Silicon only.
     expect(workflow).not.toContain('macos-15-intel')
+  })
+
+  it('signs for real only when CI provides the signing secrets', () => {
+    // The config reads its environment once, so each case loads it fresh.
+    const load = (env: Record<string, string>) => JSON.parse(execFileSync(process.execPath, ['-e',
+      "const c=require('./electron-builder.beta.cjs');process.stdout.write(JSON.stringify({mac:c.mac,win:c.win,background:c.dmg.background}))"
+    ], { cwd: projectRoot, env: { PATH: process.env.PATH ?? '', ...env }, encoding: 'utf8' })) as {
+      mac: { identity?: string; hardenedRuntime: boolean; notarize?: boolean }
+      win: { signtoolOptions?: { sign?: string } | null; azureSignOptions?: Record<string, string> }
+      background: string
+    }
+    const unsigned = load({})
+    expect(unsigned.mac).toMatchObject({ identity: '-', hardenedRuntime: false })
+    expect(unsigned.win.signtoolOptions?.sign).toBeUndefined()
+    expect(unsigned.win.azureSignOptions).toBeUndefined()
+    expect(unsigned.background).toBe('build/dmg-background.png')
+
+    const apple = { CSC_LINK: 'p12', APPLE_API_KEY: '/tmp/k.p8', APPLE_API_KEY_ID: 'id', APPLE_API_ISSUER: 'issuer' }
+    const signed = load(apple)
+    expect(signed.mac).toMatchObject({ hardenedRuntime: true, notarize: true })
+    expect(signed.mac.identity).toBeUndefined()
+    expect(signed.background).toBe('build/dmg-background-signed.png')
+    // A certificate without the notarization key signs but does not notarize.
+    expect(load({ CSC_LINK: 'p12' }).mac).toMatchObject({ hardenedRuntime: true, notarize: false })
+    expect(load({ CSC_LINK: 'p12' }).background).toBe('build/dmg-background.png')
+
+    const esigner = { ESIGNER_USERNAME: 'u', ESIGNER_PASSWORD: 'p', ESIGNER_CREDENTIAL_ID: 'c', ESIGNER_TOTP_SECRET: 't' }
+    expect(load(esigner).win.signtoolOptions?.sign).toBe('./scripts/esigner-windows-hook.mjs')
+    const azure = { AZURE_TENANT_ID: 't', AZURE_CLIENT_ID: 'c', AZURE_CLIENT_SECRET: 's', AZURE_SIGNING_ENDPOINT: 'https://eus.codesigning.azure.net', AZURE_SIGNING_ACCOUNT: 'a', AZURE_SIGNING_PROFILE: 'p' }
+    expect(load(azure).win).toMatchObject({ signtoolOptions: null, azureSignOptions: { publisherName: 'unoblox', codeSigningAccountName: 'a', certificateProfileName: 'p' } })
+    // eSigner wins when both are configured.
+    expect(load({ ...azure, ...esigner }).win.azureSignOptions).toBeUndefined()
   })
 
   it('builds and publishes every supported platform', async () => {

@@ -113,7 +113,7 @@ for (const [file, ink, background] of [['dsh-loader.gif', '#0C0C0C', '#f8f8f6'],
 // says how to allow it once. Text is rendered with Inter (installed where this
 // script runs), so the committed PNGs do not depend on the build machine.
 const DMG_WINDOW = JSON.parse(await readFile(join(root, 'build', 'brand', 'dmg-layout.json'), 'utf8'))
-function dmgBackground(scale) {
+function dmgBackground(scale, signed = false) {
   const { width, height, app, applications } = DMG_WINDOW
   const steps = [
     'Double-click unoblox works in Applications. If macOS says it cannot verify the app, click Done.',
@@ -126,12 +126,16 @@ function dmgBackground(scale) {
   <circle cx="${applications.x}" cy="${applications.y}" r="66" fill="#FFFFFF" stroke="#E6E2DA"/>
   <path d="M${app.x + 92} ${app.y}H${applications.x - 100}" stroke="#D9A64A" stroke-width="4" stroke-linecap="round"/>
   <path d="M${applications.x - 114} ${app.y - 13}L${applications.x - 98} ${app.y}L${applications.x - 114} ${app.y + 13}" fill="none" stroke="#D9A64A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="40" y="290" width="${width - 80}" height="118" rx="14" fill="#FFFFFF" stroke="#E6E2DA"/>
-  <text x="62" y="320" font-family="Inter" font-size="13" font-weight="600" fill="#0C0C0C">First open (once): unoblox works beta is not notarized by Apple yet</text>
-  ${steps.map((step, index) => `<circle cx="70" cy="${348 + index * 30}" r="10" fill="#D9A64A"/><text x="70" y="${352.5 + index * 30}" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#FFFFFF">${index + 1}</text><text x="88" y="${352.5 + index * 30}" font-family="Inter" font-size="12.5" fill="#3A3A38">${step}</text>`).join('')}
+  ${signed ? '' : `<rect x="40" y="290" width="${width - 80}" height="118" rx="14" fill="#FFFFFF" stroke="#E6E2DA"/>
+  <text x="62" y="320" font-family="Inter" font-size="13" font-weight="600" fill="#0C0C0C">First open (once): unoblox works beta is not notarized by Apple yet</text>`}
+  ${signed ? '' : steps.map((step, index) => `<circle cx="70" cy="${348 + index * 30}" r="10" fill="#D9A64A"/><text x="70" y="${352.5 + index * 30}" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#FFFFFF">${index + 1}</text><text x="88" y="${352.5 + index * 30}" font-family="Inter" font-size="12.5" fill="#3A3A38">${step}</text>`).join('')}
 </svg>`)
 }
 await writeFile(join(root, 'build', 'dmg-background.png'), await sharp(dmgBackground(1)).png({ compressionLevel: 9 }).toBuffer())
 await writeFile(join(root, 'build', 'dmg-background@2x.png'), await sharp(dmgBackground(2)).png({ compressionLevel: 9 }).toBuffer())
+// Notarized builds (electron-builder.beta.cjs with signing secrets) open
+// without the first-open steps, so their window shows only the drag.
+await writeFile(join(root, 'build', 'dmg-background-signed.png'), await sharp(dmgBackground(1, true)).png({ compressionLevel: 9 }).toBuffer())
+await writeFile(join(root, 'build', 'dmg-background-signed@2x.png'), await sharp(dmgBackground(2, true)).png({ compressionLevel: 9 }).toBuffer())
 
-console.log('brand assets written: icon.png, app-icon.png, icon.icns, icon.ico, logo-light.png, logo-dark.png, dsh-loader.gif, dsh-loader-dark.gif, dmg-background.png, dmg-background@2x.png')
+console.log('brand assets written: icon.png, app-icon.png, icon.icns, icon.ico, logo-light.png, logo-dark.png, dsh-loader.gif, dsh-loader-dark.gif, dmg-background.png, dmg-background@2x.png, dmg-background-signed.png, dmg-background-signed@2x.png')

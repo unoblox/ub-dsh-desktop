@@ -102,6 +102,17 @@ jobs:
         run: |
           base="$(node -p "require('./package.json').version")"
           npm version --no-git-tag-version --allow-same-version "$base-beta.${{ github.run_number }}"
+      - name: Provide the macOS signing certificate
+        if: matrix.platform == 'darwin' && env.MAC_SIGNING == 'true'
+        shell: bash
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          {
+            echo "CSC_LINK=$MAC_CSC_LINK"
+            echo "CSC_KEY_PASSWORD=$MAC_CSC_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
       - name: Prepare the Apple notarization key
         if: matrix.platform == 'darwin' && env.MAC_NOTARIZING == 'true'
         shell: bash
@@ -135,9 +146,9 @@ jobs:
         shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          # Each platform sees only its own signing secrets.
-          CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          # Each platform sees only its own signing secrets. The macOS
+          # certificate comes from the step above, only when it exists:
+          # electron-builder reads an empty CSC_LINK as a path and fails.
           ESIGNER_USERNAME: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_USERNAME || '' }}
           ESIGNER_PASSWORD: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_PASSWORD || '' }}
           ESIGNER_CREDENTIAL_ID: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_CREDENTIAL_ID || '' }}

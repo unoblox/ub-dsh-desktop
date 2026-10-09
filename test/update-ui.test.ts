@@ -3,6 +3,7 @@ import type { UpdateStatus } from '../src/shared/contracts'
 import {
   isUpdateDismissed,
   shouldShowUpdate,
+  holdUpdateForDialog,
   updateHeadline,
   updateMessage
 } from '../src/preload/update-view'
@@ -80,5 +81,14 @@ describe('updates download on their own', () => {
     expect(updateMessage(available, 'zh')).toBe('发现新版本 0.4.4，正在下载')
     expect(updateMessage(available, 'en')).toBe('unoblox works 0.4.4 is available and downloading')
     expect(updateHeadline({ ...available, phase: 'downloaded' }, 'en')).toEqual({ title: 'Update ready', description: 'Restart to install v0.4.4.' })
+  })
+})
+
+describe('update card and dialogs', () => {
+  it('waits for an open dialog unless the user asked for the check', () => {
+    const background = { phase: 'downloaded' as const, currentVersion: '1.0.0', availableVersion: '1.0.1', manual: false }
+    expect(holdUpdateForDialog(background, true)).toBe(true)
+    expect(holdUpdateForDialog(background, false)).toBe(false)
+    expect(holdUpdateForDialog({ ...background, manual: true }, true)).toBe(false)
   })
 })

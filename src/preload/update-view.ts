@@ -8,6 +8,15 @@ export function shouldShowUpdate(status: UpdateStatus): boolean {
   return status.manual && ['checking', 'up-to-date', 'error', 'unsupported'].includes(status.phase)
 }
 
+/**
+ * Whether the card waits for an open dialog to close. Background update news
+ * must not cover a dialog's buttons (the first-run key dialog sits where the
+ * card does); a check the user asked for still shows at once.
+ */
+export function holdUpdateForDialog(status: UpdateStatus, dialogOpen: boolean): boolean {
+  return dialogOpen && !status.manual
+}
+
 export function isUpdateDismissed(
   status: UpdateStatus,
   dismissedVersion: string | null,

@@ -5,6 +5,7 @@ import {
   isUpdateDismissed,
   shouldShowUpdate,
   updateHeadline,
+  holdUpdateForDialog,
   type UpdateLocale
 } from './update-view'
 import { isPluginLoadError } from './plugin-error-view'
@@ -616,7 +617,26 @@ function mount(): void {
   content = document.createElement('div')
   shadow.append(style, content)
   document.documentElement.appendChild(host)
+  // Re-check when a dialog opens or closes, so a held card appears after it.
+  new MutationObserver(() => {
+    const open = dialogOpen()
+    if (open !== lastDialogOpen) {
+      lastDialogOpen = open
+      render()
+    }
+  }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['open', 'aria-modal', 'hidden', 'style'] })
   render()
+}
+
+let lastDialogOpen = false
+
+/** A visible modal dialog of the app (the first-run key dialog, settings). */
+function dialogOpen(): boolean {
+  for (const dialog of document.querySelectorAll('[role="dialog"][aria-modal="true"], dialog[open]')) {
+    if (host?.contains(dialog)) continue
+    if (dialog.getClientRects().length > 0) return true
+  }
+  return false
 }
 
 function applyStatus(status: UpdateStatus): void {
@@ -637,7 +657,8 @@ function render(): void {
 
   if (
     !shouldShowUpdate(currentStatus) ||
-    isUpdateDismissed(currentStatus, dismissedVersion, dismissedTransientPhase)
+    isUpdateDismissed(currentStatus, dismissedVersion, dismissedTransientPhase) ||
+    holdUpdateForDialog(currentStatus, dialogOpen())
   ) {
     host.style.display = 'none'
     content.replaceChildren()

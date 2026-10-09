@@ -3,7 +3,7 @@
 unoblox works follows two rules:
 
 1. **No usage, analytics or telemetry data leaves the user's machine.**
-2. **No silent network traffic.** The only server the app contacts on its own is the unoblox API, `api.unoblox.ai`. Any other connection must be something the user asked for at that moment.
+2. **No silent network traffic.** The app contacts only the unoblox API, `api.unoblox.ai`, and, for update checks the user can turn off, GitHub. Any other connection must be something the user asked for at that moment.
 
 ## What the app contacts on its own
 
@@ -12,6 +12,7 @@ unoblox works follows two rules:
 | `api.unoblox.ai` | At startup | `GET /v1/models`: the live model list for the picker. Public, so no key is sent. |
 | `api.unoblox.ai` | When the user sends a message | Chat completions, context compaction and the conversation title, using the user's key. |
 | `api.unoblox.ai` | When the agent runs `web_search` | `POST /v1/search`. Only the query text is sent. |
+| `github.com`, then GitHub's download host (`release-assets.githubusercontent.com` or `objects.githubusercontent.com`) | 15–30 s after launch, then every 6 hours, while **Check for Updates Automatically** is on (default); and whenever the user picks **Check for Updates…** | Over-the-air updates: `GET` of the signed `latest.json` from the public `unoblox/unoblox-works-releases` releases, then the new build's installer when it is newer. The request carries no installation id, key or usage data; GitHub sees an ordinary download (IP address, user agent). Turning the option off stops all scheduled update traffic. |
 
 Nothing else is contacted automatically. This was verified by recording every outbound connection of the packaged Linux app (a logging proxy plus `strace` on every `connect()`), both idle after a fresh launch and through a full first-run session.
 
@@ -25,7 +26,7 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 | **Product analytics** (`product-analytics`, `desktop-product-telemetry`): clicks, model, plugin and session events with device and user IDs, batched every 30 s | `dsh-otel-collector.deepseeksvc.com` | Rows disabled. They had been off only because the profile was not named `desktop`. |
 | Feedback buttons, dialog and `/feedback` (`message-feedback`, `ui-message-feedback`, `command-feedback`) | — | Removed. They existed to send the conversation to DeepSeek; with that gone they would promise a submission that goes nowhere. |
 | DeepSeek account and request extensions (`deepseek-account`, `account-controller`, `deepseek-llm-api-extensions`, `session-log-deepseek`, `plugin-package-inventory-deepseek`) | `platform.deepseek.com`, `api.deepseek.com` | Rows disabled. The DeepSeek model and search routes were already off. |
-| Update checks, which sent the installation ID, version and platform | `dshdesktop.com` | Off: `UNOBLOX_UPDATE_FEED_CONFIGURED = false` in `src/main/update/update-policy.ts`. No check, version listing or download runs. Users update by installing the latest unoblox release. |
+| Update checks, which sent the installation ID, version and platform | `dshdesktop.com` | Replaced by unoblox's own updates (table above): a plain download of a signed file from GitHub, with no installation ID. |
 | Crash reports, consent-gated but sent with the installation ID | `dshdesktop.com/crash` | The desktop service has no network: nothing is uploaded or offered for upload, and pending crash reports are deleted at the next launch. Recovery screens work from the current session's own evidence. |
 | Spell-check dictionary download on Linux and Windows | Google (`redirector.gvt1.com`) | Chromium's spellchecker is off on Linux and Windows, with an empty dictionary list set as each session is created (switching it off alone still downloads the dictionary). macOS keeps its system spellchecker, which stays local. |
 | Workbench market catalog fetched at every launch | `market.dshdesktop.com` | The workbench panel is off for the beta (its copy is Chinese-only and it lists the upstream catalog). If it returns, the catalog is fetched only when the user opens the market, refreshes, or installs from it. |
@@ -53,4 +54,4 @@ The phone bridge listens on the local network only while the user is pairing, wh
 
 ## Keeping it this way
 
-`test/network-privacy.test.ts` composes the real upstream bundles with each Desktop patch and asserts every row above stays disabled. It also checks the Harness environment flag, the spell-check guard and the no-fetch-at-startup catalog. `test/update-disabled.test.ts` asserts that no update path calls the network, `test/mobile-bridge-demand.test.ts` covers when the phone bridge runs, and `test/market-installer.test.js` checks the market install is refused. When upgrading Harness, check new upstream rows against the two rules above.
+`test/network-privacy.test.ts` composes the real upstream bundles with each Desktop patch and asserts every row above stays disabled. It also checks the Harness environment flag, the spell-check guard and the no-fetch-at-startup catalog. `test/update-manager.test.ts` checks that no update request is made while automatic checks are off and that only a correctly signed manifest is acted on, `test/mobile-bridge-demand.test.ts` covers when the phone bridge runs, and `test/market-installer.test.js` checks the market install is refused. When upgrading Harness, check new upstream rows against the two rules above.

@@ -31,8 +31,9 @@ module.exports = {
   artifactName: 'unoblox-works-beta-${version}-${os}-${arch}.${ext}',
   mac: {
     ...packageJson.build.mac,
-    // The zip exists for auto-update, which the beta does not have.
-    target: ['dmg'],
+    // The dmg is for people; the zip is what over-the-air updates download
+    // (src/main/update/ota-install.ts unpacks it with ditto).
+    target: ['dmg', 'zip'],
     identity: '-',
     hardenedRuntime: false
   },

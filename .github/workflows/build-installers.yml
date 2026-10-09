@@ -2,10 +2,17 @@ name: Build beta installers
 
 # Beta installers for every desktop platform, built on native runners
 # (packaging is never cross-compiled: scripts/verify-target refuses it) with
-# electron-builder.beta.cjs: product "unoblox works", macOS (Apple Silicon only for
-# the beta) ad-hoc signed, Windows
-# unsigned, no update feed. Nothing is published; the installers are kept as
-# workflow artifacts. Each job launches the packaged app and checks it starts.
+# electron-builder.beta.cjs: product "unoblox works", macOS (Apple Silicon only
+# for the beta) ad-hoc signed, Windows unsigned. Each build is versioned
+# <package.json version>-beta.<run number>, so every build is newer than the
+# last. Each job launches the packaged app and checks it starts; the
+# installers are kept as workflow artifacts.
+#
+# With "publish" ticked, a green build is also released to the public
+# releases repository with a signed latest.json, which installed apps update
+# from (src/main/update). That needs two repository secrets:
+#   UPDATE_SIGNING_KEY  Ed25519 private key (PEM) matching UPDATE_PUBLIC_KEY
+#   RELEASES_TOKEN      token allowed to create releases in the releases repo
 
 on:
   workflow_dispatch:
@@ -20,6 +27,11 @@ on:
           - macos
           - windows
           - linux
+      publish:
+        description: Publish as an over-the-air update (all platforms must pass)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -42,7 +54,7 @@ jobs:
           ROWS: |
             [
               {"label": "macOS Apple Silicon", "family": "macos", "runner": "macos-15", "platform": "darwin", "arch": "arm64",
-               "builder": "npx --no-install electron-builder --mac --arm64", "artifact": "macos-apple-silicon", "unpacked": "dist-beta/mac-arm64", "files": "dist-beta/*.dmg"},
+               "builder": "npx --no-install electron-builder --mac --arm64", "artifact": "macos-apple-silicon", "unpacked": "dist-beta/mac-arm64", "files": "dist-beta/*.dmg\ndist-beta/*.zip"},
               {"label": "Windows x64", "family": "windows", "runner": "windows-2022", "platform": "win32", "arch": "x64",
                "builder": "node scripts/electron-builder-windows.mjs --win --x64", "artifact": "windows-x64", "unpacked": "dist-beta/win-unpacked", "files": "dist-beta/*-setup.exe"},
               {"label": "Linux x64", "family": "linux", "runner": "ubuntu-24.04", "platform": "linux", "arch": "x64",
@@ -70,6 +82,11 @@ jobs:
       - name: Test
         run: npx --no-install vitest run
         timeout-minutes: 20
+      - name: Set the beta version
+        shell: bash
+        run: |
+          base="$(node -p "require('./package.json').version")"
+          npm version --no-git-tag-version --allow-same-version "$base-beta.${{ github.run_number }}"
       - name: Package
         shell: bash
         env:
@@ -113,3 +130,48 @@ jobs:
           compression-level: 0
           if-no-files-found: error
           path: ${{ matrix.files }}
+
+  publish:
+    name: Publish over-the-air update
+    needs: installers
+    if: inputs.publish && inputs.target == 'all'
+    runs-on: ubuntu-24.04
+    env:
+      RELEASES_REPOSITORY: unoblox/unoblox-works-releases
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the publishing secrets
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          test -n "$UPDATE_SIGNING_KEY" || { echo "::error::Add the UPDATE_SIGNING_KEY repository secret"; exit 1; }
+          test -n "$RELEASES_TOKEN" || { echo "::error::Add the RELEASES_TOKEN repository secret"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unoblox-beta-*
+          path: release-assets
+          merge-multiple: true
+      - name: Sign latest.json and publish the release
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")-beta.${{ github.run_number }}"
+          tag="v$version"
+          ls -la release-assets
+          node scripts/make-update-manifest.mjs --version "$version" --dir release-assets \
+            --base-url "https://github.com/$RELEASES_REPOSITORY/releases/download/$tag" \
+            --out release-assets/latest.json
+          # Draft first, so latest.json never points at files still uploading.
+          gh release create "$tag" --repo "$RELEASES_REPOSITORY" --draft \
+            --title "unoblox works $version" \
+            --notes "unoblox works beta $version, built from ${{ github.sha }}." \
+            release-assets/*
+          gh release edit "$tag" --repo "$RELEASES_REPOSITORY" --draft=false --latest
+          curl -fsSIL "https://github.com/$RELEASES_REPOSITORY/releases/latest/download/latest.json" > /dev/null
+          echo "Published $tag"

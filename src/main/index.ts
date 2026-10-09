@@ -151,8 +151,10 @@ import {
   type WindowFocusIntent
 } from './window-raise'
 import {
+  automaticUpdateChecks,
   checkForUpdates,
   registerUpdateHandlers,
+  setAutomaticUpdateChecks,
   startUpdateManager,
   stopUpdateManager
 } from './update/update-manager'
@@ -1754,7 +1756,7 @@ function registerHarnessHandlers(): void {
     const template = windowsMenuTemplate(request.name, harnessLocale(), zoomFactor, {
       run: (command) => void executeDesktopMenuCommand(command).catch(showUnexpectedError),
       sendEditingKey: (key) => sendEditingKey(window, key)
-    }, { keepPhoneConnected: mobileBridgeDemand.keepConnected, updatesAvailable: UNOBLOX_UPDATE_FEED_CONFIGURED })
+    }, { keepPhoneConnected: mobileBridgeDemand.keepConnected, updatesAvailable: UNOBLOX_UPDATE_FEED_CONFIGURED, automaticUpdates: automaticUpdateChecks() })
     // The page reports CSS pixels; the popup is placed in window DIPs.
     return new Promise<void>((resolve) => {
       Menu.buildFromTemplate(template).popup({
@@ -1891,6 +1893,9 @@ async function executeDesktopMenuCommand(command: DesktopMenuCommand): Promise<n
       break
     case 'check-for-updates':
       await checkForUpdates(true)
+      break
+    case 'toggle-automatic-updates':
+      setAutomaticUpdates(!automaticUpdateChecks())
       break
     case 'undo':
       contents.undo()
@@ -3080,11 +3085,25 @@ async function showSafeModeManager(initial?: {
   }
 }
 
+/** Harness › Check for Updates Automatically. */
+function setAutomaticUpdates(value: boolean): void {
+  if (!setAutomaticUpdateChecks(value)) {
+    console.warn('[updater] could not save the automatic update preference; it applies to this session only')
+  }
+  installMenu()
+}
+
 function installMenu(): void {
   const isChinese = harnessLocale() === 'zh'
   const checkForUpdatesLabel = isChinese
     ? '检查更新…'
     : 'Check for Updates…'
+  const automaticUpdatesItem: Electron.MenuItemConstructorOptions = {
+    label: isChinese ? '自动检查更新' : 'Check for Updates Automatically',
+    type: 'checkbox',
+    checked: automaticUpdateChecks(),
+    click: (item) => setAutomaticUpdates(item.checked)
+  }
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(process.platform === 'darwin'
       ? [
@@ -3104,7 +3123,7 @@ function installMenu(): void {
                 label: checkForUpdatesLabel,
                 accelerator: 'CmdOrCtrl+U',
                 click: () => void checkForUpdates(true).catch(showUnexpectedError)
-              }]
+              }, automaticUpdatesItem]
               : []),
             { type: 'separator' as const },
             { role: 'hide' as const },
@@ -3152,7 +3171,8 @@ function installMenu(): void {
               label: checkForUpdatesLabel,
               accelerator: 'CmdOrCtrl+U',
               click: () => void checkForUpdates(true).catch(showUnexpectedError)
-            }
+            },
+            automaticUpdatesItem
           ]),
         ...(process.platform === 'darwin'
           ? []

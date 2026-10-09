@@ -45,7 +45,7 @@ export function windowsMenuTemplate(
   locale: 'zh' | 'en',
   zoomFactor: number,
   actions: WindowsMenuActions,
-  state: { keepPhoneConnected: boolean; updatesAvailable?: boolean } = { keepPhoneConnected: false }
+  state: { keepPhoneConnected: boolean; updatesAvailable?: boolean; automaticUpdates?: boolean } = { keepPhoneConnected: false }
 ): MenuItemConstructorOptions[] {
   const zh = locale === 'zh'
   const command = (
@@ -113,7 +113,16 @@ export function windowsMenuTemplate(
       ]
     },
     { type: 'separator' },
-    ...(state.updatesAvailable === true ? [command('check-for-updates', '检查更新…', 'Check for Updates…', 'Ctrl+U')] : []),
+    ...(state.updatesAvailable === true
+      ? [
+        command('check-for-updates', '检查更新…', 'Check for Updates…', 'Ctrl+U'),
+        {
+          ...command('toggle-automatic-updates', '自动检查更新', 'Check for Updates Automatically'),
+          type: 'checkbox' as const,
+          checked: state.automaticUpdates !== false
+        }
+      ]
+      : []),
     command('about', `关于 ${PRODUCT_NAME}`, `About ${PRODUCT_NAME}`),
     { type: 'separator' },
     command('quit', '退出', 'Exit')

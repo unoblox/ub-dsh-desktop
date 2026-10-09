@@ -377,7 +377,7 @@ describe('GitHub release contract', () => {
     expect(beta.publish).toBeNull()
     expect(beta.directories.output).toBe('dist-beta')
     // Ad-hoc: a valid seal without a certificate (an unsigned build reads as "damaged").
-    expect(beta.mac).toMatchObject({ identity: '-', hardenedRuntime: false, target: ['dmg'] })
+    expect(beta.mac).toMatchObject({ identity: '-', hardenedRuntime: false, target: ['dmg', 'zip'] })
     // Ubuntu 24.04+ needs the .deb's AppArmor profile for Chromium's sandbox.
     expect(beta.linux.target.map((entry) => entry.target)).toEqual(['AppImage', 'deb'])
     expect(beta.linux.maintainer).toBe('unoblox <hello@unoblox.ai>')

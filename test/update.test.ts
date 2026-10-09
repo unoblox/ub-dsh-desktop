@@ -6,7 +6,6 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import { parse, stringify } from 'yaml'
 import {
-  AUTO_INSTALL_ON_APP_QUIT,
   shouldCheckAfterResume,
   supportsAutoUpdates,
   UPDATE_CHECK_INTERVAL_MS
@@ -21,14 +20,10 @@ afterEach(async () => {
 })
 
 describe('desktop update policy', () => {
-  it('only installs a downloaded update after explicit user confirmation', () => {
-    expect(AUTO_INSTALL_ON_APP_QUIT).toBe(false)
-  })
-
-  it('only enables updates for installed macOS and Windows builds', () => {
+  it('updates installed builds on macOS, Windows and Linux, never development runs', () => {
     expect(supportsAutoUpdates(true, 'darwin')).toBe(true)
     expect(supportsAutoUpdates(true, 'win32')).toBe(true)
-    expect(supportsAutoUpdates(true, 'linux')).toBe(false)
+    expect(supportsAutoUpdates(true, 'linux')).toBe(true)
     expect(supportsAutoUpdates(false, 'darwin')).toBe(false)
   })
 

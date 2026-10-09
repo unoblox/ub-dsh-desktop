@@ -69,16 +69,16 @@ describe('downgrade copy', () => {
   })
 })
 
-describe('accepting an update is what starts the download', () => {
-  it('asks rather than announcing a download already under way', () => {
+describe('updates download on their own', () => {
+  it('says the update is downloading and asks only to restart', () => {
     const available: UpdateStatus = {
       phase: 'available',
       currentVersion: '0.4.3',
       availableVersion: '0.4.4',
       manual: false
     }
-    expect(updateMessage(available, 'zh')).toBe('发现新版本 0.4.4，是否更新？')
-    expect(updateMessage(available, 'en')).toBe('unoblox works 0.4.4 is available. Update now?')
+    expect(updateMessage(available, 'zh')).toBe('发现新版本 0.4.4，正在下载')
+    expect(updateMessage(available, 'en')).toBe('unoblox works 0.4.4 is available and downloading')
+    expect(updateHeadline({ ...available, phase: 'downloaded' }, 'en')).toEqual({ title: 'Update ready', description: 'Restart to install v0.4.4.' })
   })
 })
-

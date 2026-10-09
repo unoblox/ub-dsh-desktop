@@ -50,10 +50,8 @@ export function updateHeadline(status: UpdateStatus, locale: UpdateLocale): Upda
       }
     case 'available':
       return {
-        title: zh ? '有可用更新' : 'Update available',
-        description: zh
-          ? `${version} 已发布，同意后开始下载。`
-          : `${version} is ready to download.`
+        title: zh ? '发现更新' : 'Update found',
+        description: zh ? `正在准备下载 ${version}。` : `Getting ${version} ready to download.`
       }
     case 'downloading':
       return {
@@ -63,9 +61,7 @@ export function updateHeadline(status: UpdateStatus, locale: UpdateLocale): Upda
     case 'downloaded':
       return {
         title: zh ? '更新已就绪' : 'Update ready',
-        description: zh
-          ? `${version} 将在重启后生效。`
-          : `${version} will be applied on next launch.`
+        description: zh ? `重新启动即可安装 ${version}。` : `Restart to install ${version}.`
       }
     case 'up-to-date':
       return {
@@ -109,8 +105,8 @@ export function updateMessage(status: UpdateStatus, locale: UpdateLocale): strin
       return zh ? '正在检查更新…' : 'Checking for updates…'
     case 'available':
       return zh
-        ? `发现新版本${version}，是否更新？`
-        : `${PRODUCT_NAME}${version} is available. Update now?`
+        ? `发现新版本${version}，正在下载`
+        : `${PRODUCT_NAME}${version} is available and downloading`
     case 'downloading': {
       const percent = Math.round(status.percent ?? 0)
       return zh ? `正在下载更新 ${percent}%` : `Downloading update ${percent}%`

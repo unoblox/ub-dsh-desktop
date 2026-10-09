@@ -61,4 +61,9 @@ unoblox works talks only to `api.unoblox.ai` on its own and collects no usage da
 
 ## Updates
 
-The beta does not update itself. To update, install the newer beta over the old one; your conversations and settings are kept.
+unoblox works updates itself. Shortly after it starts, and every few hours, it checks for a newer beta, downloads it in the background and shows **Update ready**; click **Restart and install** when it suits you. Your conversations, settings and API key are kept.
+
+- Turn the automatic check off under **Harness › Check for Updates Automatically** (macOS: in the **unoblox works** menu). **Check for Updates…** still works.
+- macOS: the app must be in the Applications folder to update itself.
+- Linux: the AppImage replaces itself. The .deb updates through the system password prompt.
+- Updates are signed: the app installs only builds published by unoblox.

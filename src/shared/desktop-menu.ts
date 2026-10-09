@@ -10,6 +10,7 @@ export const desktopMenuCommands = [
   'safe-mode',
   'show-harness-log',
   'check-for-updates',
+  'toggle-automatic-updates',
   'undo',
   'redo',
   'cut',

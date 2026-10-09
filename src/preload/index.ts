@@ -42,7 +42,6 @@ let currentStatus: UpdateStatus | undefined
 let dismissedVersion: string | null = null
 let dismissedTransientPhase: UpdateStatus['phase'] | null = null
 let installing = false
-let accepting = false
 let versionPickerOpen = false
 let versionPickerLoading = false
 let versionPickerError = false
@@ -630,7 +629,6 @@ function applyStatus(status: UpdateStatus): void {
   if (['error', 'downloading', 'downloaded', 'up-to-date'].includes(status.phase)) {
     installingVersion = null
   }
-  if (status.phase !== 'available') accepting = false
   render()
 }
 
@@ -683,20 +681,10 @@ function render(): void {
     body.appendChild(progress)
   }
 
+  // Updates download on their own; while one starts the user can still skip it.
   if (status.phase === 'available') {
     const actions = element('div', 'actions')
-    const accept = button(locale === 'zh' ? '同意更新' : 'Update now', 'primary')
-    accept.disabled = accepting
-    accept.addEventListener('click', () => {
-      accepting = true
-      render()
-      void ipcRenderer.invoke('updates:download').catch((error: unknown) => {
-        accepting = false
-        console.error('[updater] unable to download update', error)
-        render()
-      })
-    })
-    actions.append(accept, skipButton(status))
+    actions.appendChild(skipButton(status))
     body.appendChild(actions)
   }
 

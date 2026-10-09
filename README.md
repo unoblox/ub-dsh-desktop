@@ -22,7 +22,7 @@ unoblox works runs AI agents on your computer. In the workspace folders you choo
 Every model call goes through the unoblox gateway with one API key and one prepaid ₹ balance: pick **unoblox Auto** to route each request to the best-value model, or choose a specific model per conversation from the live catalog.
 
 > [!IMPORTANT]
-> unoblox works is in **beta**. Installers are not yet signed with paid Apple or Microsoft certificates, so your computer asks you to confirm the app once on first open, and the app does not update itself yet. See [Install unoblox works beta](docs/install.md).
+> unoblox works is in **beta**. Installers are not yet signed with paid Apple or Microsoft certificates, so your computer asks you to confirm the app once on first open. Once installed, the app updates itself from signed beta releases. See [Install unoblox works beta](docs/install.md).
 
 ## Install
 

@@ -6,10 +6,12 @@ import { disableSpellcheckDownloads, noAutomaticRegistryLookup } from './network
 import { UNOBLOX_UPDATE_FEED_CONFIGURED } from './update/update-policy'
 import { DEV_PRODUCT_NAME, PRODUCT_NAME } from '../shared/brand'
 import { catalogEnvironment, catalogForLaunch, refreshUnobloxCatalog, type ResolvedCatalog } from './unoblox/model-catalog'
+import { documentsEnvironment } from './runtime/documents-directory'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { homedir } from 'node:os'
 import { parse } from 'yaml'
 import {
   app,
@@ -3368,6 +3370,15 @@ async function bootstrap(): Promise<void> {
   // Fetched alongside startup; each launch takes it if ready in time, else the
   // cached list, and the next launch starts a fresh fetch.
   const unobloxCatalogCache = join(dshHome, 'unoblox-models.json')
+  // The first-use workspace's Documents folder (runtime/documents-directory.ts).
+  const electronDocumentsPath = (): string | undefined => {
+    try {
+      return app.getPath('documents')
+    } catch (error) {
+      console.warn('[workspace] Documents folder unavailable, leaving the lookup to the Harness:', error instanceof Error ? error.message : String(error))
+      return undefined
+    }
+  }
   const fetchUnobloxCatalog = (): Promise<ResolvedCatalog> => refreshUnobloxCatalog({
     cachePath: unobloxCatalogCache,
     fetch: (url, init) => net.fetch(url, init)
@@ -3379,7 +3390,7 @@ async function bootstrap(): Promise<void> {
       pendingUnobloxCatalog = undefined
       const catalog = await catalogForLaunch(pending, unobloxCatalogCache, 2_500)
       return {
-        environment: catalogEnvironment(catalog),
+        environment: { ...documentsEnvironment(electronDocumentsPath(), homedir()), ...catalogEnvironment(catalog) },
         note: `unoblox model catalog: ${String(catalog.rows.length)} models (${catalog.source}${catalog.detail === undefined ? '' : `: ${catalog.detail}`})`
       }
     },

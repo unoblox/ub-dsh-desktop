@@ -45,6 +45,16 @@
     provider: unoblox
     model: unoblox/auto
 
+# First-use workspace: Documents comes from the Desktop main process
+# (src/main/runtime/documents-directory.ts), so it no longer depends on
+# `xdg-user-dir`, which many Linux installs lack; unset, the Harness looks it
+# up itself. The folder under Documents carries the product name, not
+# "deepseek-harness" (dsh-api-workspace-controller patch).
+- id: workspace-controller
+  config:
+    documentsDirectory: !!js process.env.DSH_DESKTOP_DOCUMENTS_DIR || undefined
+    defaultFolderName: unoblox works
+
 # Privacy: unoblox collects nothing from the user's machine and talks to no
 # server on its own except the unoblox API. Upstream rows that would send data
 # elsewhere are switched off here, not left to a profile-name check:

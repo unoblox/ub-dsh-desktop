@@ -1,0 +1,50 @@
+diff --git a/node_modules/@deepseek-ai/dsh-api-workspace-controller/lib/index.js b/node_modules/@deepseek-ai/dsh-api-workspace-controller/lib/index.js
+index b20556f..53af19e 100644
+--- a/node_modules/@deepseek-ai/dsh-api-workspace-controller/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-api-workspace-controller/lib/index.js
+@@ -606,7 +606,7 @@ function validateDocumentsDirectory(directory, platform = process.platform) {
+ * @param internals - platform facts and native command runner.
+ * @returns the absolute candidate path.
+ */
+-async function defaultWorkspaceDirectory(documentsDirectory, signal, internals = {}) {
++async function defaultWorkspaceDirectory(documentsDirectory, signal, internals = {}, folderName = "deepseek-harness") {
+ 	const platform = internals.platform ?? process.platform;
+ 	const paths = platform === "win32" ? win32 : posix;
+ 	signal.throwIfAborted();
+@@ -637,7 +637,8 @@ async function defaultWorkspaceDirectory(documentsDirectory, signal, internals =
+ 	}
+ 	directory = validateDocumentsDirectory(directory, platform);
+ 	signal.throwIfAborted();
+-	return paths.join(directory, "deepseek-harness", DEFAULT_WORKSPACE_DIRECTORY);
++	// DSH Desktop: the folder under Documents is configurable (defaultFolderName).
++	return paths.join(directory, folderName, DEFAULT_WORKSPACE_DIRECTORY);
+ }
+ //#endregion
+ //#region lib/types/index.js
+@@ -840,7 +841,8 @@ let WorkspaceController = (() => {
+ 		static inject = ["typert", "workspaceRegistry"];
+ 		static Config = z.object({
+ 			documentsDirectory: z.string(),
+-			documentsLookupTimeoutMs: z.natural().min(1).default(1e4)
++			documentsLookupTimeoutMs: z.natural().min(1).default(1e4),
++			defaultFolderName: z.string().default("deepseek-harness")
+ 		});
+ 		config = __runInitializers(this, _instanceExtraInitializers);
+ 		commands;
+@@ -853,6 +855,7 @@ let WorkspaceController = (() => {
+ 			super(ctx, "workspaceController", { namespace: "workspace" });
+ 			this.config = WorkspaceController.Config(config);
+ 			if (this.config.documentsDirectory !== void 0) validateDocumentsDirectory(this.config.documentsDirectory);
++			if (!/^[^\\/:*?"<>|\0]+$/.test(this.config.defaultFolderName) || this.config.defaultFolderName.trim() !== this.config.defaultFolderName || /^\.+$/.test(this.config.defaultFolderName)) throw new Error(`defaultFolderName must be one folder name: '${this.config.defaultFolderName}'`);
+ 			this.commands = new WorkspaceCommands(ctx);
+ 			this.feed = new WorkspaceFeed(ctx);
+ 			ctx.plugin(DirectoryPickerController);
+@@ -876,7 +879,7 @@ let WorkspaceController = (() => {
+ 		async initializeDefault(signal) {
+ 			const workspace = await this.ctx.workspaceRegistry.initializeDefault(async () => {
+ 				const timeout = AbortSignal.timeout(this.config.documentsLookupTimeoutMs);
+-				return await defaultWorkspaceDirectory(this.config.documentsDirectory, AbortSignal.any([signal, timeout]));
++				return await defaultWorkspaceDirectory(this.config.documentsDirectory, AbortSignal.any([signal, timeout]), {}, this.config.defaultFolderName);
+ 			});
+ 			return workspace === void 0 ? void 0 : { workspace: workspaceView(workspace) };
+ 		}

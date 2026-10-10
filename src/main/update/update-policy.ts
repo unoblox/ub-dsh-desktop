@@ -34,7 +34,7 @@ export const UPDATE_FEED_URL = `https://github.com/${UPDATE_RELEASES_REPOSITORY}
 
 /** Ed25519 key that verifies `latest.json`; CI signs with its private half. */
 export const UPDATE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAo0yXT5NT8JDz3tn8v4hS2ZiqZR/i7seWMKVKyMe447U=
+MCowBQYDK2VwAyEA/Y50rmITv/CS6/m/Ur8RyoiShcW8997JDi/Q5m6NQE4=
 -----END PUBLIC KEY-----
 `
 

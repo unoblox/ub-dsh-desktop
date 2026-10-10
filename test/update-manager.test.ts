@@ -2,7 +2,7 @@ import { generateKeyPairSync } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 // @ts-expect-error -- plain-JS CI script without type declarations
 import { makeUpdateManifest } from '../scripts/make-update-manifest.mjs'
@@ -65,6 +65,7 @@ let home = ''
 let manager: typeof import('../src/main/update/update-manager')
 const realPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
 const realArch = Object.getOwnPropertyDescriptor(process, 'arch')
+const realExecPath = Object.getOwnPropertyDescriptor(process, 'execPath')
 beforeEach(async () => {
   // These cases exercise the Linux AppImage path on every CI runner.
   Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
@@ -76,8 +77,10 @@ beforeEach(async () => {
   vi.clearAllMocks()
   writeFileSync(join(home, 'unoblox-works.AppImage'), 'old appimage bytes')
   vi.stubEnv('APPIMAGE', join(home, 'unoblox-works.AppImage'))
-  // The AppImage runtime runs the app from its mount at APPDIR.
-  vi.stubEnv('APPDIR', dirname(process.execPath))
+  // The AppImage runtime runs the app from its mount at APPDIR. Linux paths
+  // on every runner: the check is Linux-only.
+  vi.stubEnv('APPDIR', '/tmp/.mount_unoblox')
+  Object.defineProperty(process, 'execPath', { value: '/tmp/.mount_unoblox/unoblox-works', configurable: true, writable: true })
   vi.stubEnv('UNOBLOX_WORKS_UPDATE_FEED', `${base}/latest.json`)
   vi.stubEnv('UNOBLOX_WORKS_UPDATE_HOSTS', '127.0.0.1')
   vi.stubEnv('UNOBLOX_WORKS_UPDATE_PUBLIC_KEY', keys.publicKey.export({ type: 'spki', format: 'pem' }).toString())
@@ -87,6 +90,7 @@ beforeEach(async () => {
 afterEach(() => {
   if (realPlatform) Object.defineProperty(process, 'platform', realPlatform)
   if (realArch) Object.defineProperty(process, 'arch', realArch)
+  if (realExecPath) Object.defineProperty(process, 'execPath', realExecPath)
   manager.stopUpdateManager()
   vi.useRealTimers()
   vi.unstubAllEnvs()

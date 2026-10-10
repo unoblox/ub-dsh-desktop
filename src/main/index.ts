@@ -3700,11 +3700,19 @@ async function bootstrap(): Promise<void> {
         await runtime.stop()
         const dshHome = join(app.getPath('userData'), 'harness')
         await quarantineInstalledLaunchAgentsForUpdate(dshHome)
+      },
+      // A cancelled password prompt or an installer that would not start:
+      // the app keeps running, so the Harness has to come back.
+      resumeAfterFailedInstall: () => launchHarness(),
+      commitToInstall: () => {
+        // before-quit skips its own cleanup once quitting is set, so do it here.
         quitting = true
+        desktopStorageManager?.flushSync()
+        if (tray && !tray.isDestroyed()) tray.destroy()
+        tray = undefined
         // NSIS may force-kill before will-quit; clear the marker so the next
         // launch does not treat this intentional update as an unclean-exit.
         desktopDiagnostics?.markCleanExit()
-        stopUpdateManager()
       }
     })
   }

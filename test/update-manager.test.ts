@@ -1,8 +1,8 @@
 import { generateKeyPairSync } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 // @ts-expect-error -- plain-JS CI script without type declarations
 import { makeUpdateManifest } from '../scripts/make-update-manifest.mjs'
@@ -44,6 +44,8 @@ const NEW_APPIMAGE = 'new appimage bytes'
 
 beforeAll(async () => {
   writeFileSync(join(release, 'unoblox-works-beta-0.1.2-beta.3-linux-x86_64.AppImage'), NEW_APPIMAGE)
+  // Not a program: starting it fails, as an installer blocked by antivirus would.
+  writeFileSync(join(release, 'unoblox-works-beta-0.1.2-beta.3-windows-x64-setup.exe'), 'not a program')
   server = createServer((request, response) => {
     requests.push(request.url ?? '')
     if (request.url === '/latest.json') { response.end(manifestText); return }
@@ -74,6 +76,8 @@ beforeEach(async () => {
   vi.clearAllMocks()
   writeFileSync(join(home, 'unoblox-works.AppImage'), 'old appimage bytes')
   vi.stubEnv('APPIMAGE', join(home, 'unoblox-works.AppImage'))
+  // The AppImage runtime runs the app from its mount at APPDIR.
+  vi.stubEnv('APPDIR', dirname(process.execPath))
   vi.stubEnv('UNOBLOX_WORKS_UPDATE_FEED', `${base}/latest.json`)
   vi.stubEnv('UNOBLOX_WORKS_UPDATE_HOSTS', '127.0.0.1')
   vi.stubEnv('UNOBLOX_WORKS_UPDATE_PUBLIC_KEY', keys.publicKey.export({ type: 'spki', format: 'pem' }).toString())
@@ -96,10 +100,15 @@ it('downloads a newer signed build on its own, then installs it on restart', asy
   expect(electron.sent.map((sent) => sent.phase)).toEqual(expect.arrayContaining(['checking', 'available', 'downloading', 'downloaded']))
   expect(readFileSync(join(home, 'unoblox-works.AppImage'), 'utf8')).toBe('old appimage bytes')
 
-  let prepared = false
-  manager.startUpdateManager({ prepareToInstall: async () => { prepared = true } })
+  const order: string[] = []
+  manager.startUpdateManager({
+    prepareToInstall: async () => { order.push(`prepare:${readFileSync(join(home, 'unoblox-works.AppImage'), 'utf8')}`) },
+    resumeAfterFailedInstall: async () => { order.push('resume') },
+    commitToInstall: () => { order.push('commit') }
+  })
   await manager.installDownloadedUpdate()
-  expect(prepared).toBe(true)
+  // The Harness stops only once the new file is in place.
+  expect(order).toEqual([`prepare:${NEW_APPIMAGE}`, 'commit'])
   expect(readFileSync(join(home, 'unoblox-works.AppImage'), 'utf8')).toBe(NEW_APPIMAGE)
   expect(electron.relaunch).toHaveBeenCalledWith(expect.objectContaining({ execPath: join(home, 'unoblox-works.AppImage') }))
   expect(electron.exit).toHaveBeenCalledWith(0)
@@ -171,4 +180,44 @@ it('cannot update a Linux build run from an unpacked folder', async () => {
   expect(status.phase).toBe('unsupported')
   expect(status.message).toContain('.deb or AppImage')
   expect(requests).toEqual([])
+})
+
+it('keeps the app running when the AppImage cannot be replaced', async () => {
+  expect((await manager.checkForUpdates(true)).phase).toBe('downloaded')
+  rmSync(join(electron.userData, 'updates'), { recursive: true, force: true })
+  const order: string[] = []
+  manager.startUpdateManager({
+    prepareToInstall: async () => { order.push('prepare') },
+    resumeAfterFailedInstall: async () => { order.push('resume') },
+    commitToInstall: () => { order.push('commit') }
+  })
+  await manager.installDownloadedUpdate()
+  expect(order).toEqual([])
+  expect(electron.exit).not.toHaveBeenCalled()
+  expect(manager.getUpdateStatus().phase).toBe('error')
+  expect(readFileSync(join(home, 'unoblox-works.AppImage'), 'utf8')).toBe('old appimage bytes')
+})
+
+it('removes downloads of other versions before fetching a new one', async () => {
+  const old = join(electron.userData, 'updates', '0.1.0')
+  mkdirSync(old, { recursive: true })
+  writeFileSync(join(old, 'big.AppImage'), 'old')
+  expect((await manager.checkForUpdates(true)).phase).toBe('downloaded')
+  expect(existsSync(old)).toBe(false)
+  expect(existsSync(join(electron.userData, 'updates', '0.1.2-beta.3'))).toBe(true)
+})
+
+it.runIf(process.platform !== 'win32')('brings the Harness back when the Windows installer will not start', async () => {
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+  expect((await manager.checkForUpdates(true)).phase).toBe('downloaded')
+  const order: string[] = []
+  manager.startUpdateManager({
+    prepareToInstall: async () => { order.push('prepare') },
+    resumeAfterFailedInstall: async () => { order.push('resume') },
+    commitToInstall: () => { order.push('commit') }
+  })
+  await manager.installDownloadedUpdate()
+  expect(order).toEqual(['prepare', 'resume'])
+  expect(electron.quit).not.toHaveBeenCalled()
+  expect(manager.getUpdateStatus().phase).toBe('error')
 })

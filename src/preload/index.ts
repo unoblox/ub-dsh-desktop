@@ -760,6 +760,8 @@ function render(): void {
  */
 function skipButton(status: UpdateStatus): HTMLButtonElement {
   const skip = button(locale === 'zh' ? '跳过此版本' : 'Skip this version', 'secondary')
+  // Once the restart has begun the install no longer waits on this banner.
+  skip.disabled = installing
   skip.addEventListener('click', () => {
     const version = status.availableVersion
     if (!version) return

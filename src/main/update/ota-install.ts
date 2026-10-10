@@ -15,7 +15,8 @@ import { basename, dirname, join } from 'node:path'
  *   reopens the app (`--force-run`), as electron-updater does.
  * - Linux AppImage: the file replaces itself, then the app relaunches.
  * - Linux .deb: dpkg installs it through pkexec (the system password dialog),
- *   then the app relaunches.
+ *   from a root-owned copy whose checksum is checked again, then the app
+ *   relaunches.
  */
 
 export type RunCommand = (file: string, args: readonly string[]) => Promise<{ stdout: string }>
@@ -27,9 +28,19 @@ export const MAC_BUNDLE_ID = 'ai.unoblox.works'
 /** Where the .deb installs the app. */
 export const DEB_INSTALL_DIR = '/opt/unoblox works/'
 
-/** How this Linux build was installed, if it can update itself at all. */
+/**
+ * How this Linux build was installed, if it can update itself at all.
+ * APPIMAGE alone is only an environment variable, inherited by anything the
+ * user starts from a terminal; the AppImage runtime also mounts the app at
+ * APPDIR and runs it from there, so both must agree before the file named by
+ * APPIMAGE is overwritten.
+ */
 export function linuxInstallKind(env: NodeJS.ProcessEnv, execPath: string): LinuxInstall | undefined {
-  if (typeof env.APPIMAGE === 'string' && env.APPIMAGE.endsWith('.AppImage')) return 'appimage'
+  const appDir = env.APPDIR
+  if (
+    typeof env.APPIMAGE === 'string' && env.APPIMAGE.endsWith('.AppImage') &&
+    typeof appDir === 'string' && appDir !== '' && execPath.startsWith(appDir.endsWith('/') ? appDir : `${appDir}/`)
+  ) return 'appimage'
   if (execPath.startsWith(DEB_INSTALL_DIR)) return 'deb'
   return undefined
 }
@@ -116,9 +127,20 @@ export async function launchMacSwap(options: { pid: number; staged: string; targ
   spawn('/bin/sh', [script], { detached: true, stdio: 'ignore' }).unref()
 }
 
-/** Start the silent NSIS install; it waits for the app and reopens it. */
-export function launchWindowsInstaller(setupPath: string): void {
-  spawn(setupPath, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore' }).unref()
+/**
+ * Start the silent NSIS install; it waits for the app and reopens it.
+ * Resolves once the installer process exists, so the caller quits only when
+ * something will bring the app back (antivirus or a missing file fails here).
+ */
+export function launchWindowsInstaller(setupPath: string, spawnImpl: typeof spawn = spawn): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawnImpl(setupPath, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore' })
+    child.once('error', reject)
+    child.once('spawn', () => {
+      child.unref()
+      resolve()
+    })
+  })
 }
 
 /**
@@ -132,14 +154,50 @@ export async function replaceAppImage(appImagePath: string, downloaded: string):
   await rename(incoming, appImagePath)
 }
 
+/** Exit status of DEB_INSTALL_SCRIPT when the root-owned copy does not match. */
+const DEB_CHECKSUM_MISMATCH = 65
+
+/**
+ * Run as root by pkexec: $1 is the downloaded .deb, $2 its sha256. The file
+ * sits in the user's folder, so the user's other processes could swap it
+ * between the download check and dpkg; copying it somewhere only root can
+ * write and checking that copy closes the gap.
+ */
+export const DEB_INSTALL_SCRIPT = [
+  'set -eu',
+  'tmp=$(mktemp -d)',
+  'trap \'rm -rf "$tmp"\' EXIT',
+  'cp -- "$1" "$tmp/update.deb"',
+  `printf '%s  %s\\n' "$2" "$tmp/update.deb" | sha256sum -c --status - || exit ${String(DEB_CHECKSUM_MISMATCH)}`,
+  'dpkg -i "$tmp/update.deb"'
+].join('\n')
+
 /** Install a .deb through the system password dialog. */
-export async function installDeb(debPath: string, run: RunCommand): Promise<void> {
+export async function installDeb(debPath: string, sha256: string, run: RunCommand): Promise<void> {
+  if (!/^[0-9a-f]{64}$/u.test(sha256)) throw new Error('update checksum is not valid')
   try {
-    await run('pkexec', ['dpkg', '-i', debPath])
+    await run('pkexec', ['/bin/sh', '-c', DEB_INSTALL_SCRIPT, 'unoblox-works-update', debPath, sha256])
   } catch (error) {
     const code = (error as { code?: unknown }).code
     if (code === 'ENOENT') throw new Error(`pkexec is not available; install the update with: sudo apt install ${debPath}`)
     if (code === 126 || code === 127) throw new Error('the update was not authorised')
+    if (code === DEB_CHECKSUM_MISMATCH) throw new Error('the update file changed after it was downloaded')
     throw error
   }
+}
+
+/**
+ * Remove downloaded updates that are no longer needed: everything under
+ * `updates/` except the folders `keep` names. Each release is a few hundred
+ * megabytes, so without this every past update stays on disk.
+ */
+export async function pruneUpdateDirs(root: string, keep: ReadonlySet<string>): Promise<void> {
+  let names: string[]
+  try {
+    names = await readdir(root)
+  } catch (error) {
+    if ((error as { code?: unknown }).code === 'ENOENT') return
+    throw error
+  }
+  await Promise.all(names.filter((name) => !keep.has(name)).map((name) => rm(join(root, name), { recursive: true, force: true })))
 }

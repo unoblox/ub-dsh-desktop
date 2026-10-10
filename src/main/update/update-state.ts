@@ -3,7 +3,7 @@ import type { UpdateStatus } from '../../shared/contracts'
 export type UpdateStateEvent =
   | { type: 'check'; manual: boolean }
   | { type: 'available'; version: string }
-  | { type: 'progress'; percent: number }
+  | { type: 'progress'; percent: number; version: string }
   | { type: 'downloaded'; version: string }
   | { type: 'not-available' }
   | { type: 'error'; message: string }
@@ -30,7 +30,8 @@ export function reduceUpdateStatus(
     case 'available':
       return { ...base, phase: 'available', availableVersion: event.version }
     case 'progress':
-      return { ...current, phase: 'downloading', percent: clampPercent(event.percent) }
+      // Carries the version: after a reset (a skip) the banner still needs it.
+      return { ...base, phase: 'downloading', availableVersion: event.version, percent: clampPercent(event.percent) }
     case 'downloaded':
       return { ...base, phase: 'downloaded', availableVersion: event.version }
     case 'not-available':

@@ -9,7 +9,7 @@ describe('desktop update state', () => {
     let status = initialUpdateStatus('1.0.0')
     status = reduceUpdateStatus(status, { type: 'check', manual: false })
     status = reduceUpdateStatus(status, { type: 'available', version: '1.1.0' })
-    status = reduceUpdateStatus(status, { type: 'progress', percent: 52.37 })
+    status = reduceUpdateStatus(status, { type: 'progress', percent: 52.37, version: '1.1.0' })
 
     expect(status).toEqual({
       phase: 'downloading',
@@ -40,7 +40,7 @@ describe('desktop update state', () => {
   it('carries downgrade through transient events and clears it on reset', () => {
     const base = { ...initialUpdateStatus('1.5.0'), downgrade: true }
     expect(reduceUpdateStatus(base, { type: 'available', version: '1.2.0' }).downgrade).toBe(true)
-    expect(reduceUpdateStatus(base, { type: 'progress', percent: 40 }).downgrade).toBe(true)
+    expect(reduceUpdateStatus(base, { type: 'progress', percent: 40, version: '1.2.0' }).downgrade).toBe(true)
     expect(reduceUpdateStatus(base, { type: 'downloaded', version: '1.2.0' }).downgrade).toBe(true)
     expect(reduceUpdateStatus(base, { type: 'reset' }).downgrade).toBeUndefined()
   })
@@ -51,10 +51,19 @@ describe('desktop update state', () => {
       availableVersion: '1.1.0'
     }
 
-    expect(reduceUpdateStatus(status, { type: 'progress', percent: -5 }).percent).toBe(0)
-    expect(reduceUpdateStatus(status, { type: 'progress', percent: 140 }).percent).toBe(100)
+    expect(reduceUpdateStatus(status, { type: 'progress', percent: -5, version: '1.1.0' }).percent).toBe(0)
+    expect(reduceUpdateStatus(status, { type: 'progress', percent: 140, version: '1.1.0' }).percent).toBe(100)
     expect(
-      reduceUpdateStatus(status, { type: 'progress', percent: Number.NaN }).percent
+      reduceUpdateStatus(status, { type: 'progress', percent: Number.NaN, version: '1.1.0' }).percent
     ).toBe(0)
+  })
+})
+
+describe('progress after a skip', () => {
+  it('keeps naming the version being downloaded once a skip reset the status', () => {
+    let status = reduceUpdateStatus(initialUpdateStatus('1.0.0'), { type: 'available', version: '1.1.0' })
+    status = reduceUpdateStatus(status, { type: 'reset' })
+    status = reduceUpdateStatus(status, { type: 'progress', percent: 30, version: '1.1.0' })
+    expect(status).toMatchObject({ phase: 'downloading', availableVersion: '1.1.0', percent: 30 })
   })
 })

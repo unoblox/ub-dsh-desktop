@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { downloadUpdateFile, fetchManifestText } from '../src/main/update/ota-download'
-import { linuxInstallKind, macBundleIsUpdatable, macBundlePath, macSwapScript, replaceAppImage, shellQuote } from '../src/main/update/ota-install'
+import { DEB_INSTALL_SCRIPT, installDeb, launchWindowsInstaller, linuxInstallKind, macBundleIsUpdatable, macBundlePath, macSwapScript, pruneUpdateDirs, replaceAppImage, shellQuote } from '../src/main/update/ota-install'
 import { isAllowedUpdateUrl, offeredUpdate, parseSignedManifest, updatePlatformKey } from '../src/main/update/ota-manifest'
 import { readAutomaticChecks, UPDATE_FEED_URL, UPDATE_PUBLIC_KEY, updateFeed, writeAutomaticChecks } from '../src/main/update/update-policy'
 // @ts-expect-error -- plain-JS CI script without type declarations
@@ -93,7 +93,11 @@ describe('signed update manifest', () => {
     expect(updatePlatformKey('linux', 'x64', 'appimage')).toBe('linux-x64-appimage')
     expect(updatePlatformKey('linux', 'x64', 'deb')).toBe('linux-x64-deb')
     expect(updatePlatformKey('linux', 'x64')).toBeUndefined()
-    expect(linuxInstallKind({ APPIMAGE: '/home/a/unoblox-works.AppImage' }, '/tmp/.mount_x/unoblox-works')).toBe('appimage')
+    expect(linuxInstallKind({ APPIMAGE: '/home/a/unoblox-works.AppImage', APPDIR: '/tmp/.mount_x' }, '/tmp/.mount_x/unoblox-works')).toBe('appimage')
+    // APPIMAGE on its own is just an inherited variable: the app must run from the mount.
+    expect(linuxInstallKind({ APPIMAGE: '/home/a/unoblox-works.AppImage' }, '/tmp/.mount_x/unoblox-works')).toBeUndefined()
+    expect(linuxInstallKind({ APPIMAGE: '/home/a/unoblox-works.AppImage', APPDIR: '/tmp/.mount_x' }, '/home/a/linux-unpacked/unoblox-works')).toBeUndefined()
+    expect(linuxInstallKind({ APPIMAGE: '/home/a/unoblox-works.AppImage', APPDIR: '/tmp/.mount_x' }, '/tmp/.mount_xy/unoblox-works')).toBeUndefined()
     expect(linuxInstallKind({}, '/opt/unoblox works/unoblox-works')).toBe('deb')
     expect(linuxInstallKind({}, '/home/a/linux-unpacked/unoblox-works')).toBeUndefined()
   })
@@ -105,6 +109,11 @@ describe('update feed settings', () => {
     expect(UPDATE_FEED_URL).toBe('https://github.com/unoblox/unoblox-works-releases/releases/latest/download/latest.json')
     expect(updateFeed({ UNOBLOX_WORKS_UPDATE_FEED: 'http://127.0.0.1:1/latest.json', UNOBLOX_WORKS_UPDATE_HOSTS: '127.0.0.1' }))
       .toMatchObject({ url: 'http://127.0.0.1:1/latest.json', allowedHosts: ['127.0.0.1'] })
+  })
+
+  it('ignores the test hooks in release builds', () => {
+    const hooks = { UNOBLOX_WORKS_UPDATE_FEED: 'http://127.0.0.1:1/latest.json', UNOBLOX_WORKS_UPDATE_HOSTS: '127.0.0.1', UNOBLOX_WORKS_UPDATE_PUBLIC_KEY: 'x' }
+    expect(updateFeed(hooks, false)).toEqual({ url: UPDATE_FEED_URL, publicKey: UPDATE_PUBLIC_KEY, allowedHosts: updateFeed({}).allowedHosts })
   })
 
   it('keeps automatic checks on until the user turns them off', () => {
@@ -235,5 +244,57 @@ describe('installing an update', () => {
     expect(readFileSync(appImage, 'utf8')).toBe('new')
     if (posix) expect(statSync(appImage).mode & 0o777).toBe(0o755)
     expect(readdirSync(dir).sort()).toEqual(['download.AppImage', 'unoblox-works.AppImage'])
+  })
+
+  it.runIf(process.platform === 'linux')('installs the .deb from a root-side copy only when that copy matches', () => {
+    const dir = temp()
+    const deb = join(dir, 'update.deb')
+    writeFileSync(deb, 'deb bytes')
+    const sha = createHash('sha256').update('deb bytes').digest('hex')
+    const bin = join(dir, 'bin')
+    mkdirSync(bin)
+    const installed = join(dir, 'installed')
+    writeFileSync(join(bin, 'dpkg'), `#!/bin/sh\ncat "$2" > ${shellQuote(installed)}\n`)
+    chmodSync(join(bin, 'dpkg'), 0o755)
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
+    execFileSync('/bin/sh', ['-c', DEB_INSTALL_SCRIPT, 'test', deb, sha], { env })
+    expect(readFileSync(installed, 'utf8')).toBe('deb bytes')
+
+    rmSync(installed)
+    let status: unknown
+    try {
+      execFileSync('/bin/sh', ['-c', DEB_INSTALL_SCRIPT, 'test', deb, 'f'.repeat(64)], { env, stdio: 'ignore' })
+    } catch (error) {
+      status = (error as { status?: unknown }).status
+    }
+    expect(status).toBe(65)
+    expect(existsSync(installed)).toBe(false)
+  })
+
+  it('passes the checksum to pkexec and explains each way it can fail', async () => {
+    const sha = 'a'.repeat(64)
+    const calls: string[][] = []
+    await installDeb('/u/x.deb', sha, async (file, args) => { calls.push([file, ...args]); return { stdout: '' } })
+    expect(calls).toEqual([['pkexec', '/bin/sh', '-c', DEB_INSTALL_SCRIPT, 'unoblox-works-update', '/u/x.deb', sha]])
+    const failing = (code: unknown) => async () => { throw Object.assign(new Error('failed'), { code }) }
+    await expect(installDeb('/u/x.deb', sha, failing(126))).rejects.toThrow('not authorised')
+    await expect(installDeb('/u/x.deb', sha, failing(65))).rejects.toThrow('changed after it was downloaded')
+    await expect(installDeb('/u/x.deb', sha, failing('ENOENT'))).rejects.toThrow('pkexec is not available')
+    await expect(installDeb('/u/x.deb', 'nope', failing(0))).rejects.toThrow('checksum is not valid')
+  })
+
+  it('reports an installer that cannot start instead of quitting into nothing', async () => {
+    await expect(launchWindowsInstaller(join(temp(), 'missing-setup.exe'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('removes old downloads and keeps the ones asked for', async () => {
+    const root = join(temp(), 'updates')
+    for (const name of ['0.1.0', '0.1.1', '0.1.2']) {
+      mkdirSync(join(root, name), { recursive: true })
+      writeFileSync(join(root, name, 'file'), name)
+    }
+    await pruneUpdateDirs(root, new Set(['0.1.2']))
+    expect(readdirSync(root)).toEqual(['0.1.2'])
+    await expect(pruneUpdateDirs(join(root, 'missing'), new Set())).resolves.toBeUndefined()
   })
 })

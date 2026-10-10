@@ -15,9 +15,18 @@ import { DEFAULT_ALLOWED_HOSTS } from './ota-manifest'
  *
  * Test hooks (environment): UNOBLOX_WORKS_UPDATE_FEED,
  * UNOBLOX_WORKS_UPDATE_PUBLIC_KEY and UNOBLOX_WORKS_UPDATE_HOSTS point a build
- * at a local feed signed with a test key. Anyone able to set them can already
- * replace the app on disk, so they open nothing new.
+ * at a local feed signed with a test key. Release builds ignore them: an
+ * environment variable set once (a shell profile, a launcher) would otherwise
+ * swap the trusted key for every later launch, and with the .deb the update
+ * then runs as root. Development runs and builds made with
+ * UNOBLOX_WORKS_UPDATE_TEST_BUILD=1 (electron.vite.config.ts) honour them.
  */
+
+declare const __UNOBLOX_UPDATE_TEST_HOOKS__: boolean | undefined
+
+/** Whether this build was made to test updates against a local feed. */
+export const UPDATE_TEST_HOOKS_BUILT: boolean =
+  typeof __UNOBLOX_UPDATE_TEST_HOOKS__ !== 'undefined' && __UNOBLOX_UPDATE_TEST_HOOKS__ === true
 
 /** The releases repository the beta updates from. */
 export const UPDATE_RELEASES_REPOSITORY = 'unoblox/unoblox-works-releases'
@@ -38,7 +47,12 @@ export interface UpdateFeed {
   readonly allowedHosts: readonly string[]
 }
 
-export function updateFeed(env: NodeJS.ProcessEnv = process.env): UpdateFeed {
+/**
+ * @param allowOverrides - whether the test hooks apply: true for development
+ *   runs and test builds, false for release builds.
+ */
+export function updateFeed(env: NodeJS.ProcessEnv = process.env, allowOverrides = true): UpdateFeed {
+  if (!allowOverrides) return { url: UPDATE_FEED_URL, publicKey: UPDATE_PUBLIC_KEY, allowedHosts: DEFAULT_ALLOWED_HOSTS }
   const hosts = env.UNOBLOX_WORKS_UPDATE_HOSTS?.split(',').map((host) => host.trim()).filter((host) => host !== '')
   return {
     url: env.UNOBLOX_WORKS_UPDATE_FEED || UPDATE_FEED_URL,

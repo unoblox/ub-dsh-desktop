@@ -25,6 +25,7 @@ type Client = {
   uniqueWidgets: (entries: Array<{ callId: string; widget: Widget }>) => Array<{ callId: string; widget: Widget }>
   chartTheme: (theme: Record<string, string>, dark: boolean) => string
   isWebLink: (value: string) => boolean
+  userActedInWidget: (frame: unknown, doc: unknown, nav: unknown) => boolean
   usesCharts: (html: string) => boolean
   clampHeight: (value: number) => number
   widgetsDefinition: Definition
@@ -126,6 +127,18 @@ describe('what a widget cannot reach', () => {
     chart.setOption({ legend: { textStyle: { color: 'var(--uw-fg)' } }, series: [{ color: ' var(--uw-accent) ' }] })
     expect(applied).toEqual({ legend: { textStyle: { color: '#f2f2f3' } }, series: [{ color: '#D9A64A' }] })
     expect(registered).toMatchObject({ legend: { textStyle: { color: '#f2f2f3' } } })
+  })
+
+  it('acts for the user only right after the user acted inside that widget', () => {
+    const frame = {}
+    const active = { userActivation: { isActive: true } }
+    const idle = { userActivation: { isActive: false } }
+    expect(client.userActedInWidget(frame, { activeElement: frame }, active)).toBe(true)
+    // The widget's script on its own: no recent user action.
+    expect(client.userActedInWidget(frame, { activeElement: frame }, idle)).toBe(false)
+    // The user is typing in the chat composer, not in the widget.
+    expect(client.userActedInWidget(frame, { activeElement: {} }, active)).toBe(false)
+    expect(client.userActedInWidget(frame, { activeElement: frame }, {})).toBe(false)
   })
 
   it('opens only plain web links', () => {

@@ -94,14 +94,22 @@ window.__ModuleLoader__.load({
     }
 
     // Runs first inside the frame: the only channel to the app.
-    function bootstrap(token, page) {
+    function bootstrap(token, page, title) {
       return `(function () {
+  var widgetTitle = ${JSON.stringify(typeof title === 'string' ? title.trim().toLowerCase() : '')};
+  // The token proves a message comes from this bridge, so the widget must
+  // never see it: it is only in this closure, each message sets it in an
+  // object literal (no setter a widget adds to Object.prototype runs), the
+  // parent window is captured before the widget could replace window.parent,
+  // and this script removes itself from the page when it is done.
   var token = ${JSON.stringify(token)};
   var pageColor = ${JSON.stringify(page ?? '#ffffff')};
-  function post(message) { message.__unobloxWidget = token; parent.postMessage(message, '*'); }
+  var parentWindow = window.parent;
+  var bootstrapScript = document.currentScript;
+  function post(message) { parentWindow.postMessage(message, '*'); }
   function measure() {
     var d = document.documentElement, b = document.body;
-    post({ kind: 'resize', height: Math.max(d.scrollHeight, b ? b.scrollHeight : 0) });
+    post({ __unobloxWidget: token, kind: 'resize', height: Math.max(d.scrollHeight, b ? b.scrollHeight : 0) });
   }
   function plain(value) {
     try { return JSON.parse(JSON.stringify(value)); } catch (e) { return String(value); }
@@ -174,10 +182,45 @@ window.__ModuleLoader__.load({
   }
   var parseFromString = method(DOMParser.prototype, 'parseFromString');
   seal(DOMParser.prototype, 'parseFromString', function (html, type) { return parseFromString(this, refuseShadowRoots([html]), type); });
+  // Acting for the user (sending text as their message, opening a link)
+  // needs a real click in this widget: a trusted event, which no script can
+  // create, not on a text field, one action per click and within 2 seconds;
+  // Enter pressed in a form counts too. The widget's own script can still
+  // compute what is sent, but cannot send it unprompted or repeatedly.
+  var now = Date.now;
+  var eventTarget = getter(Event.prototype, 'target');
+  var preventDefault = method(Event.prototype, 'preventDefault');
+  var keyOf = getter(KeyboardEvent.prototype, 'key');
+  var localName = getter(Element.prototype, 'localName');
+  var inputType = getter(HTMLInputElement.prototype, 'type');
+  var editable = getter(HTMLElement.prototype, 'isContentEditable');
+  var closest = method(Element.prototype, 'closest');
+  var getAttr = method(Element.prototype, 'getAttribute');
+  var CONTROLS = { button: 1, submit: 1, reset: 1, image: 1, checkbox: 1, radio: 1 };
+  var gestureAt = 0, gestureFresh = false;
+  function isTextEntry(element) {
+    var name = localName(element);
+    if (name === 'textarea' || name === 'select') return true;
+    if (name === 'input') return !CONTROLS[inputType(element)];
+    return editable(element) === true;
+  }
+  function takeGesture() {
+    if (!gestureFresh || now() - gestureAt > 2000) return false;
+    gestureFresh = false;
+    return true;
+  }
+  function elementOf(event) {
+    var target = eventTarget(event);
+    return target && nodeType(target) === 1 ? target : null;
+  }
+  window.addEventListener('keydown', function (event) {
+    if (event.isTrusted && keyOf(event) === 'Enter') { gestureAt = now(); gestureFresh = true; }
+  }, true);
   window.unoblox = { submit: function (values) {
+    if (!takeGesture()) return;
     var data = values == null ? null : plain(values);
     if (data === null || (typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0)) data = pageFields();
-    post({ kind: 'submit', data: data });
+    post({ __unobloxWidget: token, kind: 'submit', data: data });
   } };
   function add(data, key, text) {
     if (Object.prototype.hasOwnProperty.call(data, key)) data[key] = [].concat(data[key], text); else data[key] = text;
@@ -221,23 +264,27 @@ window.__ModuleLoader__.load({
     return data;
   }
   function sendForm(form, submitter) {
-    post({ kind: 'submit', data: formFields(form, submitter), form: form.getAttribute('aria-label') || form.getAttribute('name') || '' });
+    post({ __unobloxWidget: token, kind: 'submit', data: formFields(form, submitter), form: getAttr(form, 'aria-label') || getAttr(form, 'name') || '' });
   }
+  // A submit event is trusted even when a script called requestSubmit(), so
+  // it needs the click or Enter that should have caused it.
   document.addEventListener('submit', function (event) {
-    event.preventDefault();
-    sendForm(event.target, event.submitter);
+    preventDefault(event);
+    if (takeGesture()) sendForm(eventTarget(event), event.submitter);
   }, true);
   // form.submit() skips the submit event and would try to navigate.
-  seal(HTMLFormElement.prototype, 'submit', function () { sendForm(this, null); });
+  seal(HTMLFormElement.prototype, 'submit', function () { if (takeGesture()) sendForm(this, null); });
   // Links. A srcdoc document resolves "#part" against the chat's address,
   // so following it would load the chat into the frame: in-page links scroll
   // here instead. A web link the user clicks opens in their browser (the
   // chat checks the click was real); nothing else navigates.
   window.addEventListener('click', function (event) {
-    var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+    var element = elementOf(event);
+    if (event.isTrusted && element && !isTextEntry(element)) { gestureAt = now(); gestureFresh = true; }
+    var link = element ? closest(element, 'a[href]') : null;
     if (!link) return;
-    var href = link.getAttribute('href') || '';
-    event.preventDefault();
+    var href = getAttr(link, 'href') || '';
+    preventDefault(event);
     if (href.charAt(0) === '#') {
       var id = href.slice(1);
       try { id = decodeURIComponent(id); } catch (e) {}
@@ -246,10 +293,10 @@ window.__ModuleLoader__.load({
       return;
     }
     var scheme = href.slice(0, 8).toLowerCase();
-    if (event.isTrusted && (scheme === 'https://' || scheme.slice(0, 7) === 'http://')) post({ kind: 'open', url: href });
+    if ((scheme === 'https://' || scheme.slice(0, 7) === 'http://') && takeGesture()) post({ __unobloxWidget: token, kind: 'open', url: href });
   }, true);
-  window.addEventListener('error', function (event) { post({ kind: 'error', message: String(event.message || 'error') }); });
-  window.addEventListener('unhandledrejection', function (event) { post({ kind: 'error', message: String(event.reason && event.reason.message || event.reason) }); });
+  window.addEventListener('error', function (event) { post({ __unobloxWidget: token, kind: 'error', message: toText(event.message || 'error') }); });
+  window.addEventListener('unhandledrejection', function (event) { post({ __unobloxWidget: token, kind: 'error', message: toText(event.reason && event.reason.message || event.reason) }); });
   // Readability: models pick their own colours (white on a gold button,
   // black text on the dark theme). Any text below WCAG AA against what is
   // actually behind it is switched to the dark or light ink that reads best.
@@ -306,12 +353,36 @@ window.__ModuleLoader__.load({
   }
   var pendingFix = 0;
   function scheduleFix() { if (!pendingFix) pendingFix = setTimeout(function () { pendingFix = 0; fixContrast(); }, 60); }
+  // The chat shows the title above the widget; a heading repeating it as
+  // the widget's first element only takes space.
+  function dropRepeatedTitle() {
+    var first = document.body && document.body.firstElementChild;
+    while (first && !/^H[1-4]$/.test(first.tagName) && first.children.length > 0 && first.textContent.trim().toLowerCase().indexOf(widgetTitle) === 0) first = first.firstElementChild;
+    if (widgetTitle && first && /^H[1-4]$/.test(first.tagName) && first.textContent.trim().toLowerCase() === widgetTitle) first.style.display = 'none';
+  }
+  // The chat already frames the widget. Models often wrap everything in one
+  // narrow, centred card of their own, which wastes the width: an outer
+  // wrapper holding the whole widget loses its width limit and card styling.
+  function flattenOuterCard() {
+    var body = document.body;
+    if (!body) return;
+    var children = Array.prototype.filter.call(body.children, function (el) { return !/^(SCRIPT|STYLE|TEMPLATE|LINK|META)$/.test(el.tagName); });
+    if (children.length !== 1 || !/^(DIV|MAIN|SECTION|ARTICLE|FORM)$/.test(children[0].tagName)) return;
+    var outer = children[0].style;
+    ['max-width', 'margin', 'padding', 'background', 'border', 'border-radius', 'box-shadow'].forEach(function (name) {
+      outer.setProperty(name, name === 'max-width' ? 'none' : name === 'margin' || name === 'padding' ? '0' : name === 'border' ? '0' : name === 'border-radius' ? '0' : name === 'box-shadow' ? 'none' : 'transparent', 'important');
+    });
+    outer.setProperty('width', 'auto', 'important');
+  }
   window.addEventListener('load', function () {
+    flattenOuterCard();
+    dropRepeatedTitle();
     fixContrast();
     new MutationObserver(scheduleFix).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
     measure();
     if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(document.documentElement);
   });
+  if (bootstrapScript) removeNode(bootstrapScript);
 })();`
     }
 
@@ -387,20 +458,41 @@ window.__ModuleLoader__.load({
     function buildWidgetDocument(html, options) {
       const theme = THEMES[options.dark ? 'dark' : 'light']
       const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'"
-      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-accent-fill:${theme.accentFill};--uw-on-accent:${theme.onAccent}}
+      // A compact base: one control height, tight type, tabular numbers, and
+      // a small layout kit (uw-*) so models do not hand-roll padding and cards.
+      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-accent-fill:${theme.accentFill};--uw-on-accent:${theme.onAccent};--uw-radius:6px;--uw-gap:12px}
+*,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;background:transparent}
-body{padding:4px;color:var(--uw-fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;overflow-wrap:anywhere}
+body{padding:12px 14px;color:var(--uw-fg);font:13px/1.45 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;overflow-wrap:anywhere}
+h1,h2,h3,h4{margin:0 0 8px;font-weight:600;line-height:1.3}h1{font-size:17px}h2{font-size:15px}h3,h4{font-size:13px}
+p{margin:0 0 8px}
+label{font-size:12px;font-weight:500;color:var(--uw-muted)}
 input,select,textarea,button{font:inherit;color:inherit}
-input,select,textarea{background:var(--uw-surface);border:1px solid var(--uw-border);border-radius:8px;padding:6px 10px}
-button{background:var(--uw-accent-fill);color:var(--uw-on-accent);border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--uw-accent);outline-offset:2px}
-table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);padding:6px 8px;text-align:left}`
+input,select,textarea{min-height:32px;min-width:0;background:var(--uw-surface);border:1px solid var(--uw-border);border-radius:var(--uw-radius);padding:0 10px}
+textarea{min-height:64px;padding:6px 10px}
+input[type=checkbox],input[type=radio]{min-height:0;accent-color:var(--uw-accent)}
+input[type=range]{min-height:0;padding:0;border:0;background:none;accent-color:var(--uw-accent)}
+button{min-height:32px;background:var(--uw-accent-fill);color:var(--uw-on-accent);border:0;border-radius:var(--uw-radius);padding:0 14px;font-weight:600;cursor:pointer}
+button:hover{filter:brightness(1.05)}
+:focus-visible{outline:2px solid var(--uw-accent);outline-offset:1px}
+table{border-collapse:collapse;width:100%}th{font-size:12px;font-weight:600;color:var(--uw-muted)}th,td{border-bottom:1px solid var(--uw-border);padding:5px 8px;text-align:left}.num{text-align:right}
+.uw-stack{display:flex;flex-direction:column;gap:var(--uw-gap)}
+.uw-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--uw-gap)}
+.uw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--uw-gap)}
+.uw-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;align-items:start}
+.uw-field{display:flex;flex-direction:column;gap:4px;min-width:0}.uw-field>input,.uw-field>select,.uw-field>textarea{width:100%}
+.uw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.uw-stat{background:var(--uw-surface);border-radius:var(--uw-radius);padding:8px 10px}.uw-stat>span{display:block;font-size:12px;color:var(--uw-muted)}.uw-stat>strong{display:block;font-size:19px;font-weight:700;line-height:1.25;color:var(--uw-accent)}
+.uw-card{background:var(--uw-surface);border-radius:var(--uw-radius);padding:10px 12px}
+.uw-actions{display:flex;justify-content:flex-end;gap:8px}
+.uw-chart{width:100%;height:220px}
+.uw-muted{color:var(--uw-muted)}`
       return [
         '<!doctype html><html><head><meta charset="utf-8">',
         `<meta http-equiv="Content-Security-Policy" content="${csp}">`,
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         `<style>${style}</style>`,
-        `<script>${inlineScript(bootstrap(options.token, theme.page))}</script>`,
+        `<script>${inlineScript(bootstrap(options.token, theme.page, options.title))}</script>`,
         typeof options.library === 'string' ? `<script>${inlineScript(options.library)}</script><script>${inlineScript(chartTheme(theme, options.dark))}</script>` : '',
         '</head><body>',
         neutraliseShadowRoots(html),
@@ -426,6 +518,17 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
         lines.push(clip(typeof data === 'string' ? data : JSON.stringify(data), MAX_FIELD))
       }
       return clip(lines.join('\n'), MAX_SUBMISSION)
+    }
+
+    /**
+     * Whether the user has just acted inside this widget. The widget's own
+     * script can post any message, so opening a link or sending text as the
+     * user needs a recent user activation (a click or key press) and the focus
+     * in this widget's frame. Activation alone is not enough: a key press in
+     * the chat composer activates the page too.
+     */
+    function userActedInWidget(frame, doc = document, nav = navigator) {
+      return nav.userActivation?.isActive === true && doc.activeElement === frame
     }
 
     function isWebLink(value) {
@@ -501,11 +604,10 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
           } else if (data.kind === 'error') {
             setNotice({ kind: 'error', text: t('scriptError', { message: String(data.message).slice(0, 200) }) })
           } else if (data.kind === 'open' && typeof data.url === 'string') {
-            // Only right after the user clicked: the widget's script can post
-            // this message too, but it cannot give the chat a user activation.
-            if (navigator.userActivation?.isActive !== true || !isWebLink(data.url)) return
+            if (!userActedInWidget(frame) || !isWebLink(data.url)) return
             window.open(data.url, '_blank', 'noopener,noreferrer')
           } else if (data.kind === 'submit') {
+            if (!userActedInWidget(frame)) return
             const now = Date.now()
             if (now - lastSubmit.current < SUBMIT_INTERVAL_MS) return
             lastSubmit.current = now
@@ -522,7 +624,7 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
       }, [token, widget.title, sendText, t])
 
       if (library === undefined) return h('div', { className: 'dshWidgetStatus' }, t('building'))
-      const srcDoc = buildWidgetDocument(widget.html, { dark, token, library: library ?? undefined })
+      const srcDoc = buildWidgetDocument(widget.html, { dark, token, title: widget.title, library: library ?? undefined })
       return h(React.Fragment, null,
         h('iframe', {
           ref: frameRef,
@@ -635,16 +737,16 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
     }
 
     const STYLE = `
-      .dshWidgets{display:flex;flex-direction:column;gap:12px;margin:4px 0 8px}
+      .dshWidgets{display:flex;flex-direction:column;gap:10px;margin:4px 0 8px}
       .dshWidgetRow{font-size:13px;padding:2px 0;color:var(--dsw-alias-label-secondary, inherit)}
-      .dshWidget{margin:0;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.25));border-radius:12px;overflow:hidden;background:var(--dsw-alias-bg-base, transparent)}
-      .dshWidgetHeader{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));font-size:13px}
-      .dshWidgetLabel{color:#a16207;font-weight:600;text-transform:lowercase}
+      .dshWidget{margin:0;border:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.25));border-radius:10px;overflow:hidden;background:var(--dsw-alias-bg-base, transparent)}
+      .dshWidgetHeader{display:flex;align-items:baseline;gap:8px;padding:7px 14px;border-bottom:1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));font-size:12.5px;line-height:18px}
+      .dshWidgetLabel{color:#a16207;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:lowercase}
       [data-ds-dark-theme] .dshWidgetLabel{color:#D9A64A}
-      .dshWidgetTitle{font-weight:600;color:var(--dsw-alias-label-primary, inherit)}
+      .dshWidgetTitle{font-weight:600;color:var(--dsw-alias-label-primary, inherit);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .dshWidgetFrame{display:block;width:100%;border:0;background:transparent;color-scheme:normal}
-      .dshWidgetStatus{padding:12px;font-size:13px;color:var(--dsw-alias-label-secondary, inherit)}
-      .dshWidgetNotice{padding:6px 12px 10px;font-size:12px;color:var(--dsw-alias-label-secondary, inherit)}
+      .dshWidgetStatus{padding:12px 14px;font-size:13px;color:var(--dsw-alias-label-secondary, inherit)}
+      .dshWidgetNotice{padding:0 14px 10px;font-size:12px;color:var(--dsw-alias-label-secondary, inherit)}
       .dshWidgetNotice-error{color:var(--dsw-alias-state-error-primary, #d93025)}
     `
 
@@ -694,6 +796,7 @@ table{border-collapse:collapse}th,td{border-bottom:1px solid var(--uw-border);pa
     exports.usesCharts = usesCharts
     exports.clampHeight = clampHeight
     exports.isWebLink = isWebLink
+    exports.userActedInWidget = userActedInWidget
     exports.chartTheme = chartTheme
     exports.uniqueWidgets = uniqueWidgets
     exports.WidgetToolView = WidgetToolView

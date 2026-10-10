@@ -724,5 +724,10 @@ describe('release secrets stay behind an approval', () => {
       }
     }
     expect(steps.find((step) => step.name === 'Package')?.env?.MAC_CSC_LINK).toContain('secrets.MAC_CSC_LINK')
+    // CodeSignTool needs Java 11+; it must be installed before signing starts.
+    const javaIndex = steps.findIndex((step) => (step as { uses?: string }).uses?.startsWith('actions/setup-java@'))
+    expect(javaIndex).toBeGreaterThan(-1)
+    expect((steps[javaIndex] as { with?: Record<string, string> }).with?.['java-version']).toBe('17')
+    expect(javaIndex).toBeLessThan(steps.findIndex((step) => step.name === 'Package'))
   })
 })

@@ -139,6 +139,12 @@ jobs:
           chmod 600 "$key_path"
           # Only the file's path leaves this step; the Package step reads it.
           echo "APPLE_API_KEY_FILE=$key_path" >> "$GITHUB_ENV"
+      # CodeSignTool needs Java 11 or later; the runner's default JAVA_HOME is Java 8.
+      - uses: actions/setup-java@v4
+        if: matrix.platform == 'win32' && env.ESIGNER_SIGNING == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Install SSL.com CodeSignTool
         if: matrix.platform == 'win32' && env.ESIGNER_SIGNING == 'true'
         shell: bash

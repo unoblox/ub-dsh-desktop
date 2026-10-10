@@ -58,7 +58,7 @@ Works from GitHub Actions with no hardware token. Roughly US$130–250 a year pl
 | `ESIGNER_CREDENTIAL_ID` | the eSigner credential ID |
 | `ESIGNER_TOTP_SECRET` | the eSigner TOTP secret |
 
-eSigner bills per signature; only builds run with **publish** ticked are signed (about four signatures each), and test builds stay unsigned. CI installs SSL.com CodeSignTool, and `scripts/esigner-windows-hook.mjs` signs the app, its helpers, the uninstaller and the setup `.exe`. CI then checks every signature with `Get-AuthenticodeSignature`.
+eSigner bills per signature; only builds run with **publish** ticked are signed (about four signatures each), and test builds stay unsigned. CI installs SSL.com CodeSignTool, and `scripts/esigner-windows-hook.mjs` signs the app, its helpers, the uninstaller and the setup `.exe`; executables that already carry a valid publisher signature (the bundled Python runtime) keep it. CodeSignTool runs on Java 17 (`actions/setup-java`). CI then checks every signature with `Get-AuthenticodeSignature`.
 
 ### Azure Artifact Signing (formerly Trusted Signing)
 

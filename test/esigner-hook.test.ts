@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error -- plain-JS electron-builder hook without type declarations
-import { sign } from '../scripts/esigner-windows-hook.mjs'
+import { alreadySigned, sign } from '../scripts/esigner-windows-hook.mjs'
 
 // The stand-in "java" is a shell script, so this runs where /bin/sh does.
 describe.runIf(process.platform !== 'win32')('eSigner sign hook', () => {
@@ -59,4 +59,20 @@ it('refuses to run without the installed tool', async () => {
   vi.stubEnv('CODESIGNTOOL_DIR', '')
   await expect(sign({ path: 'setup.exe' })).rejects.toThrow('CODESIGNTOOL_DIR is not set')
 })
+})
+
+describe('already-signed executables', () => {
+  type Run = (file: string, args: string[], options: { env: Record<string, string> }) => Promise<{ stdout: string }>
+  it('keeps a valid publisher signature and asks Windows about the exact path', async () => {
+    let seen = ''
+    const run: Run = async (_file, _args, options) => { seen = options.env.UNOBLOX_SIGN_PATH ?? ''; return { stdout: 'Valid\r\n' } }
+    expect(await alreadySigned("C:/app/resources/python/python's.exe", run)).toBe(true)
+    expect(seen).toBe("C:/app/resources/python/python's.exe")
+  })
+
+  it('signs anything Windows does not already trust, or cannot tell about', async () => {
+    expect(await alreadySigned('a.exe', async () => ({ stdout: 'NotSigned\r\n' }))).toBe(false)
+    expect(await alreadySigned('a.exe', async () => ({ stdout: 'HashMismatch' }))).toBe(false)
+    expect(await alreadySigned('a.exe', async () => { throw new Error('no powershell') })).toBe(false)
+  })
 })

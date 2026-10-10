@@ -17,7 +17,30 @@ function codeSignToolJar(directory) {
   return join(directory, 'jar', jars[0])
 }
 
+/**
+ * Whether Windows already trusts this file's signature. Bundled third-party
+ * runtimes (the Python that ships with the office engine) come signed by
+ * their publisher: re-signing would replace that signature with ours and cost
+ * an eSigner signature per file, so those are left as they are.
+ */
+export async function alreadySigned(path, runImpl = run) {
+  try {
+    const { stdout } = await runImpl('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      '(Get-AuthenticodeSignature -LiteralPath $env:UNOBLOX_SIGN_PATH).Status'
+    ], { env: { ...process.env, UNOBLOX_SIGN_PATH: path }, windowsHide: true })
+    return stdout.trim() === 'Valid'
+  } catch {
+    // Unknown: sign it, and the CI signature check still has the last word.
+    return false
+  }
+}
+
 export async function sign({ path }) {
+  if (await alreadySigned(path)) {
+    console.log(`eSigner skipped ${path}: already signed by its publisher`)
+    return
+  }
   const directory = process.env.CODESIGNTOOL_DIR
   if (!directory) throw new Error('CODESIGNTOOL_DIR is not set; install CodeSignTool before packaging')
   const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin', 'java') : 'java'

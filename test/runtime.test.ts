@@ -23,7 +23,7 @@ import {
   reserveLoopbackPort,
   updateReadyStability
 } from '../src/main/runtime/harness-runtime'
-import { canGrantWindowPermission, isTrustedAppUrl } from '../src/main/security-policy'
+import { appOriginsOf, canGrantWindowPermission, isTrustedAppUrl } from '../src/main/security-policy'
 import { buildDisclaimedUtilityProcessSpec } from '../src/main/runtime/disclaimed-utility-process'
 import { SAFE_MODE_PROFILE } from '../src/main/state/safe-mode-profile'
 import {
@@ -628,13 +628,20 @@ describe('offending plugin extraction', () => {
 })
 
 describe('navigation trust boundary', () => {
-  it('only trusts the launcher and loopback HTTP pages', () => {
-    expect(isTrustedAppUrl('file:///app/index.html')).toBe(true)
-    expect(isTrustedAppUrl('http://127.0.0.1:43127')).toBe(true)
-    expect(isTrustedAppUrl('http://localhost:43127')).toBe(true)
-    expect(isTrustedAppUrl('https://127.0.0.1:43127')).toBe(false)
-    expect(isTrustedAppUrl('http://example.com')).toBe(false)
-    expect(isTrustedAppUrl('javascript:alert(1)')).toBe(false)
+  it('only trusts the launcher and the window’s own loopback origin', () => {
+    const origins = appOriginsOf('http://127.0.0.1:43127/?token=x')
+    expect(origins).toEqual(['http://127.0.0.1:43127'])
+    expect(isTrustedAppUrl('file:///app/index.html', origins)).toBe(true)
+    expect(isTrustedAppUrl('http://127.0.0.1:43127/session/1', origins)).toBe(true)
+    // Another local server (one a model started, say) is just a web page.
+    expect(isTrustedAppUrl('http://127.0.0.1:3000/', origins)).toBe(false)
+    expect(isTrustedAppUrl('http://localhost:43127', origins)).toBe(false)
+    expect(isTrustedAppUrl('http://127.0.0.1:43127', [])).toBe(false)
+    expect(isTrustedAppUrl('https://127.0.0.1:43127', origins)).toBe(false)
+    expect(isTrustedAppUrl('http://example.com', origins)).toBe(false)
+    expect(isTrustedAppUrl('javascript:alert(1)', origins)).toBe(false)
+    expect(appOriginsOf(undefined)).toEqual([])
+    expect(appOriginsOf('https://example.com/')).toEqual([])
   })
 
   it('only grants clipboard writes from the trusted main frame', () => {

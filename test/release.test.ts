@@ -705,4 +705,24 @@ describe('release secrets stay behind an approval', () => {
     expect(workflow.jobs.installers?.environment).toBe("${{ inputs.publish && vars.RELEASE_ENVIRONMENT || '' }}")
     expect(workflow.jobs.publish?.environment).toBe("${{ vars.RELEASE_ENVIRONMENT || '' }}")
   })
+
+  it('publishes only from main, never an unsigned Windows installer, and keeps certificates out of later steps', async () => {
+    const text = await readFile(path.join(projectRoot, '.github', 'workflows', 'build-installers.yml'), 'utf8')
+    const workflow = parse(text) as { jobs: Record<string, { if?: string; steps: Array<{ name?: string; if?: string; run?: string; env?: Record<string, string> }> }> }
+    expect(workflow.jobs.publish?.if).toContain("github.ref == 'refs/heads/main'")
+    const steps = workflow.jobs.installers?.steps ?? []
+    const gate = steps.find((step) => step.name === 'Check this build may be published')
+    expect(steps.indexOf(gate ?? {})).toBe(0)
+    expect(gate?.if).toBe('inputs.publish')
+    expect(gate?.run).toContain('refs/heads/main')
+    expect(gate?.run).toContain('Windows signing is not set up')
+    expect(steps.find((step) => step.name === 'Check the Windows signature users get')?.if).toContain('inputs.publish ||')
+    // Signing material never goes to $GITHUB_ENV, which every later step inherits.
+    for (const step of steps) {
+      for (const line of (step.run ?? '').split('\n').filter((l) => l.includes('GITHUB_ENV'))) {
+        expect(line, step.name).not.toMatch(/CSC_|PASSWORD|API_KEY_ID|API_ISSUER|APPLE_API_KEY=/u)
+      }
+    }
+    expect(steps.find((step) => step.name === 'Package')?.env?.MAC_CSC_LINK).toContain('secrets.MAC_CSC_LINK')
+  })
 })

@@ -97,6 +97,19 @@ jobs:
       ESIGNER_SIGNING: ${{ inputs.publish && secrets.ESIGNER_USERNAME != '' && secrets.ESIGNER_PASSWORD != '' && secrets.ESIGNER_CREDENTIAL_ID != '' && secrets.ESIGNER_TOTP_SECRET != '' }}
       AZURE_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_SIGNING_PROFILE != '' }}
     steps:
+      - name: Check this build may be published
+        if: inputs.publish
+        shell: bash
+        # A published build reaches every installed app, so it must come from
+        # main and, on Windows, carry a real signature: fail now, not after
+        # an unsigned installer has been released.
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::Publish only from main (this run is on $GITHUB_REF)"; exit 1
+          fi
+          if [ "${{ matrix.platform }}" = win32 ] && [ "$ESIGNER_SIGNING" != true ] && [ "$AZURE_SIGNING" != true ]; then
+            echo "::error::Windows signing is not set up: add the ESIGNER_* (or AZURE_*) secrets before publishing"; exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -113,17 +126,6 @@ jobs:
         run: |
           base="$(node -p "require('./package.json').version")"
           npm version --no-git-tag-version --allow-same-version "$base-beta.${{ github.run_number }}"
-      - name: Provide the macOS signing certificate
-        if: matrix.platform == 'darwin' && env.MAC_SIGNING == 'true'
-        shell: bash
-        env:
-          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-        run: |
-          {
-            echo "CSC_LINK=$MAC_CSC_LINK"
-            echo "CSC_KEY_PASSWORD=$MAC_CSC_KEY_PASSWORD"
-          } >> "$GITHUB_ENV"
       - name: Prepare the Apple notarization key
         if: matrix.platform == 'darwin' && env.MAC_NOTARIZING == 'true'
         shell: bash
@@ -135,11 +137,8 @@ jobs:
           key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
           printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
           chmod 600 "$key_path"
-          {
-            echo "APPLE_API_KEY=$key_path"
-            echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
-            echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
-          } >> "$GITHUB_ENV"
+          # Only the file's path leaves this step; the Package step reads it.
+          echo "APPLE_API_KEY_FILE=$key_path" >> "$GITHUB_ENV"
       - name: Install SSL.com CodeSignTool
         if: matrix.platform == 'win32' && env.ESIGNER_SIGNING == 'true'
         shell: bash
@@ -157,9 +156,12 @@ jobs:
         shell: bash
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          # Each platform sees only its own signing secrets. The macOS
-          # certificate comes from the step above, only when it exists:
-          # electron-builder reads an empty CSC_LINK as a path and fails.
+          # Each platform sees only its own signing secrets, and only in this
+          # step (not $GITHUB_ENV, which every later step and action inherits).
+          MAC_CSC_LINK: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_LINK || '' }}
+          MAC_CSC_KEY_PASSWORD: ${{ matrix.platform == 'darwin' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          MAC_APPLE_API_KEY_ID: ${{ matrix.platform == 'darwin' && secrets.APPLE_API_KEY_ID || '' }}
+          MAC_APPLE_API_ISSUER: ${{ matrix.platform == 'darwin' && secrets.APPLE_API_ISSUER || '' }}
           ESIGNER_USERNAME: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_USERNAME || '' }}
           ESIGNER_PASSWORD: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_PASSWORD || '' }}
           ESIGNER_CREDENTIAL_ID: ${{ matrix.platform == 'win32' && inputs.publish && secrets.ESIGNER_CREDENTIAL_ID || '' }}
@@ -170,7 +172,19 @@ jobs:
           AZURE_SIGNING_ENDPOINT: ${{ matrix.platform == 'win32' && secrets.AZURE_SIGNING_ENDPOINT || '' }}
           AZURE_SIGNING_ACCOUNT: ${{ matrix.platform == 'win32' && secrets.AZURE_SIGNING_ACCOUNT || '' }}
           AZURE_SIGNING_PROFILE: ${{ matrix.platform == 'win32' && secrets.AZURE_SIGNING_PROFILE || '' }}
-        run: node scripts/verify-target.mjs ${{ matrix.platform }} ${{ matrix.arch }} && ${{ matrix.builder }} --publish never --config electron-builder.beta.cjs
+        run: |
+          set -euo pipefail
+          # electron-builder reads an empty CSC_LINK as a path and fails, so
+          # these are set only when the secrets exist.
+          if [ "$MAC_SIGNING" = true ] && [ -n "$MAC_CSC_LINK" ]; then
+            export CSC_LINK="$MAC_CSC_LINK" CSC_KEY_PASSWORD="$MAC_CSC_KEY_PASSWORD"
+          fi
+          if [ "$MAC_NOTARIZING" = true ] && [ -n "${APPLE_API_KEY_FILE:-}" ]; then
+            export APPLE_API_KEY="$APPLE_API_KEY_FILE" APPLE_API_KEY_ID="$MAC_APPLE_API_KEY_ID" APPLE_API_ISSUER="$MAC_APPLE_API_ISSUER"
+          fi
+          unset MAC_CSC_LINK MAC_CSC_KEY_PASSWORD
+          node scripts/verify-target.mjs ${{ matrix.platform }} ${{ matrix.arch }}
+          ${{ matrix.builder }} --publish never --config electron-builder.beta.cjs
       - name: Check the macOS signature users get
         if: matrix.platform == 'darwin'
         shell: bash
@@ -201,7 +215,8 @@ jobs:
           ls -la "$mount" "$mount/.background" || true
           hdiutil detach "$mount"
       - name: Check the Windows signature users get
-        if: matrix.platform == 'win32' && (env.ESIGNER_SIGNING == 'true' || env.AZURE_SIGNING == 'true')
+        # Always for a publish build: an unsigned installer must never be released.
+        if: matrix.platform == 'win32' && (inputs.publish || env.ESIGNER_SIGNING == 'true' || env.AZURE_SIGNING == 'true')
         shell: pwsh
         run: |
           $files = @(Get-ChildItem dist-beta/*-setup.exe) + @(Get-ChildItem "dist-beta/win-unpacked/*.exe")
@@ -238,7 +253,7 @@ jobs:
   publish:
     name: Publish over-the-air update
     needs: installers
-    if: inputs.publish && inputs.target == 'all'
+    if: inputs.publish && inputs.target == 'all' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     environment: ${{ vars.RELEASE_ENVIRONMENT || '' }}
     env:

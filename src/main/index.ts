@@ -92,6 +92,7 @@ import {
   serializeGpuFallbackState
 } from './gpu-fallback'
 import { secureWindow } from './security'
+import { appOriginsOf } from './security-policy'
 import { SafeModeFrame } from './safe-mode-frame'
 import { desktopResourceUrl, installDesktopProtocol, registerDesktopScheme, SAFE_MODE_PAGE } from './desktop-protocol'
 import { ensureLaunchRoot } from './state/launch-root'
@@ -1040,7 +1041,7 @@ function createWindow(): BrowserWindow {
     appendRendererPluginFailureLog(details.message)
   })
   installPluginRecoveryNavigation(window)
-  secureWindow(window)
+  secureWindow(window, () => appOriginsOf(runtime.snapshot().url))
   installContextMenu(window, harnessLocale)
   installMainWindowRendererRecovery(window)
   window.on('closed', () => {
@@ -3334,7 +3335,7 @@ async function showMobilePairing(): Promise<void> {
     }
   })
   mobileWindow = pairingWindow
-  secureWindow(pairingWindow)
+  secureWindow(pairingWindow, () => appOriginsOf(mobileBridge?.snapshot().desktopUrl))
   pairingWindow.on('closed', () => {
     // A newer pairing window replaced this one: pairing goes on.
     if (mobileWindow !== pairingWindow) return

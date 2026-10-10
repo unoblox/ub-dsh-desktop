@@ -16,7 +16,7 @@ interface FakeFrame {
 
 type Listener = (...args: unknown[]) => void
 
-function fakeWindow() {
+function fakeWindow(origins: readonly string[] = ['http://127.0.0.1:4310']) {
   const listeners = new Map<string, Listener[]>()
   const webContents = {
     on(event: string, listener: Listener) {
@@ -32,7 +32,7 @@ function fakeWindow() {
   }
   // The structural parameter type is narrower than BrowserWindow; the fake
   // implements only what secureWindow calls.
-  secureWindow({ webContents } as unknown as Parameters<typeof secureWindow>[0])
+  secureWindow({ webContents } as unknown as Parameters<typeof secureWindow>[0], () => origins)
   let nextId = 10
   const frame = (name: string, parent: FakeFrame | null): FakeFrame => ({ name, frameTreeNodeId: nextId++, parent })
   const created = (child: FakeFrame) => emit('frame-created', {}, { frame: child })
@@ -41,7 +41,8 @@ function fakeWindow() {
     emit('will-frame-navigate', event)
     return event.preventDefault.mock.calls.length > 0
   }
-  return { webContents, frame, created, navigate }
+  const opened = (url: string) => (webContents.setWindowOpenHandler.mock.calls[0]?.[0] as (details: { url: string }) => { action: string })({ url })
+  return { webContents, frame, created, navigate, emit, opened }
 }
 
 describe('widget frame navigation guard', () => {
@@ -93,5 +94,36 @@ describe('widget frame navigation guard', () => {
     expect(isInsideWidgetFrame({ frameTreeNodeId: 3, parent: child }, new Set([2]))).toBe(true)
     expect(isInsideWidgetFrame(child, new Set([3]))).toBe(false)
     expect(isInsideWidgetFrame(undefined, new Set([1]))).toBe(false)
+  })
+})
+
+describe('app window trust', () => {
+  it('opens only its own origin inside the app, everything else in the browser', () => {
+    const win = fakeWindow()
+    openExternal.mockClear()
+    expect(win.opened('http://127.0.0.1:4310/session/2')).toEqual({ action: 'allow' })
+    expect(win.opened('http://127.0.0.1:3000/')).toEqual({ action: 'deny' })
+    expect(openExternal).toHaveBeenCalledWith('http://127.0.0.1:3000/')
+  })
+
+  it('applies the same rules to a window the page opens', () => {
+    const win = fakeWindow()
+    const childListeners = new Map<string, Listener[]>()
+    const child = {
+      webContents: {
+        on(event: string, listener: Listener) {
+          childListeners.set(event, [...(childListeners.get(event) ?? []), listener])
+          return child.webContents
+        },
+        setWindowOpenHandler: vi.fn(),
+        setWebRTCIPHandlingPolicy: vi.fn(),
+        session: { setPermissionCheckHandler: vi.fn(), setPermissionRequestHandler: vi.fn() }
+      }
+    }
+    win.emit('did-create-window', child)
+    expect(child.webContents.setWindowOpenHandler).toHaveBeenCalled()
+    const preventDefault = vi.fn()
+    for (const listener of childListeners.get('will-navigate') ?? []) listener({ preventDefault }, 'http://127.0.0.1:3000/')
+    expect(preventDefault).toHaveBeenCalled()
   })
 })

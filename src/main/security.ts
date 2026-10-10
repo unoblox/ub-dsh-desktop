@@ -7,15 +7,21 @@ import {
   WIDGET_FRAME_NAME
 } from './security-policy'
 
-export function secureWindow(window: Pick<BrowserWindow, 'webContents'>): void {
+/**
+ * @param appOrigins - the loopback origins this window serves, read at each
+ *   navigation because the Harness gets a new port on every launch.
+ */
+export function secureWindow(window: Pick<BrowserWindow, 'webContents'>, appOrigins: () => readonly string[]): void {
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isTrustedAppUrl(url)) return { action: 'allow' }
+    if (isTrustedAppUrl(url, appOrigins())) return { action: 'allow' }
     if (url.startsWith('https://') || url.startsWith('http://')) void shell.openExternal(url)
     return { action: 'deny' }
   })
+  // A window the app page opens gets the same rules, or it could go anywhere.
+  window.webContents.on('did-create-window', (child) => secureWindow(child, appOrigins))
 
   window.webContents.on('will-navigate', (event, url) => {
-    if (isTrustedAppUrl(url)) return
+    if (isTrustedAppUrl(url, appOrigins())) return
     event.preventDefault()
     if (url.startsWith('https://') || url.startsWith('http://')) void shell.openExternal(url)
   })

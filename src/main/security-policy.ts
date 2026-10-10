@@ -10,14 +10,28 @@ function isHarnessUrl(rawUrl: string): boolean {
   }
 }
 
-export function isTrustedAppUrl(rawUrl: string): boolean {
+/**
+ * Whether a page may navigate to, or open a window on, `rawUrl` inside the app.
+ * Loopback pages count only on the window's own origin (the Harness, or the
+ * phone bridge's pairing page): any other local server, such as one a model
+ * started for a project, opens in the browser like any other web page.
+ * @param appOrigins - the origins this window serves, e.g. `http://127.0.0.1:43127`.
+ */
+export function isTrustedAppUrl(rawUrl: string, appOrigins: readonly string[]): boolean {
+  let parsed: URL
   try {
-    const parsed = new URL(rawUrl)
-    if (parsed.protocol === 'file:' || parsed.protocol === 'dsh-recovery:' || parsed.protocol === 'dsh-desktop:') return true
+    parsed = new URL(rawUrl)
   } catch {
     return false
   }
-  return isHarnessUrl(rawUrl)
+  if (parsed.protocol === 'file:' || parsed.protocol === 'dsh-recovery:' || parsed.protocol === 'dsh-desktop:') return true
+  return isHarnessUrl(rawUrl) && appOrigins.includes(parsed.origin)
+}
+
+/** The origin of a loopback app URL, for `isTrustedAppUrl`; none for anything else. */
+export function appOriginsOf(rawUrl: string | undefined): string[] {
+  if (rawUrl === undefined || !isHarnessUrl(rawUrl)) return []
+  return [new URL(rawUrl).origin]
 }
 
 export function canGrantWindowPermission(

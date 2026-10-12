@@ -30,13 +30,14 @@ export const TOOL_DESCRIPTION = [
   'Use it when interaction or a visual makes the answer clearly better; answer in plain text or Markdown otherwise.',
   'Pass one self-contained HTML fragment or document with inline <style> and <script>. It runs in a sandbox with no network:',
   'no external scripts, stylesheets, fonts, images or fetch/XHR; use inline SVG or data: URLs.',
-  'Charts: the ECharts 6 library is preloaded as window.echarts when the HTML mentions "echarts"; put each chart in <div class="uw-chart" id="c"></div> and call echarts.init(document.getElementById("c")); the default chart theme already matches the app.',
+  'Charts: the ECharts 6 library is preloaded as window.echarts when the HTML mentions "echarts"; put each chart in <div class="uw-chart" id="c"></div>, call echarts.init(document.getElementById("c")) once and later only chart.setOption(...). The theme already sets colours, fonts, axes, gridlines, tooltips and sizing: do not set colours, backgrounds, fonts or grid styling in the options unless a colour carries meaning, and never use a dual y-axis.',
   'Design: compact, clean and sharp. The chat already draws a frame with the title above the widget, so do not repeat the title, and do not wrap the widget in an outer card, padding, border, background or shadow; no gradients or emoji.',
   'Form controls, buttons and tables are already styled (one 32px control height, 13px text): do not restyle them. Lay out with the built-in classes instead of your own spacing:',
   'uw-split (inputs beside results, stacks when narrow), uw-field (a <label> above its input), uw-grid, uw-row, uw-stack, uw-stats with uw-stat (<div class="uw-stat"><span>label</span><strong>value</strong></div>) for key numbers, uw-card (a subtle panel), uw-actions (buttons, right-aligned), uw-chart (a 220px chart container), uw-muted, and num on numeric table cells.',
   'Prefer side-by-side layouts to tall stacks; keep charts 180–260px tall; at most one primary button.',
   'Colours, when you need them: CSS variables --uw-fg, --uw-muted, --uw-surface, --uw-border, --uw-accent (accent text, highlights), --uw-accent-fill (fills) and --uw-on-accent (text on the fill). They follow light and dark mode. Do not use font sizes below 12px.',
-  'Forms: when a <form> is submitted, its fields are sent back to you as the user\'s next message; give every input a name attribute. From a button\'s click handler you can also call unoblox.submit({ ...values }); it only works in response to the user\'s click.',
+  'Interactivity: update results live from input and change events. For actions the widget handles itself (add an item, recalculate, filter), use <button type="button"> or a submit handler that calls event.preventDefault(); those stay in the widget.',
+  'Sending to you: a <form> whose submit the widget does not handle sends its fields back to you as the user\'s next message; give every input a name attribute. Use that only when the user is answering you. From a button\'s click handler you can also call unoblox.submit({ ...values }); it only works in response to the user\'s click.',
   'The widget resizes to its content. Keep it focused and accessible: label inputs and use buttons for actions.',
   'The user sees the widget, not its code: do not repeat the HTML or any code in your text reply; at most add one short sentence.'
 ].join(' ')

@@ -23,7 +23,7 @@ type Client = {
   inlineScript: (source: string) => string
   neutraliseShadowRoots: (html: string) => string
   uniqueWidgets: (entries: Array<{ callId: string; widget: Widget }>) => Array<{ callId: string; widget: Widget }>
-  chartTheme: (theme: Record<string, string>, dark: boolean) => string
+  chartTheme: (dark: boolean) => string
   isWebLink: (value: string) => boolean
   userActedInWidget: (frame: unknown, doc: unknown, nav: unknown) => boolean
   usesCharts: (html: string) => boolean
@@ -112,21 +112,6 @@ describe('what a widget cannot reach', () => {
     const scripts = [...doc.matchAll(/<script>([\s\S]*?)<\/script>/gu)].map((match) => match[1] ?? '')
     expect(scripts).toHaveLength(3)
     for (const script of scripts) expect(() => new vm.Script(script)).not.toThrow()
-  })
-
-  it('resolves theme variables in chart options, which a canvas cannot read', () => {
-    let registered: unknown
-    let applied: unknown
-    const echarts = {
-      registerTheme: (_name: string, theme: unknown) => { registered = theme },
-      init: (_el: unknown, name: unknown) => ({ name, setOption: (option: unknown) => { applied = option } })
-    }
-    vm.runInNewContext(client.chartTheme({ fg: '#f2f2f3', muted: '#aaa', surface: '#222', border: '#333', accent: '#D9A64A', onAccent: '#18191c' }, true), { window: { echarts } })
-    const chart = (echarts.init as unknown as (el: unknown) => { name: string; setOption: (option: unknown) => void })({})
-    expect(chart.name).toBe('unoblox')
-    chart.setOption({ legend: { textStyle: { color: 'var(--uw-fg)' } }, series: [{ color: ' var(--uw-accent) ' }] })
-    expect(applied).toEqual({ legend: { textStyle: { color: '#f2f2f3' } }, series: [{ color: '#D9A64A' }] })
-    expect(registered).toMatchObject({ legend: { textStyle: { color: '#f2f2f3' } } })
   })
 
   it('acts for the user only right after the user acted inside that widget', () => {

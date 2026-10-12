@@ -266,12 +266,19 @@ window.__ModuleLoader__.load({
   function sendForm(form, submitter) {
     post({ __unobloxWidget: token, kind: 'submit', data: formFields(form, submitter), form: getAttr(form, 'aria-label') || getAttr(form, 'name') || '' });
   }
-  // A submit event is trusted even when a script called requestSubmit(), so
+  // A form the widget handles itself (its submit handler calls
+  // preventDefault: add a task, recalculate) stays in the widget. Only a
+  // form left to the browser goes to the chat, as the tool description
+  // tells the model. This listener is on the window in the bubbling phase,
+  // so the widget's own handlers on the form and document have run. A
+  // submit event is trusted even when a script called requestSubmit(), so
   // it needs the click or Enter that should have caused it.
-  document.addEventListener('submit', function (event) {
+  var defaultPrevented = getter(Event.prototype, 'defaultPrevented');
+  window.addEventListener('submit', function (event) {
+    if (defaultPrevented(event)) return;
     preventDefault(event);
     if (takeGesture()) sendForm(eventTarget(event), event.submitter);
-  }, true);
+  });
   // form.submit() skips the submit event and would try to navigate.
   seal(HTMLFormElement.prototype, 'submit', function () { if (takeGesture()) sendForm(this, null); });
   // Links. A srcdoc document resolves "#part" against the chat's address,
@@ -330,7 +337,13 @@ window.__ModuleLoader__.load({
     for (var n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.nodeValue.trim() !== '') return true;
     return false;
   }
-  var fixing = false;
+  var fixing = false, fixed = [];
+  function undoFixes() {
+    fixed.forEach(function (fix) {
+      if (fix.value) fix.el.style.setProperty('color', fix.value, fix.priority); else fix.el.style.removeProperty('color');
+    });
+    fixed = [];
+  }
   function fixContrast() {
     if (fixing || !document.body) return;
     fixing = true;
@@ -347,6 +360,7 @@ window.__ModuleLoader__.load({
         var need = size >= 24 || (size >= 18.66 && bold) ? 3 : 4.5;
         if (ratio(blend(fg, bg), bg) >= need) continue;
         var ink = ratio(INKS[0], bg) >= ratio(INKS[1], bg) ? '#18191c' : '#ffffff';
+        fixed.push({ el: el, value: el.style.getPropertyValue('color'), priority: el.style.getPropertyPriority('color') });
         el.style.setProperty('color', ink, 'important');
       }
     } finally { fixing = false; }
@@ -382,44 +396,116 @@ window.__ModuleLoader__.load({
     measure();
     if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(document.documentElement);
   });
+  // The chat switched between light and dark: restyle in place, so what the
+  // user entered and added stays. Only the chat (the parent window, which no
+  // widget can impersonate as a message source) sends this, and it carries
+  // no token: the widget's own listeners see every message.
+  window.addEventListener('message', function (event) {
+    if (event.source !== parentWindow) return;
+    var data = event.data;
+    if (!data || data.__unobloxTheme !== true || typeof data.vars !== 'object' || data.vars === null) return;
+    var root = document.documentElement.style;
+    Object.keys(data.vars).forEach(function (name) {
+      if (/^--uw-[a-z-]+$/.test(name) && typeof data.vars[name] === 'string') root.setProperty(name, data.vars[name]);
+    });
+    root.setProperty('color-scheme', data.dark ? 'dark' : 'light');
+    if (typeof data.page === 'string' && /^#[0-9a-f]{6}$/i.test(data.page)) pageColor = data.page;
+    undoFixes();
+    fixContrast();
+    window.dispatchEvent(new CustomEvent('unoblox:theme', { detail: { dark: data.dark === true } }));
+  });
   if (bootstrapScript) removeNode(bootstrapScript);
 })();`
     }
 
+    // Categorical series colours in fixed order, validated for colour vision
+    // deficiency, a visible chroma and 3:1 against each mode's page
+    // (dataviz validate_palette: all checks pass in both modes).
     const CHART_COLORS = {
-      light: ['#c8922f', '#2f62d0', '#1f8a70', '#c2410c', '#7c3aed', '#5f6b7a'],
-      dark: ['#D9A64A', '#7aaaff', '#4fd1a5', '#fb923c', '#a78bfa', '#94a3b8']
+      light: ['#a8761f', '#2f62d0', '#1f8a70', '#c2410c', '#7c3aed', '#c0397a'],
+      dark: ['#b98a2c', '#5a8cec', '#2ea27f', '#d9733a', '#9579ea', '#d0609a']
+    }
+    const CHART_FONT = 'Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
+
+    function themeVars(theme) {
+      return { '--uw-fg': theme.fg, '--uw-muted': theme.muted, '--uw-bg': 'transparent', '--uw-surface': theme.surface, '--uw-border': theme.border, '--uw-accent': theme.accent, '--uw-accent-fill': theme.accentFill, '--uw-on-accent': theme.onAccent, '--uw-page': theme.page }
+    }
+
+    /** The ECharts theme for one mode: recessive axes, thin marks, a real tooltip. */
+    function chartConfig(theme, dark) {
+      const label = { color: theme.muted, fontSize: 12, fontFamily: CHART_FONT }
+      const category = {
+        axisLine: { show: true, lineStyle: { color: theme.border, width: 1 } },
+        axisTick: { show: false },
+        axisLabel: { ...label, margin: 10 },
+        splitLine: { show: false },
+        nameTextStyle: label
+      }
+      const value = {
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { ...label, margin: 10 },
+        splitLine: { show: true, lineStyle: { color: theme.border, width: 1, type: 'solid' } },
+        nameTextStyle: label
+      }
+      // A ring in the page colour separates markers and slices from what is behind them.
+      const ring = { borderColor: theme.page, borderWidth: 2 }
+      return {
+        color: CHART_COLORS[dark ? 'dark' : 'light'],
+        backgroundColor: 'transparent',
+        textStyle: { color: theme.fg, fontFamily: CHART_FONT, fontSize: 12 },
+        title: { textStyle: { color: theme.fg, fontSize: 13, fontWeight: 600 }, subtextStyle: { color: theme.muted, fontSize: 12 } },
+        legend: { itemWidth: 14, itemHeight: 10, itemGap: 16, textStyle: { color: theme.fg, fontSize: 12 }, pageTextStyle: { color: theme.muted } },
+        grid: { left: 8, right: 12, top: 36, bottom: 4, containLabel: true },
+        tooltip: {
+          backgroundColor: theme.surface,
+          borderColor: theme.border,
+          borderWidth: 1,
+          padding: [8, 10],
+          textStyle: { color: theme.fg, fontSize: 12, fontFamily: CHART_FONT },
+          extraCssText: `border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,${dark ? '.45' : '.12'})`,
+          axisPointer: { lineStyle: { color: theme.muted, width: 1 }, crossStyle: { color: theme.muted }, shadowStyle: { color: dark ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.04)' } }
+        },
+        categoryAxis: category, valueAxis: value, logAxis: value, timeAxis: category,
+        bar: { barMaxWidth: 28, itemStyle: { borderRadius: [4, 4, 0, 0] } },
+        line: { symbol: 'circle', symbolSize: 8, showSymbol: false, lineStyle: { width: 2, cap: 'round', join: 'round' }, itemStyle: ring, emphasis: { scale: true } },
+        scatter: { symbolSize: 9, itemStyle: ring },
+        pie: { itemStyle: { ...ring, borderRadius: 4 }, label: { color: theme.fg, fontSize: 12 }, labelLine: { lineStyle: { color: theme.border } } },
+        gauge: { axisLine: { lineStyle: { color: [[1, theme.border]] } }, detail: { color: theme.fg }, title: { color: theme.muted } },
+        animationDuration: 450,
+        animationDurationUpdate: 300,
+        animationEasing: 'cubicOut'
+      }
     }
 
     /**
-     * Charts draw on a canvas, which cannot read CSS variables: a chart that
-     * asks for "var(--uw-fg)" would draw black on the dark theme. Give
-     * ECharts a matching default theme, and resolve --uw-* variables in the
-     * options a widget passes.
+     * Charts set up for the widget frame:
+     * - SVG, not a canvas: a canvas is drawn for the pixel density when the
+     *   chart starts and blurs when the app is zoomed or the display scaled;
+     *   SVG stays sharp, and its text renders like the page's.
+     * - They follow their container's size.
+     * - A chart without a tooltip gets one.
+     * - --uw-* variables in options are resolved (a chart cannot read CSS),
+     *   and the options are re-applied when the chat switches theme.
      */
-    function chartTheme(theme, dark) {
-      const vars = { '--uw-fg': theme.fg, '--uw-muted': theme.muted, '--uw-bg': 'transparent', '--uw-surface': theme.surface, '--uw-border': theme.border, '--uw-accent': theme.accent, '--uw-accent-fill': theme.accentFill, '--uw-on-accent': theme.onAccent }
-      const axis = { axisLine: { lineStyle: { color: theme.border } }, axisTick: { lineStyle: { color: theme.border } }, axisLabel: { color: theme.muted }, splitLine: { lineStyle: { color: theme.border } }, nameTextStyle: { color: theme.muted } }
-      const config = {
-        color: CHART_COLORS[dark ? 'dark' : 'light'],
-        backgroundColor: 'transparent',
-        textStyle: { color: theme.fg },
-        title: { textStyle: { color: theme.fg }, subtextStyle: { color: theme.muted } },
-        legend: { textStyle: { color: theme.fg, fontSize: 12 } },
-        tooltip: { backgroundColor: theme.surface, borderColor: theme.border, textStyle: { color: theme.fg } },
-        categoryAxis: axis, valueAxis: axis, logAxis: axis, timeAxis: axis,
-        pie: { label: { color: theme.fg } }
+    function chartTheme(dark) {
+      const themes = {
+        light: { name: 'unoblox-light', page: THEMES.light.page, vars: themeVars(THEMES.light), config: chartConfig(THEMES.light, false) },
+        dark: { name: 'unoblox-dark', page: THEMES.dark.page, vars: themeVars(THEMES.dark), config: chartConfig(THEMES.dark, true) }
       }
       return `(function () {
   var e = window.echarts;
   if (!e || typeof e.registerTheme !== 'function') return;
-  var vars = ${JSON.stringify(vars)};
-  e.registerTheme('unoblox', ${JSON.stringify(config)});
+  var themes = ${JSON.stringify(themes)};
+  e.registerTheme(themes.light.name, themes.light.config);
+  e.registerTheme(themes.dark.name, themes.dark.config);
+  var mode = ${JSON.stringify(dark ? 'dark' : 'light')};
+  var charts = [];
   function resolve(value, depth) {
     if (depth > 12) return value;
     if (typeof value === 'string') {
       var m = /^\\s*var\\((--uw-[a-z-]+)[^)]*\\)\\s*$/.exec(value);
-      return m && vars[m[1]] ? vars[m[1]] : value;
+      return m && themes[mode].vars[m[1]] ? themes[mode].vars[m[1]] : value;
     }
     if (Array.isArray(value)) return value.map(function (item) { return resolve(item, depth + 1); });
     var proto = value && typeof value === 'object' ? Object.getPrototypeOf(value) : undefined;
@@ -430,17 +516,104 @@ window.__ModuleLoader__.load({
     }
     return value;
   }
+  // Stacked bars: only the top of each stack is rounded, and a 2px gap in
+  // the page colour separates the segments (unless the widget styled them).
+  function shapeStacks(option) {
+    if (!option || typeof option !== 'object' || !Array.isArray(option.series)) return option;
+    var last = {};
+    option.series.forEach(function (series, index) {
+      if (series && series.type === 'bar' && series.stack != null) last[series.stack] = index;
+    });
+    if (Object.keys(last).length === 0) return option;
+    var copy = {};
+    for (var key in option) if (Object.prototype.hasOwnProperty.call(option, key)) copy[key] = option[key];
+    copy.series = option.series.map(function (series, index) {
+      if (!series || series.type !== 'bar' || series.stack == null) return series;
+      var style = series.itemStyle || {};
+      var out = {};
+      for (var k in series) if (Object.prototype.hasOwnProperty.call(series, k)) out[k] = series[k];
+      var item = {};
+      for (var j in style) if (Object.prototype.hasOwnProperty.call(style, j)) item[j] = style[j];
+      if (item.borderRadius === undefined) item.borderRadius = last[series.stack] === index ? [4, 4, 0, 0] : 0;
+      if (item.borderWidth === undefined) { item.borderWidth = 1; item.borderColor = themes[mode].page; }
+      out.itemStyle = item;
+      return out;
+    });
+    return copy;
+  }
+  // A line coloured only through lineStyle keeps the palette colour for its
+  // legend key and markers; give the series the line's colour.
+  function matchLineColors(option) {
+    if (!option || typeof option !== 'object' || !Array.isArray(option.series)) return option;
+    var changed = false;
+    var series = option.series.map(function (item) {
+      var line = item && item.lineStyle && item.lineStyle.color;
+      if (!line || item.color !== undefined || (item.itemStyle && item.itemStyle.color !== undefined)) return item;
+      changed = true;
+      var out = {};
+      for (var k in item) if (Object.prototype.hasOwnProperty.call(item, k)) out[k] = item[k];
+      out.color = line;
+      return out;
+    });
+    if (!changed) return option;
+    var copy = {};
+    for (var key in option) if (Object.prototype.hasOwnProperty.call(option, key)) copy[key] = option[key];
+    copy.series = series;
+    return copy;
+  }
+  function withTooltip(option, chart) {
+    if (chart.__unobloxTooltip || !option || typeof option !== 'object' || !option.series) return option;
+    chart.__unobloxTooltip = true;
+    if (option.tooltip !== undefined) return option;
+    var cartesian = option.xAxis !== undefined || option.yAxis !== undefined;
+    var copy = {};
+    for (var key in option) if (Object.prototype.hasOwnProperty.call(option, key)) copy[key] = option[key];
+    copy.tooltip = cartesian ? { trigger: 'axis', axisPointer: { type: 'line' } } : { trigger: 'item' };
+    return copy;
+  }
   var init = e.init;
   e.init = function (el, name, opts) {
-    var chart = init.call(e, el, name == null ? 'unoblox' : name, opts);
+    var existing = typeof e.getInstanceByDom === 'function' && el ? e.getInstanceByDom(el) : undefined;
+    if (existing && existing.__unobloxWrapped) return existing;
+    var options = {};
+    if (opts && typeof opts === 'object') for (var key in opts) if (Object.prototype.hasOwnProperty.call(opts, key)) options[key] = opts[key];
+    if (options.renderer === undefined) options.renderer = 'svg';
+    var own = name == null || name === 'unoblox';
+    var chart = init.call(e, el, own ? themes[mode].name : name, options);
     var setOption = chart.setOption;
+    var history = [];
+    chart.__unobloxWrapped = true;
     chart.setOption = function (option) {
       var args = Array.prototype.slice.call(arguments);
-      args[0] = resolve(option, 0);
+      history.push(args.slice());
+      if (history.length > 40) history.shift();
+      args[0] = withTooltip(matchLineColors(shapeStacks(resolve(option, 0))), chart);
       return setOption.apply(chart, args);
     };
+    charts.push({ chart: chart, own: own, history: history, apply: function () {
+      history.forEach(function (args) {
+        var copy = args.slice();
+        copy[0] = matchLineColors(shapeStacks(resolve(copy[0], 0)));
+        setOption.apply(chart, copy);
+      });
+    } });
+    if (el && typeof ResizeObserver === 'function') {
+      var pending = 0;
+      new ResizeObserver(function () {
+        if (pending) return;
+        pending = requestAnimationFrame(function () { pending = 0; if (!chart.isDisposed()) chart.resize(); });
+      }).observe(el);
+    }
     return chart;
   };
+  window.addEventListener('unoblox:theme', function (event) {
+    mode = event.detail && event.detail.dark ? 'dark' : 'light';
+    charts.forEach(function (entry) {
+      if (entry.chart.isDisposed()) return;
+      if (entry.own && typeof entry.chart.setTheme === 'function') entry.chart.setTheme(themes[mode].name);
+      entry.apply();
+    });
+  });
 })();`
     }
 
@@ -460,7 +633,7 @@ window.__ModuleLoader__.load({
       const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'"
       // A compact base: one control height, tight type, tabular numbers, and
       // a small layout kit (uw-*) so models do not hand-roll padding and cards.
-      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-accent-fill:${theme.accentFill};--uw-on-accent:${theme.onAccent};--uw-radius:6px;--uw-gap:12px}
+      const style = `:root{color-scheme:${options.dark ? 'dark' : 'light'};--uw-fg:${theme.fg};--uw-muted:${theme.muted};--uw-bg:${theme.bg};--uw-surface:${theme.surface};--uw-border:${theme.border};--uw-accent:${theme.accent};--uw-accent-fill:${theme.accentFill};--uw-on-accent:${theme.onAccent};--uw-page:${theme.page};--uw-radius:6px;--uw-gap:12px}
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;background:transparent}
 body{padding:12px 14px;color:var(--uw-fg);font:13px/1.45 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;overflow-wrap:anywhere}
@@ -471,7 +644,9 @@ input,select,textarea,button{font:inherit;color:inherit}
 input,select,textarea{min-height:32px;min-width:0;background:var(--uw-surface);border:1px solid var(--uw-border);border-radius:var(--uw-radius);padding:0 10px}
 textarea{min-height:64px;padding:6px 10px}
 input[type=checkbox],input[type=radio]{min-height:0;accent-color:var(--uw-accent)}
-input[type=range]{min-height:0;padding:0;border:0;background:none;accent-color:var(--uw-accent)}
+input[type=range]{-webkit-appearance:none;appearance:none;height:18px;min-height:0;padding:0;border:0;background:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--uw-border)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6px;border-radius:50%;background:var(--uw-accent-fill);border:2px solid var(--uw-page);box-shadow:0 0 0 1px var(--uw-accent)}
 button{min-height:32px;background:var(--uw-accent-fill);color:var(--uw-on-accent);border:0;border-radius:var(--uw-radius);padding:0 14px;font-weight:600;cursor:pointer}
 button:hover{filter:brightness(1.05)}
 :focus-visible{outline:2px solid var(--uw-accent);outline-offset:1px}
@@ -493,7 +668,7 @@ table{border-collapse:collapse;width:100%}th{font-size:12px;font-weight:600;colo
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         `<style>${style}</style>`,
         `<script>${inlineScript(bootstrap(options.token, theme.page, options.title))}</script>`,
-        typeof options.library === 'string' ? `<script>${inlineScript(options.library)}</script><script>${inlineScript(chartTheme(theme, options.dark))}</script>` : '',
+        typeof options.library === 'string' ? `<script>${inlineScript(options.library)}</script><script>${inlineScript(chartTheme(options.dark))}</script>` : '',
         '</head><body>',
         neutraliseShadowRoots(html),
         '</body></html>'
@@ -581,7 +756,18 @@ table{border-collapse:collapse;width:100%}th{font-size:12px;font-weight:600;colo
       const [notice, setNotice] = useState(undefined)
       const charts = usesCharts(widget.html)
       const [library, setLibrary] = useState(charts ? undefined : null)
-      const token = useMemo(randomToken, [widget.html, dark])
+      const token = useMemo(randomToken, [widget.html])
+      // The document is built once per widget, in the theme of that moment; a
+      // later theme switch restyles it in place (see the bootstrap), so the
+      // user's input survives it.
+      const builtDark = useMemo(() => dark, [widget.html])
+      const loaded = useRef(false)
+      useEffect(() => {
+        const frame = frameRef.current
+        if (!loaded.current || !frame?.contentWindow) return
+        const theme = THEMES[dark ? 'dark' : 'light']
+        frame.contentWindow.postMessage({ __unobloxTheme: true, dark, page: theme.page, vars: themeVars(theme) }, '*')
+      }, [dark])
 
       useEffect(() => {
         if (!charts) return undefined
@@ -624,7 +810,7 @@ table{border-collapse:collapse;width:100%}th{font-size:12px;font-weight:600;colo
       }, [token, widget.title, sendText, t])
 
       if (library === undefined) return h('div', { className: 'dshWidgetStatus' }, t('building'))
-      const srcDoc = buildWidgetDocument(widget.html, { dark, token, title: widget.title, library: library ?? undefined })
+      const srcDoc = buildWidgetDocument(widget.html, { dark: builtDark, token, title: widget.title, library: library ?? undefined })
       return h(React.Fragment, null,
         h('iframe', {
           ref: frameRef,
@@ -636,6 +822,14 @@ table{border-collapse:collapse;width:100%}th{font-size:12px;font-weight:600;colo
           sandbox: 'allow-scripts allow-forms',
           referrerPolicy: 'no-referrer',
           srcDoc,
+          // A theme switch while the document was still loading is sent on load.
+          onLoad: () => {
+            loaded.current = true
+            if (dark !== builtDark) {
+              const theme = THEMES[dark ? 'dark' : 'light']
+              frameRef.current?.contentWindow?.postMessage({ __unobloxTheme: true, dark, page: theme.page, vars: themeVars(theme) }, '*')
+            }
+          },
           style: { height: `${String(height)}px` }
         }),
         notice ? h('div', { className: `dshWidgetNotice dshWidgetNotice-${notice.kind}`, role: notice.kind === 'error' ? 'alert' : 'status' }, notice.text) : null

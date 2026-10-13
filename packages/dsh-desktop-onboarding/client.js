@@ -69,6 +69,11 @@ window.__ModuleLoader__.load({
       .dshDeskOnbKeyHint{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
       .dshDeskOnbKeyHint a{color:var(--dsw-alias-brand-primary)}
       .dshDeskOnbKeyError{margin:0;font-size:12px;line-height:18px;font-weight:500;color:var(--dsw-alias-state-error-primary)}
+      .dshDeskOnbSignIn{flex:none;display:flex;flex-direction:column;gap:8px;margin-top:18px}
+      .dshDeskOnbSignInRow{display:flex;align-items:center;gap:10px}
+      .dshDeskOnbSignInRow>button:first-child{flex:1}
+      .dshDeskOnbOr{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
+      .dshDeskOnbOr::before,.dshDeskOnbOr::after{content:"";flex:1;height:1px;background:var(--dsw-alias-border-l2)}
       @media (width<=560px){.dshDeskOnbContent{padding:20px}}
     `
 
@@ -104,6 +109,12 @@ window.__ModuleLoader__.load({
       unobloxSearchPrivacy: 'Web search sends only the search query text to unoblox, which runs it on Perplexity (United States). Nothing else from the session is sent, and unoblox does not store queries. Each successful search is billed to your ₹ balance.',
       unobloxKeyLink: 'Get an API key',
       unobloxConnect: 'Connect and continue',
+      signInButton: 'Sign in with unoblox',
+      signInWaiting: 'Waiting for your browser…',
+      signInCancel: 'Cancel',
+      signInHint: 'Opens unoblox.ai in your browser. New to unoblox? You can create an account there; the API key is set up for you.',
+      signInOr: 'or paste an API key',
+      signInFailed: 'Could not sign in: {message}',
       unobloxConnecting: 'Connecting…',
       unobloxKeyRequired: 'Enter your unoblox API key to continue, or choose Not now.',
       unobloxKeyFailed: 'The API key could not be saved: {message}'
@@ -129,6 +140,12 @@ window.__ModuleLoader__.load({
       unobloxSearchPrivacy: '网页搜索仅将搜索词发送给 unoblox，并由其交给 Perplexity（美国）执行。会话中的其他内容不会被发送，unoblox 不保存搜索词。每次成功的搜索从 ₹ 余额中扣费。',
       unobloxKeyLink: '获取 API Key',
       unobloxConnect: '接入并继续',
+      signInButton: '使用 unoblox 登录',
+      signInWaiting: '正在等待浏览器…',
+      signInCancel: '取消',
+      signInHint: '将在浏览器中打开 unoblox.ai。还没有 unoblox 账户？可以在那里创建，API 密钥会自动为你设置好。',
+      signInOr: '或粘贴 API 密钥',
+      signInFailed: '未能登录：{message}',
       unobloxConnecting: '接入中…',
       unobloxKeyRequired: '请输入 unoblox API Key 后继续，或选择“暂不”。',
       unobloxKeyFailed: 'API Key 保存失败：{message}'
@@ -196,6 +213,30 @@ window.__ModuleLoader__.load({
         ),
         React.createElement('p', { className: 'dshDeskOnbHint' }, t('desktopIntroFeedback'))
       )
+    }
+
+    // "Sign in with unoblox": the desktop main process opens the browser and
+    // stores the key itself (window.dshDesktop); this page never sees the key.
+    function SignInSection({ t, waiting, disabled, failure, onSignIn, onCancel }) {
+      return React.createElement(
+        'div',
+        { className: 'dshDeskOnbSignIn' },
+        React.createElement(
+          'div',
+          { className: 'dshDeskOnbSignInRow' },
+          React.createElement(Button, { variant: 'primary', disabled: disabled || waiting, onClick: onSignIn }, t(waiting ? 'signInWaiting' : 'signInButton')),
+          waiting ? React.createElement(Button, { variant: 'outline', onClick: onCancel }, t('signInCancel')) : null
+        ),
+        React.createElement('p', { className: 'dshDeskOnbKeyHint' }, t('signInHint')),
+        failure ? React.createElement('p', { className: 'dshDeskOnbKeyError', role: 'alert', 'aria-live': 'polite' }, failure) : null,
+        React.createElement('div', { className: 'dshDeskOnbOr', role: 'separator' }, t('signInOr'))
+      )
+    }
+
+    /** The desktop bridge, when this page runs in unoblox works. */
+    function desktopSignIn() {
+      const bridge = typeof window === 'undefined' ? undefined : window.dshDesktop
+      return bridge && typeof bridge.unobloxSignIn === 'function' ? bridge : undefined
     }
 
     // unoblox API-key entry. Presentational: the parent owns the draft, busy
@@ -331,6 +372,16 @@ window.__ModuleLoader__.load({
       const [keyDraft, setKeyDraft] = useState('')
       const [keyBusy, setKeyBusy] = useState(false)
       const [keyFailure, setKeyFailure] = useState(undefined)
+      const [signInAvailable, setSignInAvailable] = useState(false)
+      const [signInWaiting, setSignInWaiting] = useState(false)
+      const [signInFailure, setSignInFailure] = useState(undefined)
+      useEffect(() => {
+        const bridge = desktopSignIn()
+        if (!bridge) return undefined
+        let live = true
+        bridge.unobloxSignInAvailable().then((available) => { if (live) setSignInAvailable(available === true) }, () => {})
+        return () => { live = false }
+      }, [])
       const titleRef = useRef(null)
       const keyInputRef = useRef(null)
       const finishedRef = useRef(false)
@@ -407,8 +458,33 @@ window.__ModuleLoader__.load({
 
       if (!visible) return null
 
+      const signIn = () => {
+        const bridge = desktopSignIn()
+        if (!bridge || signInWaiting) return
+        setSignInWaiting(true)
+        setSignInFailure(undefined)
+        bridge.unobloxSignIn().then(
+          (result) => {
+            if (result?.ok === true) {
+              finish()
+              return
+            }
+            setSignInWaiting(false)
+            // Cancelling is the user's own choice, not a failure to report.
+            if (result?.code !== 'cancelled') setSignInFailure(t('signInFailed').replace('{message}', String(result?.message ?? 'unknown error')))
+          },
+          (error) => {
+            setSignInWaiting(false)
+            setSignInFailure(t('signInFailed').replace('{message}', error instanceof Error ? error.message : String(error)))
+          }
+        )
+      }
+      const cancelSignIn = () => {
+        desktopSignIn()?.unobloxSignInCancel().catch(() => {})
+      }
+
       const connect = () => {
-        if (keyBusy) return
+        if (keyBusy || signInWaiting) return
         // An empty field is answered at once, without the busy state that
         // disables the input and would drop keyboard focus.
         if (keyDraft.trim().length === 0) {
@@ -449,10 +525,13 @@ window.__ModuleLoader__.load({
             t('step0Title')
           ),
           React.createElement(NoticeBody, { t }),
+          signInAvailable
+            ? React.createElement(SignInSection, { t, waiting: signInWaiting, disabled: keyBusy, failure: signInFailure, onSignIn: signIn, onCancel: cancelSignIn })
+            : null,
           React.createElement(UnobloxKeyField, {
             t,
             value: keyDraft,
-            busy: keyBusy,
+            busy: keyBusy || signInWaiting,
             failure: keyFailure,
             onChange: setKeyDraft,
             onSubmit: connect,
@@ -463,12 +542,13 @@ window.__ModuleLoader__.load({
             { className: 'dshDeskOnbActions' },
             React.createElement(
               Button,
-              { variant: 'outline', disabled: keyBusy, onClick: () => finish() },
+              { variant: 'outline', disabled: keyBusy || signInWaiting, onClick: () => finish() },
               t('later')
             ),
             React.createElement(
               Button,
-              { variant: 'primary', disabled: keyBusy, onClick: connect },
+              // With sign-in offered, that is the primary action; the paste path steps back.
+              { variant: signInAvailable ? 'outline' : 'primary', disabled: keyBusy || signInWaiting, onClick: connect },
               t(keyBusy ? 'unobloxConnecting' : 'unobloxConnect')
             )
           )

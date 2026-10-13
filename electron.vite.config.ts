@@ -7,7 +7,11 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     define: {
       // Release builds ignore the update feed test hooks (src/main/update/update-policy.ts).
-      __UNOBLOX_UPDATE_TEST_HOOKS__: JSON.stringify(process.env.UNOBLOX_WORKS_UPDATE_TEST_BUILD === '1')
+      __UNOBLOX_UPDATE_TEST_HOOKS__: JSON.stringify(process.env.UNOBLOX_WORKS_UPDATE_TEST_BUILD === '1'),
+      // "Sign in with unoblox" (src/main/unoblox/sign-in-config.ts): the OAuth
+      // client this build signs in with, and whether its test hooks apply.
+      __UNOBLOX_SIGNIN_CLIENT_ID__: JSON.stringify(process.env.UNOBLOX_WORKS_SIGNIN_CLIENT_ID ?? ''),
+      __UNOBLOX_SIGNIN_TEST_HOOKS__: JSON.stringify(process.env.UNOBLOX_WORKS_SIGNIN_TEST_BUILD === '1')
     }
   },
   preload: {

@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   // Tests point the updater at local feeds, as a test build does.
-  define: { __UNOBLOX_UPDATE_TEST_HOOKS__: 'true' },
+  define: { __UNOBLOX_UPDATE_TEST_HOOKS__: 'true', __UNOBLOX_SIGNIN_TEST_HOOKS__: 'true', __UNOBLOX_SIGNIN_CLIENT_ID__: "''" },
   test: {
     include: ['test/**/*.{test,spec}.{ts,js,mjs}'],
     // Native Intel runners and Windows CI contend for CPU and disk while integration suites

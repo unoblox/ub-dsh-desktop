@@ -578,7 +578,12 @@ contextBridge.exposeInMainWorld(
     setBuiltInImageGenerationEnabled: (enabled: boolean): Promise<{ ok: boolean; enabled?: boolean; restartRequired?: boolean; reason?: string }> =>
       ipcRenderer.invoke('desktop-host-plugin:set-enabled', enabled),
     uninstallMarket: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('market:uninstall'),
-    openInFinder: (path: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('harness:open-in-finder', path)
+    openInFinder: (path: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('harness:open-in-finder', path),
+    // "Sign in with unoblox": the main process opens the browser and stores the
+    // key itself; the page only learns whether it worked.
+    unobloxSignInAvailable: (): Promise<boolean> => ipcRenderer.invoke('unoblox:sign-in-available'),
+    unobloxSignIn: (): Promise<{ ok: true } | { ok: false; code: string; message: string }> => ipcRenderer.invoke('unoblox:sign-in'),
+    unobloxSignInCancel: (): Promise<void> => ipcRenderer.invoke('unoblox:sign-in-cancel')
   })
 )
 

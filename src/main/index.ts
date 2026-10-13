@@ -4,6 +4,8 @@ import { checkBlockingPluginUpdates, selectPluginRecoveryTarget, PluginRecoveryE
 import { RepairAgentService, type CrashEvidence } from './repair-agent'
 import { disableSpellcheckDownloads, noAutomaticRegistryLookup } from './network-privacy'
 import { UNOBLOX_UPDATE_FEED_CONFIGURED } from './update/update-policy'
+import { SIGN_IN_TEST_HOOKS_BUILT, signInConfig } from './unoblox/sign-in-config'
+import { UnobloxSignIn } from './unoblox/sign-in-service'
 import { DEV_PRODUCT_NAME, PRODUCT_NAME } from '../shared/brand'
 import { catalogEnvironment, catalogForLaunch, refreshUnobloxCatalog, type ResolvedCatalog } from './unoblox/model-catalog'
 import { documentsEnvironment } from './runtime/documents-directory'
@@ -233,6 +235,21 @@ let mainWindow: BrowserWindow | undefined
 let mobileWindow: BrowserWindow | undefined
 let tray: Tray | undefined
 let runtime: HarnessRuntime
+// "Sign in with unoblox": the browser signs in, the key goes straight into the
+// Harness credential store (src/main/unoblox/).
+const unobloxSignIn = new UnobloxSignIn({
+  config: () => signInConfig(process.env, !app.isPackaged || SIGN_IN_TEST_HOOKS_BUILT),
+  harness: () => {
+    const snapshot = runtime?.snapshot()
+    return { url: snapshot?.url, authToken: snapshot?.authToken }
+  },
+  // Only the configured unoblox.ai sign-in page is opened, in the user's browser.
+  openBrowser: (url) => shell.openExternal(url),
+  // Chromium's network stack honours the system proxy and certificate store.
+  tokenFetch: (url, init) => net.fetch(url, init),
+  harnessFetch: (url, init) => fetch(url, init),
+  log: (message) => runtime?.note(message)
+})
 let desktopStorageManager: DesktopStorageManager | undefined
 let windowStateManager: WindowStateManager | undefined
 let mobileBridge: LanMobileBridge
@@ -3096,6 +3113,44 @@ function setAutomaticUpdates(value: boolean): void {
   installMenu()
 }
 
+async function signInFromMenu(): Promise<void> {
+  const isChinese = harnessLocale() === 'zh'
+  const result = await unobloxSignIn.signIn()
+  if (result.ok || result.code === 'cancelled' || result.code === 'busy') return
+  await dialog.showMessageBox({
+    type: 'warning',
+    message: isChinese ? '未能登录 unoblox' : 'Could not sign in to unoblox',
+    detail: result.message
+  })
+}
+
+/**
+ * Remove the key from this computer. Identity has no endpoint an app can use
+ * to revoke its key yet, so the dialog says where to delete it.
+ */
+async function signOutFromMenu(): Promise<void> {
+  const isChinese = harnessLocale() === 'zh'
+  const confirm = await dialog.showMessageBox({
+    type: 'question',
+    buttons: isChinese ? ['退出登录', '取消'] : ['Sign Out', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    message: isChinese ? '从这台电脑上移除 unoblox API 密钥？' : 'Remove the unoblox API key from this computer?',
+    detail: isChinese
+      ? '移除后，unoblox works 在你重新登录或粘贴密钥之前无法使用模型。该密钥在你的 unoblox 账户中仍然有效，可以在 unoblox.ai 的 API 密钥页面删除。'
+      : 'unoblox works cannot use models until you sign in again or paste a key. The key stays active on your unoblox account; you can delete it on unoblox.ai under API keys.'
+  })
+  if (confirm.response !== 0) return
+  const result = await unobloxSignIn.signOut()
+  if (!result.ok) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      message: isChinese ? '未能移除密钥' : 'Could not remove the key',
+      detail: result.message
+    })
+  }
+}
+
 function installMenu(): void {
   const isChinese = harnessLocale() === 'zh'
   const checkForUpdatesLabel = isChinese
@@ -3151,6 +3206,17 @@ function installMenu(): void {
           type: 'checkbox',
           checked: mobileBridgeDemand.keepConnected,
           click: (item) => setKeepPhoneConnected(item.checked)
+        },
+        { type: 'separator' },
+        ...(unobloxSignIn.available()
+          ? [{
+              label: isChinese ? '登录 unoblox…' : 'Sign In with unoblox…',
+              click: () => void signInFromMenu().catch(showUnexpectedError)
+            }]
+          : []),
+        {
+          label: isChinese ? '退出 unoblox 登录…' : 'Sign Out of unoblox…',
+          click: () => void signOutFromMenu().catch(showUnexpectedError)
         },
         { type: 'separator' },
         {
@@ -3486,6 +3552,18 @@ async function bootstrap(): Promise<void> {
   })
   ipcMain.handle('mobile:open-pairing', () => showMobilePairing())
   ipcMain.handle('mobile:status', () => ({ connected: mobileBridge.snapshot().connected }))
+  ipcMain.handle('unoblox:sign-in-available', (event) => {
+    assertTrustedMainWindowEvent(event)
+    return unobloxSignIn.available()
+  })
+  ipcMain.handle('unoblox:sign-in', (event) => {
+    assertTrustedMainWindowEvent(event)
+    return unobloxSignIn.signIn()
+  })
+  ipcMain.handle('unoblox:sign-in-cancel', (event) => {
+    assertTrustedMainWindowEvent(event)
+    unobloxSignIn.cancel()
+  })
   ipcMain.handle('harness:show-log', () => {
     shell.showItemInFolder(join(app.getPath('logs'), 'harness.log'))
   })

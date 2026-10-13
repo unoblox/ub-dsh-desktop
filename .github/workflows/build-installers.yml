@@ -96,6 +96,9 @@ jobs:
       # eSigner bills per signature, so only published builds are signed with it.
       ESIGNER_SIGNING: ${{ inputs.publish && secrets.ESIGNER_USERNAME != '' && secrets.ESIGNER_PASSWORD != '' && secrets.ESIGNER_CREDENTIAL_ID != '' && secrets.ESIGNER_TOTP_SECRET != '' }}
       AZURE_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_SIGNING_PROFILE != '' }}
+      # "Sign in with unoblox": the OAuth client this build signs in with (not a
+      # secret). Unset, sign-in is hidden and users paste a key as before.
+      UNOBLOX_WORKS_SIGNIN_CLIENT_ID: ${{ vars.UNOBLOX_WORKS_SIGNIN_CLIENT_ID || '' }}
     steps:
       - name: Check this build may be published
         if: inputs.publish

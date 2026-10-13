@@ -79,6 +79,17 @@ describe.each(DESKTOP_PATCHES)('unoblox provider lock in %s', (desktopPatch) => 
     expect(evaluateJs(models, { DSH_DESKTOP_UNOBLOX_MODELS: JSON.stringify(live) })).toEqual(live)
   })
 
+  it('gives the info strip the launch\'s free models, or none', () => {
+    const { entries } = compose(desktopPatch)
+    const info = entries.find((candidate) => candidate.id === 'dsh-desktop-unoblox-info')
+    // Safe Mode leaves the strip out.
+    if (info === undefined) return
+    const freeModels = (info.config as { freeModels: unknown }).freeModels
+    expect(evaluateJs(freeModels, {})).toEqual([])
+    expect(evaluateJs(freeModels, { DSH_DESKTOP_UNOBLOX_FREE_MODELS: '{not json' })).toEqual([])
+    expect(evaluateJs(freeModels, { DSH_DESKTOP_UNOBLOX_FREE_MODELS: '["qwen/qwen3.8-27b", 3]' })).toEqual(['qwen/qwen3.8-27b'])
+  })
+
   it('disables the DeepSeek API-key and account adapters', () => {
     const { entries } = compose(desktopPatch)
     expect(entry(entries, 'llm-deepseek').disabled).toBe(true)

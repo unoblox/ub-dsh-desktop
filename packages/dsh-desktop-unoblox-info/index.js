@@ -17,7 +17,10 @@ export const INFO_ROUTE = '/api/desktop-unoblox.info'
 
 export const Config = z.object({
   provider: z.string().default('unoblox'),
-  apiKeyEnv: z.string().default('UNOBLOX_API_KEY')
+  apiKeyEnv: z.string().default('UNOBLOX_API_KEY'),
+  // unoblox's freemium models in picker order (DSH_DESKTOP_UNOBLOX_FREE_MODELS,
+  // see build/dsh-desktop.patch.yml); offered when a turn is refused for balance.
+  freeModels: z.array(z.string()).default([])
 })
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
@@ -35,6 +38,7 @@ export function apply(ctx, config, deps = {}) {
   const provider = config?.provider ?? 'unoblox'
   const ref = credentialRef(config?.apiKeyEnv ?? 'UNOBLOX_API_KEY')
   const turns = createTurnStore(deps.now === undefined ? {} : { now: deps.now })
+  const freeModels = Array.isArray(config?.freeModels) ? config.freeModels.filter((id) => typeof id === 'string' && id !== '') : []
 
   ctx.on('llm-pi-ai/response', (response) => {
     if (!isRecord(response) || response.provider !== provider) return
@@ -65,7 +69,8 @@ export function apply(ctx, config, deps = {}) {
       return Response.json({
         key,
         billing: turns.latestBilling() ?? null,
-        turn: turn ?? null
+        turn: turn ?? null,
+        freeModels
       }, { headers: NO_STORE })
     }
   })

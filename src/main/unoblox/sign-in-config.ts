@@ -5,10 +5,10 @@ import type { SignInConfig } from './sign-in'
  * unoblox.ai's same-origin proxy (it has no host of its own); the browser
  * page that signs the user in is unoblox.ai/oauth/authorize.
  *
- * The client id is set when the app is built (UNOBLOX_WORKS_SIGNIN_CLIENT_ID,
- * see electron.vite.config.ts): a build without one hides sign-in, and users
- * paste a key as before. Identity matches redirect URIs exactly, port
- * included, so the port below is registered with that client.
+ * Builds sign in with the production client below; UNOBLOX_WORKS_SIGNIN_CLIENT_ID
+ * at build time (electron.vite.config.ts) names another one. Its registered
+ * redirect is http://127.0.0.1:53682/callback, and identity matches any port
+ * on 127.0.0.1 against it (RFC 8252), so the OS picks a free port.
  *
  * Test hooks (environment): UNOBLOX_WORKS_SIGNIN_AUTHORIZE_URL,
  * UNOBLOX_WORKS_SIGNIN_TOKEN_URL, UNOBLOX_WORKS_SIGNIN_REVOKE_URL,
@@ -20,23 +20,23 @@ import type { SignInConfig } from './sign-in'
 export const SIGN_IN_AUTHORIZE_URL = 'https://unoblox.ai/oauth/authorize'
 export const SIGN_IN_TOKEN_URL = 'https://unoblox.ai/api/identity/oauth/token'
 export const SIGN_IN_REVOKE_URL = 'https://unoblox.ai/api/identity/oauth/revoke'
-/**
- * Identity registers only http://127.0.0.1:53682/callback and, until any-port
- * matching is live, compares the port exactly: another port would be refused.
- */
+/** The registered redirect's port, used when any-port matching is switched off. */
 export const SIGN_IN_PORTS: readonly number[] = [53682]
 /**
- * Identity is adding RFC 8252 any-port matching for registered 127.0.0.1
- * redirects. Once identity says it is live in production, set this to true:
- * the OS then picks the port, and the registered 53682 URI matches it.
+ * Identity matches any port on a registered 127.0.0.1 redirect (live in
+ * production since 2026-10-13), so the OS picks one: sign-in never fails
+ * because another program holds 53682.
  */
-export const SIGN_IN_ANY_PORT = false
+export const SIGN_IN_ANY_PORT = true
+/** The production "unoblox works" OAuth client (public; PKCE, no secret). */
+export const SIGN_IN_PRODUCTION_CLIENT_ID = 'ubc_caba2302ca6e89dd9f0cdda7f6097624'
 export const SIGN_IN_SCOPE = 'inference'
 
 declare const __UNOBLOX_SIGNIN_CLIENT_ID__: string | undefined
 declare const __UNOBLOX_SIGNIN_TEST_HOOKS__: boolean | undefined
 
-export const SIGN_IN_CLIENT_ID: string = typeof __UNOBLOX_SIGNIN_CLIENT_ID__ === 'string' ? __UNOBLOX_SIGNIN_CLIENT_ID__ : ''
+export const SIGN_IN_CLIENT_ID: string =
+  typeof __UNOBLOX_SIGNIN_CLIENT_ID__ === 'string' && __UNOBLOX_SIGNIN_CLIENT_ID__ !== '' ? __UNOBLOX_SIGNIN_CLIENT_ID__ : SIGN_IN_PRODUCTION_CLIENT_ID
 export const SIGN_IN_TEST_HOOKS_BUILT: boolean =
   typeof __UNOBLOX_SIGNIN_TEST_HOOKS__ !== 'undefined' && __UNOBLOX_SIGNIN_TEST_HOOKS__ === true
 

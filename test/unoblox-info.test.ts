@@ -94,7 +94,7 @@ describe('turn store', () => {
   })
 })
 
-function host(credential: { value?: string, throws?: boolean } | undefined) {
+function host(credential: { value?: string, throws?: boolean } | undefined, config: Record<string, unknown> = {}) {
   const listeners = new Map<string, (payload: unknown) => void>()
   const routes = new Map<string, (request: Request) => Promise<Response>>()
   const warnings: unknown[] = []
@@ -113,7 +113,7 @@ function host(credential: { value?: string, throws?: boolean } | undefined) {
       routes.set(route.path, route.fetch)
     } } }
   }
-  applyInfo(ctx, {}, { now: () => 5 })
+  applyInfo(ctx, config, { now: () => 5 })
   const emit = (payload: unknown) => listeners.get('llm-pi-ai/response')!(payload)
   const read = async (session?: string) => {
     const response = await routes.get(INFO_ROUTE)!(new Request(`http://127.0.0.1${INFO_ROUTE}${session === undefined ? '' : `?session=${session}`}`))
@@ -133,7 +133,8 @@ describe('info route', () => {
     expect(body).toEqual({
       key: 'set',
       billing: { ...turnFromHeaders(CHAT_HEADERS).billing, at: 5 },
-      turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 }
+      turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 },
+      freeModels: []
     })
     // Another conversation sees the account balance but not this routing.
     expect(await read('s2')).toMatchObject({ billing: { balanceInr: 250.5 }, turn: null })
@@ -145,6 +146,11 @@ describe('info route', () => {
     const locked = host({ throws: true })
     expect(await locked.read()).toMatchObject({ key: 'unknown' })
     expect(locked.warnings).toHaveLength(1)
+  })
+
+  it('lists the free models the launch configured, for a balance refusal', async () => {
+    const { read } = host({ value: 'k' }, { freeModels: ['google/gemma-4-26b-a4b-it', 'qwen/qwen3.8-27b', 7, ''] })
+    expect(await read()).toMatchObject({ freeModels: ['google/gemma-4-26b-a4b-it', 'qwen/qwen3.8-27b'] })
   })
 
   it('ignores malformed events', async () => {

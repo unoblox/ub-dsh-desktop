@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authorizeRequestUrl, createPkce, listenForCallback, signInWithUnoblox, SignInError, type SignInConfig } from '../src/main/unoblox/sign-in'
-import { SIGN_IN_ANY_PORT, SIGN_IN_AUTHORIZE_URL, SIGN_IN_PORTS, SIGN_IN_REVOKE_URL, SIGN_IN_TOKEN_URL, signInConfig } from '../src/main/unoblox/sign-in-config'
+import { SIGN_IN_ANY_PORT, SIGN_IN_AUTHORIZE_URL, SIGN_IN_CLIENT_ID, SIGN_IN_PORTS, SIGN_IN_PRODUCTION_CLIENT_ID, SIGN_IN_REVOKE_URL, SIGN_IN_TOKEN_URL, signInConfig } from '../src/main/unoblox/sign-in-config'
 import { deviceName, DEVICE_FILE, SignInDevice, type KeyVault } from '../src/main/unoblox/sign-in-device'
 import { callHarnessRemote } from '../src/main/unoblox/harness-credentials'
 import { UnobloxSignIn } from '../src/main/unoblox/sign-in-service'
@@ -175,7 +175,14 @@ describe('sign-in settings', () => {
   it('is off without a valid client id, so the build falls back to pasting a key', () => {
     expect(signInConfig({}, false, '')).toBeUndefined()
     expect(signInConfig({}, false, 'not-a-client')).toBeUndefined()
-    expect(signInConfig({}, false, CLIENT)).toEqual({ clientId: CLIENT, authorizeUrl: SIGN_IN_AUTHORIZE_URL, tokenUrl: SIGN_IN_TOKEN_URL, revokeUrl: SIGN_IN_REVOKE_URL, ports: SIGN_IN_PORTS, scope: 'inference' })
+    expect(signInConfig({}, false, CLIENT)).toEqual({ clientId: CLIENT, authorizeUrl: SIGN_IN_AUTHORIZE_URL, tokenUrl: SIGN_IN_TOKEN_URL, revokeUrl: SIGN_IN_REVOKE_URL, ports: [0], scope: 'inference' })
+  })
+
+  it('signs in with the production client unless the build names another', () => {
+    expect(SIGN_IN_PRODUCTION_CLIENT_ID).toBe('ubc_caba2302ca6e89dd9f0cdda7f6097624')
+    // The test build defines no client id, as a release build without the override does.
+    expect(SIGN_IN_CLIENT_ID).toBe(SIGN_IN_PRODUCTION_CLIENT_ID)
+    expect(signInConfig({}, false)?.clientId).toBe(SIGN_IN_PRODUCTION_CLIENT_ID)
   })
 
   it('ignores the test hooks in release builds and accepts only unoblox.ai or this machine in test builds', () => {
@@ -187,18 +194,20 @@ describe('sign-in settings', () => {
   })
 
   it('registers the loopback ports identity must allow for the client', () => {
-    // Only this redirect is registered; identity matches its port exactly until any-port ships.
+    // The one registered redirect; with any-port matching it stands for every 127.0.0.1 port.
     expect(SIGN_IN_PORTS).toEqual([53682])
     expect(SIGN_IN_AUTHORIZE_URL).toBe('https://unoblox.ai/oauth/authorize')
     expect(SIGN_IN_TOKEN_URL).toBe('https://unoblox.ai/api/identity/oauth/token')
     expect(SIGN_IN_REVOKE_URL).toBe('https://unoblox.ai/api/identity/oauth/revoke')
   })
 
-  it('keeps the fixed ports until identity matches any loopback port, then lets the OS pick', () => {
-    expect(SIGN_IN_ANY_PORT).toBe(false)
-    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_ANY_PORT: '1' }, true, CLIENT)?.ports).toEqual([0])
+  it('lets the OS pick the port now that identity matches any loopback port', () => {
+    expect(SIGN_IN_ANY_PORT).toBe(true)
+    expect(signInConfig({}, false, CLIENT)?.ports).toEqual([0])
+    // A test build can go back to the registered port.
+    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_ANY_PORT: '0' }, true, CLIENT)?.ports).toEqual(SIGN_IN_PORTS)
     // Release builds ignore the test switch.
-    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_ANY_PORT: '1' }, false, CLIENT)?.ports).toEqual(SIGN_IN_PORTS)
+    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_ANY_PORT: '0' }, false, CLIENT)?.ports).toEqual([0])
     expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_REVOKE_URL: 'https://evil.example/revoke' }, true, CLIENT)).toBeUndefined()
   })
 })

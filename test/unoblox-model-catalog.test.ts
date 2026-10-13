@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   UNOBLOX_AUTO_ROW,
+  UNOBLOX_FREE_MODELS_ENV,
   UNOBLOX_MODELS_ENV,
   UNOBLOX_MODELS_URL,
   catalogEnvironment,
@@ -105,6 +106,20 @@ describe('unoblox model listing', () => {
     expect(isFreeModel({ ...QWEN, pricing: { prompt: '', completion: '0' } })).toBe(false)
     expect(isFreeModel({ ...QWEN, pricing: { prompt: 0, completion: 0 } })).toBe(true)
   })
+
+  it('follows the freemium flag once the listing carries it, whatever the price', () => {
+    // As listed on 2026-10-13: standard prices, charged ₹0 on the free tier.
+    const priced = { pricing: { prompt: '0.00000362', completion: '0.00012217', request: '0' } }
+    expect(isFreeModel({ ...QWEN, ...priced, freemium: true })).toBe(true)
+    expect(isFreeModel({ ...QWEN, freemium: false })).toBe(false)
+    expect(isFreeModel({ ...FABLE, freemium: false })).toBe(false)
+    expect(isFreeModel({ ...QWEN, ...priced, freemium: 'yes' })).toBe(false)
+    const rows = catalogFromListing({ data: [{ ...FABLE, freemium: false }, { ...QWEN, ...priced, freemium: true }, { ...OCR, freemium: true }] })
+    expect(rows?.map((row) => row.name)).toEqual([UNOBLOX_AUTO_ROW.name, `${QWEN.name} · free`, FABLE.name])
+    // A cached free row stays free when read back.
+    const cached = parseCachedCatalog(JSON.stringify({ version: 1, models: rows?.slice(1) }))
+    expect(cached).toEqual(rows)
+  })
 })
 
 describe('catalog resolution', () => {
@@ -169,6 +184,8 @@ describe('catalog resolution', () => {
   })
 
   it('hands the rows to the patch files as JSON', () => {
-    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"unoblox Auto · best value"}]' })
+    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"unoblox Auto · best value"}]', [UNOBLOX_FREE_MODELS_ENV]: '[]' })
+    const rows = [UNOBLOX_AUTO_ROW, { id: 'google/gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B Instruct · free' }, { id: 'qwen/qwen3.8-27b', name: 'Qwen3.8-27B · free' }, { id: 'anthropic/claude-fable-5-1', name: 'Claude Fable 5.1' }]
+    expect(JSON.parse(catalogEnvironment({ rows, source: 'live' })[UNOBLOX_FREE_MODELS_ENV]!)).toEqual(['google/gemma-4-26b-a4b-it', 'qwen/qwen3.8-27b'])
   })
 })

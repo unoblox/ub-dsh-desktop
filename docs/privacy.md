@@ -43,7 +43,7 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 - **Image generation**, if the user configures an OpenAI or Volcengine key in its settings.
 - **Phone pairing over the internet**, if the user picks Internet mode on the pairing page or agrees when no local network is found (Cloudflare or Pinggy).
 - **Links** the user clicks (docs and the website), which open in the system browser.
-- **Sign in with unoblox**, when the user clicks it: the system browser opens `unoblox.ai/oauth/authorize`, where they sign in and approve; the browser comes back to a one-time listener on `127.0.0.1` port 53682 (closed as soon as it answers or after 5 minutes); then the app sends that one-time code, this computer's name and a random install id to `unoblox.ai/api/identity/oauth/token`, which returns the account's API key, named "unoblox works on <computer name>" on the user's keys page. No password passes through the app.
+- **Sign in with unoblox**, when the user clicks it: the system browser opens `unoblox.ai/oauth/authorize`, where they sign in and approve; the browser comes back to a one-time listener on `127.0.0.1`, on a port the operating system picks (closed as soon as it answers or after 5 minutes); then the app sends that one-time code, this computer's name and a random install id to `unoblox.ai/api/identity/oauth/token`, which returns the account's API key, named "unoblox works on <computer name>" on the user's keys page. No password passes through the app.
 - **Sign Out of unoblox…**: `unoblox.ai/api/identity/oauth/revoke` with that key, so it stops working on the account too.
 
 ## Kept on the machine

@@ -122,7 +122,8 @@ window.__ModuleLoader__.load({
       return {
         key: body.key,
         ...(billing === undefined ? {} : { balanceInr: billing.balanceInr, ...(typeof billing.note === 'string' ? { note: billing.note } : {}) }),
-        ...(model === undefined ? {} : { model, ...(typeof routing.reason === 'string' ? { reason: routing.reason } : {}) })
+        ...(model === undefined ? {} : { model, ...(typeof routing.reason === 'string' ? { reason: routing.reason } : {}) }),
+        freeModels: Array.isArray(body.freeModels) ? body.freeModels.filter((id) => typeof id === 'string' && id !== '') : []
       }
     }
 
@@ -272,10 +273,11 @@ window.__ModuleLoader__.load({
     // or resends without a click.
     const UNOBLOX_PROVIDER = 'unoblox'
     const TOP_UP_URL = 'https://unoblox.ai/user/credits/topup'
-    // Served at ₹0 even with no balance (identity, 2026-10-13); the first one
-    // the picker accepts is used. `unoblox/auto` and `unoblox/free` are not
-    // reliable at ₹0. Replace with the /v1/models freemium flag once it ships.
-    const FREE_MODELS = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'google/gemma-4-26b-a4b-it']
+    // The free models come from /v1/models (`freemium`) through the info
+    // route; the first one the picker accepts is used. These stand in when
+    // the route has none (an offline first launch). `unoblox/auto` and
+    // `unoblox/free` are left out: they can be refused at ₹0.
+    const FREE_MODELS = ['qwen/qwen3.8-27b', 'google/gemma-4-26b-a4b-it']
     const REQUEST_KEY = 'desktop-unoblox-request'
 
     function turnNumber(location) {
@@ -444,10 +446,10 @@ window.__ModuleLoader__.load({
     // ---------- composition ----------
 
     function apply(ctx) {
+      const service = createInfoService()
       ctx.inject(['slots', 'locale'], (scope) => {
         installStyles()
         scope.effect(() => scope.locale.register(NS, { zh, en }))
-        const service = createInfoService()
         // After the stock stats pills (0) and the PPT chooser (20).
         scope.slots.inject('conversation.composer.dock', () => scope.slots.register({
           name: 'conversation.composer.dock',
@@ -475,8 +477,9 @@ window.__ModuleLoader__.load({
               const directories = ctx.get('modelDirectories')
               if (!directories) throw new Error('model selection is not available')
               const directory = directories.directoryFor(sessionId)
+              const listed = await service.load(sessionId).then((view) => view.freeModels, () => [])
               let refused
-              for (const model of FREE_MODELS) {
+              for (const model of listed.length > 0 ? listed : FREE_MODELS) {
                 const result = await directory.select({ provider: UNOBLOX_PROVIDER, model })
                 if (result?.ok === true) return model
                 refused = result?.error

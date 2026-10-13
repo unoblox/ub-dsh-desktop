@@ -14,11 +14,14 @@ import { dirname } from 'node:path'
  * launch: a fresh listing when it arrives in time, otherwise the last good
  * listing cached on disk, otherwise Auto alone. `unoblox/auto` is always the
  * first row (and the overlay's default model), then the free models (named
- * "… · free"), then the rest by name.
+ * "… · free"), then the rest by name. The free models' ids also go to the
+ * unoblox info plugin (DSH_DESKTOP_UNOBLOX_FREE_MODELS), which offers them
+ * when a turn is refused for balance.
  */
 
 export const UNOBLOX_MODELS_URL = 'https://api.unoblox.ai/v1/models'
 export const UNOBLOX_MODELS_ENV = 'DSH_DESKTOP_UNOBLOX_MODELS'
+export const UNOBLOX_FREE_MODELS_ENV = 'DSH_DESKTOP_UNOBLOX_FREE_MODELS'
 
 export interface UnobloxModelRow {
   readonly id: string
@@ -61,12 +64,17 @@ function zeroPrice(value: unknown): boolean {
 }
 
 /**
- * Whether unoblox lists the model at no charge: its prompt and completion
- * prices are both zero, and a per-request price, if any, is zero too. The
- * listing has no free-tier flag, so the price is the signal.
+ * Whether unoblox serves the model at ₹0 on the free tier: the listing's
+ * `freemium` flag. Freemium models still list their standard prices (the
+ * charge is ₹0 "at standard rates"), so the price says nothing once the flag
+ * is there. A listing without the flag (before 2026-10-13) counts a model as
+ * free when its prompt and completion prices, and any per-request price, are
+ * zero.
  */
 export function isFreeModel(entry: unknown): boolean {
-  if (!isRecord(entry) || !isRecord(entry.pricing)) return false
+  if (!isRecord(entry)) return false
+  if (typeof entry.freemium === 'boolean') return entry.freemium
+  if (!isRecord(entry.pricing)) return false
   const { prompt, completion, request } = entry.pricing
   return zeroPrice(prompt) && zeroPrice(completion) && (request === undefined || zeroPrice(request))
 }
@@ -129,10 +137,10 @@ export function parseCachedCatalog(raw: string): UnobloxModelRow[] | undefined {
   const rows = catalogFromListing({
     data: value.models.map((row: unknown) => isRecord(row) ? {
       id: row.id,
-      // Cached rows keep the display name; give the suffix back as a price
+      // Cached rows keep the display name; give the suffix back as the flag
       // so the row is grouped and labelled exactly as when it was fetched.
       name: typeof row.name === 'string' && row.name.endsWith(FREE_MODEL_SUFFIX) ? row.name.slice(0, -FREE_MODEL_SUFFIX.length) : row.name,
-      ...(typeof row.name === 'string' && row.name.endsWith(FREE_MODEL_SUFFIX) ? { pricing: { prompt: '0', completion: '0' } } : {}),
+      freemium: typeof row.name === 'string' && row.name.endsWith(FREE_MODEL_SUFFIX),
       context_length: row.contextWindow,
       max_completion_tokens: row.maxTokens,
       input_modalities: Array.isArray(row.input) ? row.input : ['text'],
@@ -252,7 +260,15 @@ export async function catalogForLaunch(
     : { rows: cached, source: 'cache', detail: `listing not ready within ${String(waitMs)} ms` }
 }
 
-/** The environment entry the patch files read. */
+/** The free models' ids, in picker order. */
+export function freeModelIds(rows: readonly UnobloxModelRow[]): string[] {
+  return rows.filter((row) => row.name.endsWith(FREE_MODEL_SUFFIX)).map((row) => row.id)
+}
+
+/** The environment entries the patch files read. */
 export function catalogEnvironment(catalog: ResolvedCatalog): Record<string, string> {
-  return { [UNOBLOX_MODELS_ENV]: JSON.stringify(catalog.rows) }
+  return {
+    [UNOBLOX_MODELS_ENV]: JSON.stringify(catalog.rows),
+    [UNOBLOX_FREE_MODELS_ENV]: JSON.stringify(freeModelIds(catalog.rows))
+  }
 }

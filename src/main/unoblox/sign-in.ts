@@ -37,8 +37,13 @@ export interface SignInConfig {
   readonly authorizeUrl: string
   /** Form-encoded token endpoint that returns the key. */
   readonly tokenUrl: string
+  /** RFC 7009 revocation endpoint for the key this client received. */
+  readonly revokeUrl: string
   readonly clientId: string
-  /** Loopback ports registered for this client, tried in order. */
+  /**
+   * Loopback ports registered for this client, tried in order. `[0]` lets the
+   * OS pick one, for an identity service that matches any loopback port.
+   */
   readonly ports: readonly number[]
   readonly scope?: string
 }
@@ -123,7 +128,9 @@ export async function listenForCallback(ports: readonly number[], state: string,
     })
     if (server) break
   }
-  if (!server) throw new SignInError('ports-busy', 'Every sign-in port is in use by another program.')
+  if (!server) {
+    throw new SignInError('ports-busy', `Sign-in needs port ${ports.join(', ')} on this computer, and another program is using it. Close that program and try again, or paste an API key.`)
+  }
   const listening = server
   const port = (listening.address() as AddressInfo).port
 
@@ -191,10 +198,19 @@ export async function listenForCallback(ports: readonly number[], state: string,
 export type TokenFetch = (url: string, init: RequestInit) => Promise<Response>
 
 /** Exchange the code for the key; the response is the identity service's JSON. */
+/**
+ * This computer, for identity: one active key per user, app and device,
+ * named "<client name> on <device name>".
+ */
+export interface SignInDeviceInfo {
+  readonly id: string
+  readonly name: string
+}
+
 export async function exchangeCode(
   fetchImpl: TokenFetch,
   config: SignInConfig,
-  request: { code: string; verifier: string; redirectUri: string },
+  request: { code: string; verifier: string; redirectUri: string; device?: SignInDeviceInfo },
   signal: AbortSignal
 ): Promise<string> {
   const body = new URLSearchParams({
@@ -202,7 +218,8 @@ export async function exchangeCode(
     code: request.code,
     code_verifier: request.verifier,
     client_id: config.clientId,
-    redirect_uri: request.redirectUri
+    redirect_uri: request.redirectUri,
+    ...(request.device === undefined ? {} : { device_id: request.device.id, device_name: request.device.name })
   })
   let response: Response
   try {
@@ -235,8 +252,32 @@ export async function exchangeCode(
   return key
 }
 
+export const REVOKE_TIMEOUT_MS = 10_000
+
+/**
+ * Revoke the key this client received (RFC 7009; identity answers 200 for any
+ * token). Returns false when unoblox.ai could not be reached or refused.
+ */
+export async function revokeKey(fetchImpl: TokenFetch, config: SignInConfig, key: string): Promise<boolean> {
+  try {
+    const response = await fetchImpl(config.revokeUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token: key, client_id: config.clientId }).toString(),
+      redirect: 'error',
+      signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS)
+    })
+    await response.body?.cancel()
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
 export interface SignInDependencies {
   readonly config: SignInConfig
+  /** Sent with the token request when known. */
+  readonly device?: SignInDeviceInfo
   readonly openBrowser: (url: string) => Promise<void>
   readonly fetch: TokenFetch
   readonly signal: AbortSignal
@@ -256,7 +297,7 @@ export async function signInWithUnoblox(dependencies: SignInDependencies): Promi
       throw new SignInError('network', `Could not open the browser (${error instanceof Error ? error.message : String(error)}).`)
     }
     const code = await listener.code
-    return await exchangeCode(dependencies.fetch, config, { code, verifier, redirectUri: listener.redirectUri }, signal)
+    return await exchangeCode(dependencies.fetch, config, { code, verifier, redirectUri: listener.redirectUri, ...(dependencies.device === undefined ? {} : { device: dependencies.device }) }, signal)
   } finally {
     listener.close()
   }

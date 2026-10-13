@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authorizeRequestUrl, createPkce, listenForCallback, signInWithUnoblox, SignInError, type SignInConfig } from '../src/main/unoblox/sign-in'
-import { SIGN_IN_AUTHORIZE_URL, SIGN_IN_PORTS, SIGN_IN_TOKEN_URL, signInConfig } from '../src/main/unoblox/sign-in-config'
+import { SIGN_IN_ANY_PORT, SIGN_IN_AUTHORIZE_URL, SIGN_IN_PORTS, SIGN_IN_REVOKE_URL, SIGN_IN_TOKEN_URL, signInConfig } from '../src/main/unoblox/sign-in-config'
+import { deviceName, DEVICE_FILE, SignInDevice, type KeyVault } from '../src/main/unoblox/sign-in-device'
 import { callHarnessRemote } from '../src/main/unoblox/harness-credentials'
 import { UnobloxSignIn } from '../src/main/unoblox/sign-in-service'
 
@@ -69,7 +73,7 @@ function fakeIdentity(options: { tokenStatus?: number; tokenBody?: unknown; redi
 }
 
 async function config(count = 3): Promise<SignInConfig> {
-  return { authorizeUrl: 'https://unoblox.ai/oauth/authorize', tokenUrl: 'https://unoblox.ai/api/identity/oauth/token', clientId: CLIENT, ports: await freePorts(count), scope: 'inference' }
+  return { authorizeUrl: 'https://unoblox.ai/oauth/authorize', tokenUrl: 'https://unoblox.ai/api/identity/oauth/token', revokeUrl: 'https://unoblox.ai/api/identity/oauth/revoke', clientId: CLIENT, ports: await freePorts(count), scope: 'inference' }
 }
 
 describe('Sign in with unoblox', () => {
@@ -161,7 +165,7 @@ describe('Sign in with unoblox', () => {
     expect(a.verifier).not.toBe(b.verifier)
     expect(a.challenge).toBe(base64url(createHash('sha256').update(a.verifier).digest()))
     expect(a.verifier).toMatch(/^[A-Za-z0-9_-]{43}$/u)
-    const url = new URL(authorizeRequestUrl({ authorizeUrl: SIGN_IN_AUTHORIZE_URL, tokenUrl: SIGN_IN_TOKEN_URL, clientId: CLIENT, ports: [1] }, 'http://127.0.0.1:1/callback', a.challenge, 'st'))
+    const url = new URL(authorizeRequestUrl({ authorizeUrl: SIGN_IN_AUTHORIZE_URL, tokenUrl: SIGN_IN_TOKEN_URL, revokeUrl: SIGN_IN_REVOKE_URL, clientId: CLIENT, ports: [1] }, 'http://127.0.0.1:1/callback', a.challenge, 'st'))
     expect(url.searchParams.get('code_challenge')).toBe(a.challenge)
     expect(url.searchParams.has('scope')).toBe(false)
   })
@@ -171,7 +175,7 @@ describe('sign-in settings', () => {
   it('is off without a valid client id, so the build falls back to pasting a key', () => {
     expect(signInConfig({}, false, '')).toBeUndefined()
     expect(signInConfig({}, false, 'not-a-client')).toBeUndefined()
-    expect(signInConfig({}, false, CLIENT)).toEqual({ clientId: CLIENT, authorizeUrl: SIGN_IN_AUTHORIZE_URL, tokenUrl: SIGN_IN_TOKEN_URL, ports: SIGN_IN_PORTS, scope: 'inference' })
+    expect(signInConfig({}, false, CLIENT)).toEqual({ clientId: CLIENT, authorizeUrl: SIGN_IN_AUTHORIZE_URL, tokenUrl: SIGN_IN_TOKEN_URL, revokeUrl: SIGN_IN_REVOKE_URL, ports: SIGN_IN_PORTS, scope: 'inference' })
   })
 
   it('ignores the test hooks in release builds and accepts only unoblox.ai or this machine in test builds', () => {
@@ -183,13 +187,29 @@ describe('sign-in settings', () => {
   })
 
   it('registers the loopback ports identity must allow for the client', () => {
-    expect(SIGN_IN_PORTS).toEqual([53682, 53683, 53684])
+    // Only this redirect is registered; identity matches its port exactly until any-port ships.
+    expect(SIGN_IN_PORTS).toEqual([53682])
     expect(SIGN_IN_AUTHORIZE_URL).toBe('https://unoblox.ai/oauth/authorize')
     expect(SIGN_IN_TOKEN_URL).toBe('https://unoblox.ai/api/identity/oauth/token')
+    expect(SIGN_IN_REVOKE_URL).toBe('https://unoblox.ai/api/identity/oauth/revoke')
+  })
+
+  it('keeps the fixed ports until identity matches any loopback port, then lets the OS pick', () => {
+    expect(SIGN_IN_ANY_PORT).toBe(false)
+    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_ANY_PORT: '1' }, true, CLIENT)?.ports).toEqual([0])
+    // Release builds ignore the test switch.
+    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_ANY_PORT: '1' }, false, CLIENT)?.ports).toEqual(SIGN_IN_PORTS)
+    expect(signInConfig({ UNOBLOX_WORKS_SIGNIN_REVOKE_URL: 'https://evil.example/revoke' }, true, CLIENT)).toBeUndefined()
   })
 })
 
 describe('the sign-in service', () => {
+  let home = ''
+  // A stand-in for the OS keychain: reversible, and visibly not plain text.
+  const vault: KeyVault = { encrypt: (text) => Buffer.from(`enc:${Buffer.from(text).toString('hex')}`), decrypt: (data) => Buffer.from(data.toString().slice(4), 'hex').toString() }
+  beforeEach(async () => { home = await mkdtemp(join(tmpdir(), 'signin-home-')) })
+  afterEach(async () => { await rm(home, { recursive: true, force: true }) })
+
   function service(overrides: Partial<ConstructorParameters<typeof UnobloxSignIn>[0]> = {}) {
     const stored: unknown[] = []
     const harnessFetch = vi.fn(async (url: URL, init: RequestInit) => {
@@ -199,11 +219,13 @@ describe('the sign-in service', () => {
       return new Response(JSON.stringify({ rpcId: body.rpcId, result: { ok: true } }))
     })
     const sign = new UnobloxSignIn({
-      config: () => ({ authorizeUrl: 'https://unoblox.ai/oauth/authorize', tokenUrl: 'https://unoblox.ai/x', clientId: CLIENT, ports: [] }),
+      config: () => ({ authorizeUrl: 'https://unoblox.ai/oauth/authorize', tokenUrl: 'https://unoblox.ai/x', revokeUrl: 'https://unoblox.ai/r', clientId: CLIENT, ports: [] }),
       harness: () => ({ url: 'http://127.0.0.1:4000/', authToken: 'launch' }),
       openBrowser: async () => {},
       tokenFetch: async () => new Response('{}'),
       harnessFetch,
+      device: new SignInDevice(() => home, () => vault),
+      deviceName: () => 'Test MacBook',
       log: () => {},
       ...overrides
     })
@@ -245,9 +267,11 @@ describe('the sign-in service', () => {
     await expect(off.signIn()).resolves.toMatchObject({ ok: false, code: 'not-configured' })
   })
 
-  it('signs out by removing the key from the credential store', async () => {
-    const { sign, stored } = service()
-    await expect(sign.signOut()).resolves.toEqual({ ok: true })
+  it('signs out a pasted key by removing it here only', async () => {
+    const revoke = vi.fn(async () => new Response(null))
+    const { sign, stored } = service({ tokenFetch: revoke })
+    await expect(sign.signOut()).resolves.toEqual({ ok: true, revoked: 'not-kept' })
+    expect(revoke).not.toHaveBeenCalled()
     expect(stored).toEqual([{ path: '/api/credentials/unset', method: 'credentials/unset', args: { ref: 'UNOBLOX_API_KEY' }, cookie: 'dsh=session' }])
   })
 
@@ -263,5 +287,89 @@ describe('the sign-in service', () => {
 describe('SignInError', () => {
   it('carries a code the page can act on', () => {
     expect(new SignInError('cancelled', 'x')).toMatchObject({ code: 'cancelled', name: 'SignInError' })
+  })
+})
+
+describe('this computer, for identity', () => {
+  let home = ''
+  const vault: KeyVault = { encrypt: (text) => Buffer.from(`enc:${Buffer.from(text).toString('hex')}`), decrypt: (data) => Buffer.from(data.toString().slice(4), 'hex').toString() }
+  beforeEach(async () => { home = await mkdtemp(join(tmpdir(), 'signin-device-')) })
+  afterEach(async () => { await rm(home, { recursive: true, force: true }) })
+
+  it('keeps one random install id across restarts, readable only by the user', async () => {
+    const id = await new SignInDevice(() => home, () => vault).deviceId()
+    expect(id).toMatch(/^[A-Za-z0-9_-]{43}$/u)
+    // A new process (restart or update) reads the same file.
+    await expect(new SignInDevice(() => home, () => vault).deviceId()).resolves.toBe(id)
+    if (process.platform !== 'win32') expect((await stat(join(home, DEVICE_FILE))).mode & 0o777).toBe(0o600)
+    await expect(new SignInDevice(() => join(home, 'other'), () => vault).deviceId()).resolves.not.toBe(id)
+  })
+
+  it('replaces a damaged file with a new id', async () => {
+    await writeFile(join(home, DEVICE_FILE), '{"deviceId":"short"}')
+    await expect(new SignInDevice(() => home, () => vault).deviceId()).resolves.toMatch(/^[A-Za-z0-9_-]{43}$/u)
+  })
+
+  it('keeps the signed-in key only encrypted, and only when the OS can encrypt it', async () => {
+    const device = new SignInDevice(() => home, () => vault)
+    await device.rememberKey(KEY)
+    const file = await readFile(join(home, DEVICE_FILE), 'utf8')
+    expect(file).not.toContain(KEY)
+    await expect(device.revocableKey()).resolves.toBe(KEY)
+    await device.forgetKey()
+    await expect(device.revocableKey()).resolves.toBeUndefined()
+    const id = await device.deviceId()
+    const plain = new SignInDevice(() => home, () => undefined)
+    await plain.rememberKey(KEY)
+    expect(await readFile(join(home, DEVICE_FILE), 'utf8')).not.toContain(KEY)
+    await expect(plain.revocableKey()).resolves.toBeUndefined()
+    await expect(plain.deviceId()).resolves.toBe(id)
+  })
+
+  it('names the computer from its host name, or plainly', () => {
+    expect(deviceName('Pawans-MacBook-Pro.local', 'darwin')).toBe('Pawans-MacBook-Pro')
+    expect(deviceName("Asha's\u0007 PC", 'win32')).toBe("Asha's PC")
+    expect(deviceName('x'.repeat(100), 'linux')).toHaveLength(64)
+    expect(deviceName('', 'darwin')).toBe('macOS computer')
+    expect(deviceName('  ', 'win32')).toBe('Windows computer')
+    expect(deviceName('', 'linux')).toBe('Linux computer')
+  })
+
+  it('sends the device with the token request, and revokes before removing on sign-out', async () => {
+    const settings = await config(1)
+    const identity = fakeIdentity()
+    const revoked: URLSearchParams[] = []
+    const tokenFetch = async (url: string, init: RequestInit) => {
+      if (url.endsWith('/revoke')) { revoked.push(new URLSearchParams(String(init.body))); return new Response(null, { status: 200 }) }
+      return identity.token(url, init)
+    }
+    const calls: string[] = []
+    const harnessFetch = async (_url: URL, init: RequestInit) => {
+      if (init.method === 'GET') return new Response(null, { status: 302, headers: { 'set-cookie': 'dsh=s' } })
+      const body = JSON.parse(String(init.body)) as { rpcId: string; method: string }
+      calls.push(body.method)
+      return new Response(JSON.stringify({ rpcId: body.rpcId, result: { ok: true } }))
+    }
+    const device = new SignInDevice(() => home, () => vault)
+    const sign = new UnobloxSignIn({ config: () => settings, harness: () => ({ url: 'http://127.0.0.1:1/', authToken: 't' }), openBrowser: identity.browser, tokenFetch, harnessFetch, device, deviceName: () => 'Test MacBook', log: () => {} })
+    await expect(sign.signIn()).resolves.toEqual({ ok: true })
+    expect(identity.seen.token?.get('device_name')).toBe('Test MacBook')
+    expect(identity.seen.token?.get('device_id')).toBe(await device.deviceId())
+    await expect(sign.signOut()).resolves.toEqual({ ok: true, revoked: 'yes' })
+    expect(revoked.map((p) => [p.get('token'), p.get('client_id')])).toEqual([[KEY, CLIENT]])
+    expect(calls).toEqual(['credentials/set', 'credentials/unset'])
+    await expect(device.revocableKey()).resolves.toBeUndefined()
+  })
+
+  it('still signs out when unoblox.ai cannot be reached, and says so', async () => {
+    const device = new SignInDevice(() => home, () => vault)
+    await device.rememberKey(KEY)
+    const harnessFetch = async (_url: URL, init: RequestInit) => init.method === 'GET'
+      ? new Response(null, { status: 302, headers: { 'set-cookie': 'dsh=s' } })
+      : new Response(JSON.stringify({ rpcId: (JSON.parse(String(init.body)) as { rpcId: string }).rpcId, result: { ok: true } }))
+    const offline = async () => { throw new TypeError('fetch failed') }
+    const withConfig = new UnobloxSignIn({ config: () => ({ authorizeUrl: 'https://unoblox.ai/a', tokenUrl: 'https://unoblox.ai/t', revokeUrl: 'https://unoblox.ai/r', clientId: CLIENT, ports: [53682] }), harness: () => ({ url: 'http://127.0.0.1:1/', authToken: 't' }), openBrowser: async () => {}, tokenFetch: offline, harnessFetch, device, deviceName: () => 'x', log: () => {} })
+    await expect(withConfig.signOut()).resolves.toEqual({ ok: true, revoked: 'unreachable' })
+    await expect(device.revocableKey()).resolves.toBeUndefined()
   })
 })

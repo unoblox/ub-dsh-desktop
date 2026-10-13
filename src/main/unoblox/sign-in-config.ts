@@ -8,17 +8,29 @@ import type { SignInConfig } from './sign-in'
  * The client id is set when the app is built (UNOBLOX_WORKS_SIGNIN_CLIENT_ID,
  * see electron.vite.config.ts): a build without one hides sign-in, and users
  * paste a key as before. Identity matches redirect URIs exactly, port
- * included, so these ports must all be registered with that client.
+ * included, so the port below is registered with that client.
  *
  * Test hooks (environment): UNOBLOX_WORKS_SIGNIN_AUTHORIZE_URL,
- * UNOBLOX_WORKS_SIGNIN_TOKEN_URL and UNOBLOX_WORKS_SIGNIN_CLIENT_ID point a
+ * UNOBLOX_WORKS_SIGNIN_TOKEN_URL, UNOBLOX_WORKS_SIGNIN_REVOKE_URL,
+ * UNOBLOX_WORKS_SIGNIN_CLIENT_ID and UNOBLOX_WORKS_SIGNIN_ANY_PORT (1/0) point a
  * build at staging. As with the update feed, release builds ignore them; a
  * development run or a build made with UNOBLOX_WORKS_SIGNIN_TEST_BUILD=1
  * honours them.
  */
 export const SIGN_IN_AUTHORIZE_URL = 'https://unoblox.ai/oauth/authorize'
 export const SIGN_IN_TOKEN_URL = 'https://unoblox.ai/api/identity/oauth/token'
-export const SIGN_IN_PORTS: readonly number[] = [53682, 53683, 53684]
+export const SIGN_IN_REVOKE_URL = 'https://unoblox.ai/api/identity/oauth/revoke'
+/**
+ * Identity registers only http://127.0.0.1:53682/callback and, until any-port
+ * matching is live, compares the port exactly: another port would be refused.
+ */
+export const SIGN_IN_PORTS: readonly number[] = [53682]
+/**
+ * Identity is adding RFC 8252 any-port matching for registered 127.0.0.1
+ * redirects. Once identity says it is live in production, set this to true:
+ * the OS then picks the port, and the registered 53682 URI matches it.
+ */
+export const SIGN_IN_ANY_PORT = false
 export const SIGN_IN_SCOPE = 'inference'
 
 declare const __UNOBLOX_SIGNIN_CLIENT_ID__: string | undefined
@@ -61,7 +73,9 @@ export function signInConfig(env: NodeJS.ProcessEnv, allowOverrides: boolean, bu
   const clientId = pick('UNOBLOX_WORKS_SIGNIN_CLIENT_ID', builtClientId)
   const authorizeUrl = pick('UNOBLOX_WORKS_SIGNIN_AUTHORIZE_URL', SIGN_IN_AUTHORIZE_URL)
   const tokenUrl = pick('UNOBLOX_WORKS_SIGNIN_TOKEN_URL', SIGN_IN_TOKEN_URL)
+  const revokeUrl = pick('UNOBLOX_WORKS_SIGNIN_REVOKE_URL', SIGN_IN_REVOKE_URL)
+  const anyPort = allowOverrides && env.UNOBLOX_WORKS_SIGNIN_ANY_PORT !== undefined ? env.UNOBLOX_WORKS_SIGNIN_ANY_PORT === '1' : SIGN_IN_ANY_PORT
   const allowed = allowOverrides ? isTestUrl : isUnobloxUrl
-  if (!CLIENT_ID_PATTERN.test(clientId) || !allowed(authorizeUrl) || !allowed(tokenUrl)) return undefined
-  return { clientId, authorizeUrl, tokenUrl, ports: SIGN_IN_PORTS, scope: SIGN_IN_SCOPE }
+  if (!CLIENT_ID_PATTERN.test(clientId) || !allowed(authorizeUrl) || !allowed(tokenUrl) || !allowed(revokeUrl)) return undefined
+  return { clientId, authorizeUrl, tokenUrl, revokeUrl, ports: anyPort ? [0] : SIGN_IN_PORTS, scope: SIGN_IN_SCOPE }
 }

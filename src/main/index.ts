@@ -6,6 +6,7 @@ import { disableSpellcheckDownloads, noAutomaticRegistryLookup } from './network
 import { UNOBLOX_UPDATE_FEED_CONFIGURED } from './update/update-policy'
 import { SIGN_IN_TEST_HOOKS_BUILT, signInConfig } from './unoblox/sign-in-config'
 import { UnobloxSignIn } from './unoblox/sign-in-service'
+import { deviceName, SignInDevice, type KeyVault } from './unoblox/sign-in-device'
 import { DEV_PRODUCT_NAME, PRODUCT_NAME } from '../shared/brand'
 import { catalogEnvironment, catalogForLaunch, refreshUnobloxCatalog, type ResolvedCatalog } from './unoblox/model-catalog'
 import { documentsEnvironment } from './runtime/documents-directory'
@@ -13,7 +14,7 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { homedir } from 'node:os'
+import { homedir, hostname } from 'node:os'
 import { parse } from 'yaml'
 import {
   app,
@@ -23,6 +24,7 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  safeStorage,
   shell,
   Tray,
   utilityProcess,
@@ -248,8 +250,22 @@ const unobloxSignIn = new UnobloxSignIn({
   // Chromium's network stack honours the system proxy and certificate store.
   tokenFetch: (url, init) => net.fetch(url, init),
   harnessFetch: (url, init) => fetch(url, init),
+  device: new SignInDevice(() => app.getPath('userData'), signInVault),
+  deviceName: () => deviceName(hostname(), process.platform),
   log: (message) => runtime?.note(message)
 })
+
+/**
+ * The OS keychain (macOS Keychain, Windows DPAPI, the Linux secret service)
+ * for the copy of the signed-in key kept to revoke it. Linux without a secret
+ * service falls back to a fixed password ("basic_text"), which protects
+ * nothing, so no copy is kept there.
+ */
+function signInVault(): KeyVault | undefined {
+  if (!safeStorage.isEncryptionAvailable()) return undefined
+  if (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text') return undefined
+  return { encrypt: (text) => safeStorage.encryptString(text), decrypt: (data) => safeStorage.decryptString(data) }
+}
 let desktopStorageManager: DesktopStorageManager | undefined
 let windowStateManager: WindowStateManager | undefined
 let mobileBridge: LanMobileBridge
@@ -3113,6 +3129,9 @@ function setAutomaticUpdates(value: boolean): void {
   installMenu()
 }
 
+/** Where users manage their API keys on unoblox.ai. */
+const UNOBLOX_KEYS_PAGE_URL = 'https://unoblox.ai/user/keys'
+
 async function signInFromMenu(): Promise<void> {
   const isChinese = harnessLocale() === 'zh'
   const result = await unobloxSignIn.signIn()
@@ -3135,10 +3154,10 @@ async function signOutFromMenu(): Promise<void> {
     buttons: isChinese ? ['退出登录', '取消'] : ['Sign Out', 'Cancel'],
     defaultId: 1,
     cancelId: 1,
-    message: isChinese ? '从这台电脑上移除 unoblox API 密钥？' : 'Remove the unoblox API key from this computer?',
+    message: isChinese ? '退出 unoblox 登录？' : 'Sign out of unoblox?',
     detail: isChinese
-      ? '移除后，unoblox works 在你重新登录或粘贴密钥之前无法使用模型。该密钥在你的 unoblox 账户中仍然有效，可以在 unoblox.ai 的 API 密钥页面删除。'
-      : 'unoblox works cannot use models until you sign in again or paste a key. The key stays active on your unoblox account; you can delete it on unoblox.ai under API keys.'
+      ? '这台电脑的 API 密钥会被撤销并移除。退出后，unoblox works 在你重新登录或粘贴密钥之前无法使用模型。'
+      : 'This computer’s API key is revoked and removed. unoblox works cannot use models until you sign in again or paste a key.'
   })
   if (confirm.response !== 0) return
   const result = await unobloxSignIn.signOut()
@@ -3148,7 +3167,25 @@ async function signOutFromMenu(): Promise<void> {
       message: isChinese ? '未能移除密钥' : 'Could not remove the key',
       detail: result.message
     })
+    return
   }
+  if (result.revoked === 'yes') return
+  // Removed here, but still active on the account: offline, a pasted key, or no keychain to keep a copy.
+  const followUp = await dialog.showMessageBox({
+    type: 'info',
+    buttons: isChinese ? ['打开 unoblox.ai', '好'] : ['Open unoblox.ai', 'OK'],
+    defaultId: 1,
+    cancelId: 1,
+    message: isChinese ? '已在这台电脑上退出登录' : 'Signed out on this computer',
+    detail: result.revoked === 'unreachable'
+      ? (isChinese
+          ? '无法连接 unoblox.ai，所以密钥仍然有效。请在 unoblox.ai 的“设置 › API 密钥”中删除它。'
+          : 'We couldn’t reach unoblox.ai, so the key is still active. Also remove it on unoblox.ai under Settings › API keys.')
+      : (isChinese
+          ? '这个密钥在你的 unoblox 账户中仍然有效。如不再需要，请在 unoblox.ai 的“设置 › API 密钥”中删除它。'
+          : 'The key is still active on your unoblox account. If you no longer need it, delete it on unoblox.ai under Settings › API keys.')
+  })
+  if (followUp.response === 0) await shell.openExternal(UNOBLOX_KEYS_PAGE_URL)
 }
 
 function installMenu(): void {

@@ -43,11 +43,12 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 - **Image generation**, if the user configures an OpenAI or Volcengine key in its settings.
 - **Phone pairing over the internet**, if the user picks Internet mode on the pairing page or agrees when no local network is found (Cloudflare or Pinggy).
 - **Links** the user clicks (docs and the website), which open in the system browser.
-- **Sign in with unoblox**, when the user clicks it: the system browser opens `unoblox.ai/oauth/authorize`, where they sign in and approve; the browser comes back to a one-time listener on `127.0.0.1` (ports 53682–53684, closed as soon as it answers or after 5 minutes); then the app sends that one-time code to `unoblox.ai/api/identity/oauth/token`, which returns the account's API key. No password passes through the app.
+- **Sign in with unoblox**, when the user clicks it: the system browser opens `unoblox.ai/oauth/authorize`, where they sign in and approve; the browser comes back to a one-time listener on `127.0.0.1` port 53682 (closed as soon as it answers or after 5 minutes); then the app sends that one-time code, this computer's name and a random install id to `unoblox.ai/api/identity/oauth/token`, which returns the account's API key, named "unoblox works on <computer name>" on the user's keys page. No password passes through the app.
+- **Sign Out of unoblox…**: `unoblox.ai/api/identity/oauth/revoke` with that key, so it stops working on the account too.
 
 ## Kept on the machine
 
-- The unoblox API key: in the Harness credential store, never sent anywhere but `api.unoblox.ai`, and never to the renderer. A key from **Sign in with unoblox** goes from the token response straight into that store in the main process. **Sign Out of unoblox…** removes it from this computer; the key stays active on the user's account until they delete it on unoblox.ai, because the identity service has no endpoint an app can use to revoke its own key yet.
+- The unoblox API key: in the Harness credential store, never sent anywhere but `api.unoblox.ai`, and never to the renderer. A key from **Sign in with unoblox** goes from the token response straight into that store in the main process. **Sign Out of unoblox…** revokes it on unoblox.ai, then removes it from this computer even when unoblox.ai cannot be reached (the dialog then says to delete it at unoblox.ai/user/keys). To be able to revoke it, the app keeps a copy of the signed-in key encrypted by the operating system (macOS Keychain, Windows DPAPI, the Linux secret service) in `unoblox-device.json` in its data folder, next to the random install id; without such a service (Linux `basic_text`) no copy is kept.
 - Conversations, workspaces and settings: under the app's user-data folder.
 - Local diagnostics: the harness log, used only by the app's own recovery screens.
 

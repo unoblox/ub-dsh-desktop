@@ -1,5 +1,5 @@
 diff --git a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
-index 0c74b3a..b138d9f 100644
+index 0c74b3a..4a9f9bb 100644
 --- a/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 +++ b/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js
 @@ -1378,8 +1378,9 @@ function mapUsage(usage) {
@@ -13,10 +13,49 @@ index 0c74b3a..b138d9f 100644
  	if (/\b429\b|rate.?limit/i.test(message)) return "RATE_LIMIT";
  	if (/\b413\b|failed to buffer the request body:\s*length limit exceeded|payload too large|request body too large/i.test(message)) return "INVALID_REQUEST";
  	if (/\b400\b|invalid.?request/i.test(message)) return "INVALID_REQUEST";
-@@ -1454,6 +1455,14 @@ function mapStopReason(message, contextWindow) {
- 		}
+@@ -1444,9 +1445,10 @@ function mapStopReason(message, contextWindow) {
+ 		};
+ 		case "error": {
+ 			const text = message.errorMessage ?? "pi-ai stream error";
++			const gateway = unobloxGatewayFailure(text);
+ 			return {
+ 				kind: "error",
+-				failure: {
++				failure: gateway ?? {
+ 					message: text,
+ 					code: classifyPiAiError(text)
+ 				}
+@@ -1455,6 +1457,42 @@ function mapStopReason(message, contextWindow) {
  	}
  }
+ /**
++* unoblox desktop: the unoblox gateway answers a refused request with an
++* OpenAI-style body carrying a stable `error_code` (UB-GW-…), and pi-ai hands
++* it over as "<status>: {json}". Turn that into the gateway's own message (it
++* carries the ₹ figures) and keep the status, so the chat shows a sentence and
++* the desktop plugin can offer "Top up" or "Use a free model" for a 402.
++* Every 402 is a balance or spending limit there (UB-GW-003/295/068/004/005/306).
++* Anything else keeps pi-ai's text and the stock classification.
++*/
++function unobloxGatewayFailure(text) {
++	const match = /^\s*(\d{3})\b[\s:]*(\{[\s\S]*\})\s*$/.exec(text);
++	if (match === null) return void 0;
++	let body;
++	try {
++		body = JSON.parse(match[2]);
++	} catch {
++		return void 0;
++	}
++	const error = body !== null && typeof body === "object" && body.error !== null && typeof body.error === "object" ? body.error : body;
++	if (error === null || typeof error !== "object" || typeof error.error_code !== "string" || !/^UB-[A-Z]+-\d+$/.test(error.error_code)) return void 0;
++	const status = Number(match[1]);
++	const said = typeof error.message === "string" && error.message.trim() !== "" ? error.message.trim() : `unoblox refused the request (HTTP ${match[1]})`;
++	return {
++		message: `${said} (${error.error_code})`,
++		code: status === 402 ? "UNOBLOX_BALANCE" : classifyPiAiError(`${match[1]} ${said}`),
++		...status >= 100 && status <= 599 ? { status } : {}
++	};
++}
 +/** Restore the terminal content array from completed stream blocks when a provider omits it. */
 +function completeTerminalMessage(message, completed) {
 +	if (Array.isArray(message.content)) return message;
@@ -25,10 +64,11 @@ index 0c74b3a..b138d9f 100644
 +		content: [...completed.entries()].sort(([left], [right]) => left - right).map(([, block]) => block)
 +	};
 +}
- /**
++/**
  * Translate the pi-ai event stream into StreamChunks. pi-ai never throws
  * mid-stream — failures arrive as `error` events, which become error/aborted
-@@ -1468,6 +1477,7 @@ function mapStopReason(message, contextWindow) {
+ * `finish` chunks (the harness protocol's other error-delivery style).
+@@ -1468,6 +1506,7 @@ function mapStopReason(message, contextWindow) {
  */
  async function* toStreamChunks(events, contextWindow, callerSignal, requestedModel) {
  	const toolIds = /* @__PURE__ */ new Map();
@@ -36,7 +76,7 @@ index 0c74b3a..b138d9f 100644
  	for await (const event of events) switch (event.type) {
  		case "start": break;
  		case "text_start":
-@@ -1484,16 +1494,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
+@@ -1484,16 +1523,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
  				text: event.delta
  			};
  			break;
@@ -61,7 +101,7 @@ index 0c74b3a..b138d9f 100644
  		case "thinking_start":
  			yield {
  				type: "block-start",
-@@ -1508,16 +1521,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
+@@ -1508,16 +1550,19 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
  				text: event.delta
  			};
  			break;
@@ -86,7 +126,7 @@ index 0c74b3a..b138d9f 100644
  		case "toolcall_start": {
  			const partial = event.partial.content[event.contentIndex];
  			const id = partial?.type === "toolCall" ? partial.id : "";
-@@ -1544,29 +1560,34 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
+@@ -1544,29 +1589,34 @@ async function* toStreamChunks(events, contextWindow, callerSignal, requestedMod
  			};
  			break;
  		}
@@ -132,7 +172,7 @@ index 0c74b3a..b138d9f 100644
  		case "error":
  			yield {
  				type: "usage",
-@@ -1670,6 +1691,15 @@ var __disposeResources = (function(SuppressedError) {
+@@ -1670,6 +1720,15 @@ var __disposeResources = (function(SuppressedError) {
  	var e = new Error(message);
  	return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
  });
@@ -148,7 +188,7 @@ index 0c74b3a..b138d9f 100644
  /** Copy profile stream knobs into pi-ai's common option vocabulary. */
  function profileOptions(profile, reasoning, apiKey) {
  	const enabledReasoning = reasoning === "off" ? void 0 : reasoning;
-@@ -1734,8 +1764,11 @@ function reasoningInfo(model, defaultLevel) {
+@@ -1734,8 +1793,11 @@ function reasoningInfo(model, defaultLevel) {
  	} };
  }
  /** Merge deployment headers while removing case-insensitive attribution collisions. */
@@ -162,7 +202,7 @@ index 0c74b3a..b138d9f 100644
  	const reserved = new Set(Object.keys(attribution).map((name) => name.toLowerCase()));
  	return {
  		...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
-@@ -1884,7 +1917,14 @@ var PiAiAdapter = class extends LlmAdapter {
+@@ -1884,7 +1946,14 @@ var PiAiAdapter = class extends LlmAdapter {
  					...options.maxTokens === void 0 ? {} : { maxTokens: options.maxTokens },
  					...options.sessionId === void 0 ? {} : { sessionId: String(options.sessionId) },
  					signal: watchdog.signal,
@@ -178,7 +218,7 @@ index 0c74b3a..b138d9f 100644
  				}), model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]();
  				let exhausted = false;
  				try {
-@@ -2566,6 +2606,9 @@ function apply(ctx, config) {
+@@ -2566,6 +2635,9 @@ function apply(ctx, config) {
  		const credentials = ctx.get("credentials");
  		const hit = credentials !== void 0 ? (await credentials.resolve(ref))?.value : launchEnvironmentOf(ctx).get(ref)?.value;
  		if (hit !== void 0 && hit.length > 0) return assertUsableApiKey(hit, "llm-pi-ai", ref);
@@ -188,7 +228,7 @@ index 0c74b3a..b138d9f 100644
  		throw new LlmError(`llm-pi-ai: no credential for provider route "${provider}"; its profile resolves ${ref}, which is not set — store ${ref} through the credentials service (the web Models page writes it) or export it, and remove apiKeyEnv only if this provider should authenticate from pi-ai's own environment discovery`, "MISSING_CREDENTIAL");
  	};
  	const auth = {
-@@ -2580,6 +2623,17 @@ function apply(ctx, config) {
+@@ -2580,6 +2652,17 @@ function apply(ctx, config) {
  		resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(attachments, (hostPath) => ctx.get("fs")?.processPathFromHostPath(hostPath), ref),
  		onReplayDegrade: ({ provider, model, reason }) => {
  			ctx.logger.warn(`llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}"; sending that message as provider-neutral content (${reason})`);

@@ -52,6 +52,22 @@ The patched `@deepseek-ai/dsh-client-ui-settings-models` hides the Models page's
 - The search privacy notice is not repeated in the strip, because no API response carries it. It stays in the first-run dialog.
 - Safe Mode does not load the strip.
 
+## When unoblox refuses a turn
+
+The stock error row under a failed turn shows unoblox's own sentence and code. `packages/dsh-desktop-unoblox-info` adds a row of actions under it (slot `conversation.chat.turnTail`):
+
+| Refusal | Shown | What the click does |
+| --- | --- | --- |
+| Any 402: balance or spending limit (`UB-GW-003`/`295`/`068`/`004`/`005`/`306`) | "Retry with a free model", "Top up" | Switches this conversation to the first free model the picker accepts (`qwen/qwen3.8-27b`, then `openai/gpt-oss-120b`, then `google/gemma-4-26b-a4b-it`) and sends the user's message again. Top up opens `https://unoblox.ai/user/credits/topup` in the browser. |
+| 401 with an unoblox code (e.g. `UB-GW-007`, revoked key) | "Sign in again" | Only when this build can sign in (docs/sign-in.md). After sign-in: "Send again". |
+| 429 / 5xx with an unoblox code (busy, `UB-GW-009`) | A short note and "Send again" | Sends the message again. The key is not touched. |
+
+- Nothing switches models or resends on its own. Switching goes through the model picker's own directory, so the composer and the default model change exactly as if the user had picked it there.
+- "Send again" repeats the first message the user typed in that turn. A message with files or images is not repeated: the row switches the model and asks the user to send again.
+- The free models are hard-coded because `/v1/models` has no free-tier flag yet (identity, 2026-10-13). `unoblox/auto` and `unoblox/free` are left out: they can still be refused at ₹0.
+
+How the refusal reaches the client: pi-ai reports an HTTP error as `"<status>: <body>"`. The `dsh-llm-pi-ai` patch (`unobloxGatewayFailure`, against `@deepseek-ai/dsh-llm-pi-ai@0.2.0-rc.2`) reads a body carrying an `error_code` of the form `UB-…`. It turns that into the failure `{ message: "<gateway sentence> (<code>)", code, status }`, where `code` is `UNOBLOX_BALANCE` for every 402 and the stock classification otherwise. Other providers' errors keep the stock text and code. `test/pi-ai-unoblox-gateway-error.test.mjs` runs the patched helper on the text the real OpenAI SDK and pi-ai produce for each case. Remove this part of the patch when upstream keeps the HTTP status and a provider error code on the failure.
+
 ## Live captures (2026-10-07, key redacted)
 
 - `POST /v1/chat/completions` with `unoblox/auto` → 200. `unoblox/auto` is not listed by `GET /v1/models` (65 models), and `GET /v1/models/unoblox/auto` is 404, but chat accepts it. Headers: `x-unoblox-selector: unoblox/auto`, `x-unoblox-selected-model` / `x-unoblox-served-model: google/gemma-4-26b-a4b-it`, `x-unoblox-selection-reason: unoblox/auto -> google/gemma-4-26b-a4b-it (best value: quality-per-price over capable models)`, `x-unoblox-cache: BYPASS` (`non_zero_temperature`), `x-generation-id: <uuid>`, `x-unoblox-freemium: {"balance_inr":…,"balance_requirement_inr":1000.0,"base_inr":0.0,"charged_inr":0.0,"gst_inr":0.0,"gst_rate_bps":0,"note":"Charged ₹0.00 at standard rates — …","stage":"paid","tier":"freemium"}`. A non-streaming body repeats that block as `unoblox`, plus OpenAI `usage`.

@@ -28,6 +28,17 @@ window.__ModuleLoader__.load({
       /* The missing key blocks every reply: error colour, clickable. */
       .dshUbxInfoKey{flex:none;font:inherit;border:1px solid currentColor;background:none;cursor:pointer;color:var(--dsw-alias-state-error-primary)}
       .dshUbxInfoKey:hover{background:var(--dsw-alias-interactive-bg-hover)}
+      /* Actions under a turn unoblox refused (balance, key, busy). */
+      .dshUbxFail{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:2px 0 8px;font-size:var(--dsh-content-font-size-secondary,13px);line-height:20px;color:var(--dsw-alias-label-secondary)}
+      .dshUbxFailHint{flex:1 1 100%}
+      .dshUbxFailBtn{box-sizing:border-box;display:inline-flex;align-items:center;padding:3px 12px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2,rgba(127,127,127,.35));background:none;color:var(--dsw-alias-label-primary);font:inherit;text-decoration:none;cursor:pointer}
+      .dshUbxFailBtn:hover{background:var(--dsw-alias-interactive-bg-hover)}
+      .dshUbxFailBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+      .dshUbxFailBtn:disabled{opacity:.55;cursor:default}
+      .dshUbxFailPrimary{border-color:transparent;background:#D9A64A;color:#18191c;font-weight:600}
+      .dshUbxFailPrimary:hover{background:#cf9a3c}
+      .dshUbxFailStatus{flex:1 1 100%}
+      .dshUbxFailStatus[data-tone=error]{color:var(--dsw-alias-state-error-primary)}
     `
 
     const en = {
@@ -36,7 +47,23 @@ window.__ModuleLoader__.load({
       model: 'Model {model}',
       modelRouted: 'Model {model}. {reason}',
       keyMissing: 'Add API key',
-      keyMissingHint: 'No unoblox API key yet. Click to open Settings › Models and add it.'
+      keyMissingHint: 'No unoblox API key yet. Click to open Settings › Models and add it.',
+      failBalanceHint: 'Free models cost ₹0 and keep working while your balance is low.',
+      failTopUp: 'Top up',
+      failUseFree: 'Retry with a free model',
+      failSwitching: 'Switching…',
+      failSwitchedSent: 'Switched to {model} (free) and sent your message again. You can change models in the model picker.',
+      failSwitched: 'Switched to {model} (free). Send your message again to continue.',
+      failSwitchFailed: 'Could not switch models: {message}',
+      failSignIn: 'Sign in again',
+      failSigningIn: 'Waiting for the browser…',
+      failSignedIn: 'Signed in.',
+      failSignInFailed: 'Sign-in did not finish: {message}',
+      failRetry: 'Send again',
+      failSent: 'Sent again.',
+      failSendFailed: 'Could not send: {message}',
+      failBusyHint: 'unoblox is busy right now. Wait a moment, then send again.',
+      failServerHint: 'unoblox could not finish this request. Your key is fine; try again.'
     }
     const zh = {
       label: 'unoblox',
@@ -44,7 +71,23 @@ window.__ModuleLoader__.load({
       model: '模型 {model}',
       modelRouted: '模型 {model}。{reason}',
       keyMissing: '添加 API 密钥',
-      keyMissingHint: '尚未设置 unoblox API 密钥。点击打开“设置 › 模型”添加。'
+      keyMissingHint: '尚未设置 unoblox API 密钥。点击打开“设置 › 模型”添加。',
+      failBalanceHint: '免费模型不收费（₹0），余额不足时也能继续使用。',
+      failTopUp: '充值',
+      failUseFree: '改用免费模型重试',
+      failSwitching: '正在切换…',
+      failSwitchedSent: '已切换到 {model}（免费）并重新发送了你的消息。可随时在模型选择器中更换模型。',
+      failSwitched: '已切换到 {model}（免费）。请重新发送消息以继续。',
+      failSwitchFailed: '无法切换模型：{message}',
+      failSignIn: '重新登录',
+      failSigningIn: '正在等待浏览器…',
+      failSignedIn: '已登录。',
+      failSignInFailed: '登录未完成：{message}',
+      failRetry: '重新发送',
+      failSent: '已重新发送。',
+      failSendFailed: '发送失败：{message}',
+      failBusyHint: 'unoblox 当前繁忙。请稍候再重新发送。',
+      failServerHint: 'unoblox 未能完成此请求。你的密钥没有问题，请重试。'
     }
 
     // ---------- formatting (pure) ----------
@@ -220,6 +263,175 @@ window.__ModuleLoader__.load({
       return h(UnobloxInfoStrip, { view, t: props.t })
     }
 
+    // ---------- refused turns ----------
+
+    // When unoblox refuses a turn, the stock error row shows its sentence.
+    // These actions sit under it: top up or retry on a free model after a
+    // balance or spending-limit refusal (every 402), sign in again after a
+    // revoked key, send again when unoblox was busy. Nothing switches models
+    // or resends without a click.
+    const UNOBLOX_PROVIDER = 'unoblox'
+    const TOP_UP_URL = 'https://unoblox.ai/user/credits/topup'
+    // Served at ₹0 even with no balance (identity, 2026-10-13); the first one
+    // the picker accepts is used. `unoblox/auto` and `unoblox/free` are not
+    // reliable at ₹0. Replace with the /v1/models freemium flag once it ships.
+    const FREE_MODELS = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'google/gemma-4-26b-a4b-it']
+    const REQUEST_KEY = 'desktop-unoblox-request'
+
+    function turnNumber(location) {
+      return location?.kind === 'turn' || location?.kind === 'step' ? location.turn?.turn : undefined
+    }
+
+    /** The words the user sent, or undefined when the message also carried files or images. */
+    function requestText(content) {
+      if (!Array.isArray(content) || content.length === 0) return undefined
+      if (!content.every((block) => isRecord(block) && block.type === 'text' && typeof block.text === 'string')) return undefined
+      const text = content.map((block) => block.text).join('\n')
+      return text.trim() === '' ? undefined : text
+    }
+
+    /**
+     * The user's message that opened each turn, kept as turn data so "Send
+     * again" can repeat it. Only the first user message of a turn publishes,
+     * since turn data has one owner; later ones (steering) are ignored.
+     */
+    const requestDefinition = {
+      kind: REQUEST_KEY,
+      match: (event) => event.type === 'user/message' && event.surfaceOp === 'append' && event.data?.source?.kind === 'user'
+        ? { id: String(event.data.id), role: 'start' }
+        : null,
+      start: (_context, match, reader) => {
+        const turn = turnNumber(match.location)
+        const earlier = reader?.previous(REQUEST_KEY)?.state
+        return { turn, first: turn !== undefined && earlier?.turn !== turn, text: requestText(match.event.data.content) }
+      },
+      update: (context) => context.state,
+      buildLocationData: (context, scope, previous) => {
+        const state = context.state
+        if (scope !== 'turn' || state === undefined || !state.first || state.turn === undefined) return null
+        if (previous?.kind === 'turn' && previous.turn === state.turn && previous.value === state) return previous
+        return { kind: 'turn', turn: state.turn, key: REQUEST_KEY, value: state }
+      }
+    }
+
+    /**
+     * Which refusal ended the turn: 'balance' for any 402 (see the
+     * dsh-llm-pi-ai patch), or 'auth' / 'busy' / 'server' when the message
+     * carries an unoblox code. Other failures keep only the stock row.
+     */
+    function refusalOf(reason) {
+      if (!isRecord(reason) || reason.kind !== 'error' || !isRecord(reason.error)) return undefined
+      const { code, message } = reason.error
+      if (code === 'UNOBLOX_BALANCE') return 'balance'
+      if (typeof message !== 'string' || !/\(UB-[A-Z]+-\d+\)$/u.test(message)) return undefined
+      if (code === 'AUTH') return 'auth'
+      if (code === 'RATE_LIMIT') return 'busy'
+      if (code === 'SERVER') return 'server'
+      return undefined
+    }
+
+    function errorText(error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+
+    /** Whether this build can sign in with unoblox (the desktop bridge says so). */
+    function useSignInAvailable(wanted) {
+      const [available, setAvailable] = useState(false)
+      useEffect(() => {
+        const bridge = typeof window === 'undefined' ? undefined : window.dshDesktop
+        if (!wanted || typeof bridge?.unobloxSignIn !== 'function' || typeof bridge.unobloxSignInAvailable !== 'function') return undefined
+        let live = true
+        bridge.unobloxSignInAvailable().then((value) => { if (live) setAvailable(value === true) }, () => {})
+        return () => { live = false }
+      }, [wanted])
+      return available
+    }
+
+    function RefusedTurnActions(props) {
+      const { turn, t, sendText, selectFreeModel } = props
+      const refusal = refusalOf(turn?.end?.data?.reason)
+      const request = turn?.data?.get(REQUEST_KEY)?.text
+      const [working, setWorking] = useState(undefined)
+      const [status, setStatus] = useState(undefined)
+      const [signedIn, setSignedIn] = useState(false)
+      // Once the message went out again, only the outcome stays.
+      const [resent, setResent] = useState(false)
+      const canSignIn = useSignInAvailable(refusal === 'auth')
+      if (refusal === undefined || (refusal === 'auth' && !canSignIn)) return null
+
+      const run = (name, task) => {
+        if (working !== undefined) return
+        setWorking(name)
+        setStatus(undefined)
+        task().then(
+          (next) => { setStatus(next) },
+          (error) => { setStatus({ tone: 'error', text: errorText(error) }) }
+        ).finally(() => { setWorking(undefined) })
+      }
+      const sendAgain = () => run('send', async () => {
+        try {
+          await sendText(request)
+        } catch (error) {
+          return { tone: 'error', text: t('failSendFailed', { message: errorText(error) }) }
+        }
+        setResent(true)
+        return { tone: 'ok', text: t('failSent') }
+      })
+      const useFree = () => run('free', async () => {
+        let model
+        try {
+          model = await selectFreeModel()
+        } catch (error) {
+          return { tone: 'error', text: t('failSwitchFailed', { message: errorText(error) }) }
+        }
+        if (request === undefined) return { tone: 'ok', text: t('failSwitched', { model: shortModel(model) }) }
+        try {
+          await sendText(request)
+        } catch (error) {
+          return { tone: 'error', text: t('failSendFailed', { message: errorText(error) }) }
+        }
+        setResent(true)
+        return { tone: 'ok', text: t('failSwitchedSent', { model: shortModel(model) }) }
+      })
+      const signIn = () => run('sign-in', async () => {
+        const result = await window.dshDesktop.unobloxSignIn()
+        if (result?.ok === true) {
+          setSignedIn(true)
+          return { tone: 'ok', text: t('failSignedIn') }
+        }
+        // Closing the browser or pressing Cancel is not an error to report.
+        if (result?.code === 'cancelled') return undefined
+        return { tone: 'error', text: t('failSignInFailed', { message: typeof result?.message === 'string' ? result.message : '' }) }
+      })
+
+      const button = (key, label, onClick, primary) => h('button', {
+        key,
+        type: 'button',
+        className: primary ? 'dshUbxFailBtn dshUbxFailPrimary' : 'dshUbxFailBtn',
+        disabled: working !== undefined,
+        onClick
+      }, label)
+      const children = []
+      if (resent) {
+        // Nothing left to do here.
+      } else if (refusal === 'balance') {
+        children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBalanceHint')))
+        children.push(button('free', working === 'free' ? t('failSwitching') : t('failUseFree'), useFree, true))
+        // Opens in the system browser through the window-open handler.
+        children.push(h('a', { key: 'top-up', className: 'dshUbxFailBtn', href: TOP_UP_URL, target: '_blank', rel: 'noopener noreferrer' }, t('failTopUp')))
+      } else if (refusal === 'auth') {
+        if (!signedIn) children.push(button('sign-in', working === 'sign-in' ? t('failSigningIn') : t('failSignIn'), signIn, true))
+        else if (request !== undefined) children.push(button('send', t('failRetry'), sendAgain, true))
+      } else {
+        children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t(refusal === 'busy' ? 'failBusyHint' : 'failServerHint')))
+        if (request !== undefined) children.push(button('send', t('failRetry'), sendAgain, false))
+      }
+      if (status !== undefined) {
+        children.push(h('span', { key: 'status', className: 'dshUbxFailStatus', role: 'status', 'data-tone': status.tone }, status.text))
+      }
+      return h('div', { className: 'dshUbxFail', 'data-unoblox-refusal': refusal }, ...children)
+    }
+
     function installStyles() {
       if (typeof document === 'undefined' || document.getElementById(STYLE_ID) !== null) return
       const tag = document.createElement('style')
@@ -245,6 +457,35 @@ window.__ModuleLoader__.load({
           inject: () => ({ service })
         }, UnobloxInfoDock))
       })
+      ctx.inject(['slots', 'locale', 'uiConversation'], (scope) => {
+        scope.uiConversation.events.register(requestDefinition)
+        scope.slots.inject('conversation.chat.turnTail', () => scope.slots.register({
+          name: 'conversation.chat.turnTail',
+          id: 'dsh-desktop-unoblox-refusal',
+          locale: NS,
+          inject: (sessionId) => ({
+            // As the user's next message in this conversation.
+            sendText: (text) => {
+              const conversation = ctx.get('sessions')?.scope(sessionId)?.get('conversation')
+              if (!conversation || typeof conversation.send !== 'function') throw new Error('the conversation is not available')
+              return conversation.send(text)
+            },
+            // Through the picker's own directory, so the composer shows the change.
+            selectFreeModel: async () => {
+              const directories = ctx.get('modelDirectories')
+              if (!directories) throw new Error('model selection is not available')
+              const directory = directories.directoryFor(sessionId)
+              let refused
+              for (const model of FREE_MODELS) {
+                const result = await directory.select({ provider: UNOBLOX_PROVIDER, model })
+                if (result?.ok === true) return model
+                refused = result?.error
+              }
+              throw new Error(typeof refused?.message === 'string' ? refused.message : 'no free model is available')
+            }
+          })
+        }, RefusedTurnActions))
+      })
     }
 
     const inject = []
@@ -257,6 +498,11 @@ window.__ModuleLoader__.load({
     exports.shortModel = shortModel
     exports.UnobloxInfoStrip = UnobloxInfoStrip
     exports.UnobloxInfoDock = UnobloxInfoDock
+    exports.RefusedTurnActions = RefusedTurnActions
+    exports.requestDefinition = requestDefinition
+    exports.refusalOf = refusalOf
+    exports.requestText = requestText
+    exports.FREE_MODELS = FREE_MODELS
     exports.locales = { en, zh }
     return module.exports
   }

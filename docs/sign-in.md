@@ -28,4 +28,4 @@ Identity is shipping these; it will say when each reaches staging and production
 - **The browser approval page** at `unoblox.ai/oauth/authorize` (404 in production today). Until it ships, builds stay without a client id.
 - **`/oauth/revoke`** and **device keys** (`device_id`, `device_name`). The app already sends and calls them; before they exist identity ignores the extra token fields, and a failed revoke shows the "remove it on unoblox.ai" message.
 - **Any-port loopback** for registered `127.0.0.1` redirects. Then set `SIGN_IN_ANY_PORT` to `true`.
-- **New accounts start at ₹0.** Free (freemium) models work at ₹0 when named; `unoblox/auto` does not consider the balance and can be refused with 402.
+- **New accounts start at ₹0.** Free (freemium) models work at ₹0 when named; `unoblox/auto` does not consider the balance and can be refused with 402. A refused turn then offers "Retry with a free model" and "Top up", and a revoked key offers "Sign in again" (docs/unoblox-provider.md, "When unoblox refuses a turn").

@@ -26,6 +26,8 @@ function failedTurn(error, request = 'Reply with exactly the word: pong') {
   }
 }
 
+// A balance that meets the free-model hold, as the info route reports it.
+const HELD = async () => ({ key: 'set', balanceInr: 1500, balanceRequirementInr: 1000, freeModels: [] })
 const BALANCE = { message: 'Your unoblox balance (₹0.00) is below the ₹1.20 this request needs. (UB-GW-003)', code: 'UNOBLOX_BALANCE', status: 402 }
 const REVOKED = { message: 'Please sign in with a valid API key. (UB-GW-007)', code: 'AUTH', status: 401 }
 
@@ -50,7 +52,7 @@ describe('refused unoblox turns', () => {
   it('offers a free model and a top-up after a balance refusal, and switches only on click', async () => {
     const selectFreeModel = vi.fn(async () => 'qwen/qwen3.8-27b')
     const sendText = vi.fn(async () => {})
-    const view = await render({ turn: failedTurn(BALANCE), selectFreeModel, sendText })
+    const view = await render({ loadBilling: HELD, turn: failedTurn(BALANCE), selectFreeModel, sendText })
     expect(view.container.querySelector('[data-unoblox-refusal]')?.getAttribute('data-unoblox-refusal')).toBe('balance')
     const topUp = view.container.querySelector('a')
     expect(topUp?.getAttribute('href')).toBe('https://unoblox.ai/user/credits/topup')
@@ -69,7 +71,7 @@ describe('refused unoblox turns', () => {
 
   it('switches without resending when the message cannot be repeated', async () => {
     const sendText = vi.fn(async () => {})
-    const view = await render({ turn: failedTurn(BALANCE, null), selectFreeModel: async () => 'google/gemma-4-26b-a4b-it', sendText })
+    const view = await render({ loadBilling: HELD, turn: failedTurn(BALANCE, null), selectFreeModel: async () => 'google/gemma-4-26b-a4b-it', sendText })
     await view.click(view.button('failUseFree'))
     expect(sendText).not.toHaveBeenCalled()
     expect(view.container.querySelector('[role=status]')?.textContent).toBe('failSwitched {"model":"gemma-4-26b-a4b-it"}')
@@ -77,7 +79,7 @@ describe('refused unoblox turns', () => {
 
   it('reports a failed switch and keeps the buttons', async () => {
     const sendText = vi.fn(async () => {})
-    const view = await render({ turn: failedTurn(BALANCE), selectFreeModel: async () => { throw new Error('session in use') }, sendText })
+    const view = await render({ loadBilling: HELD, turn: failedTurn(BALANCE), selectFreeModel: async () => { throw new Error('session in use') }, sendText })
     await view.click(view.button('failUseFree'))
     expect(sendText).not.toHaveBeenCalled()
     const status = view.container.querySelector('[role=status]')
@@ -124,6 +126,39 @@ describe('refused unoblox turns', () => {
     await view.click(view.button('failRetry'))
     expect(sendText).toHaveBeenCalledTimes(1)
     expect(view.button('failRetry')).toBeUndefined()
+  })
+})
+
+describe('free models need a held balance', () => {
+  // As served on 2026-10-17.
+  const HOLD_REFUSAL = { message: "This freemium model needs a ₹1000.00 balance held (never spent) to serve free; your balance ₹0.26 is below it, and it's also too low to cover this request at standard rates. Add ₹999.74 to restore free access, or add funds to continue at standard rates. (UB-GW-068)", code: 'UNOBLOX_BALANCE', status: 402 }
+
+  it('reads the balance and the hold from the refusal, else from the last reported balance', () => {
+    expect(plugin.freeAllowance(HOLD_REFUSAL.message)).toEqual({ canUseFree: false, requirement: 1000, balance: 0.26 })
+    expect(plugin.freeAllowance(BALANCE.message, { balanceInr: 1200 })).toEqual({ canUseFree: true, requirement: 1000, balance: 1200 })
+    expect(plugin.freeAllowance(BALANCE.message, { balanceInr: 1200, balanceRequirementInr: 2000 })).toMatchObject({ canUseFree: false, requirement: 2000 })
+    expect(plugin.freeAllowance('your balance ₹1,250.00 is fine; needs a ₹1,000.00 balance held')).toMatchObject({ canUseFree: true, balance: 1250, requirement: 1000 })
+    // Nothing known about the balance: no offer.
+    expect(plugin.freeAllowance(BALANCE.message)).toEqual({ canUseFree: false, requirement: 1000 })
+  })
+
+  it('offers only Top up below the hold, and says why', async () => {
+    const selectFreeModel = vi.fn()
+    const view = await render({ turn: failedTurn(HOLD_REFUSAL), selectFreeModel, sendText: vi.fn(), loadBilling: HELD })
+    expect(view.button('failUseFree')).toBeUndefined()
+    expect(view.container.textContent).toContain('failFreeNeedsHold {"amount":"₹1,000.00"}')
+    expect(view.container.querySelector('a')?.getAttribute('href')).toBe('https://unoblox.ai/user/credits/topup')
+  })
+
+  it('uses the last reported balance when the refusal does not say', async () => {
+    const low = await render({ turn: failedTurn(BALANCE), selectFreeModel: vi.fn(), sendText: vi.fn(), loadBilling: async () => ({ key: 'set', balanceInr: 250.5 }) })
+    expect(low.button('failUseFree')).toBeUndefined()
+    document.body.innerHTML = ''
+    const unknown = await render({ turn: failedTurn(BALANCE), selectFreeModel: vi.fn(), sendText: vi.fn(), loadBilling: async () => undefined })
+    expect(unknown.button('failUseFree')).toBeUndefined()
+    document.body.innerHTML = ''
+    const held = await render({ turn: failedTurn(BALANCE), selectFreeModel: vi.fn(), sendText: vi.fn(), loadBilling: HELD })
+    expect(held.button('failUseFree')).toBeDefined()
   })
 })
 

@@ -49,6 +49,7 @@ window.__ModuleLoader__.load({
       keyMissing: 'Add API key',
       keyMissingHint: 'No unoblox API key yet. Click to open Settings › Models and add it.',
       failBalanceHint: 'Free models cost ₹0 and keep working while your balance is low.',
+      failFreeNeedsHold: 'Free models need {amount} held in your unoblox balance (it is not spent). Top up to continue.',
       failTopUp: 'Top up',
       failUseFree: 'Retry with a free model',
       failSwitching: 'Switching…',
@@ -73,6 +74,7 @@ window.__ModuleLoader__.load({
       keyMissing: '添加 API 密钥',
       keyMissingHint: '尚未设置 unoblox API 密钥。点击打开“设置 › 模型”添加。',
       failBalanceHint: '免费模型不收费（₹0），余额不足时也能继续使用。',
+      failFreeNeedsHold: '免费模型需要 unoblox 余额中保留 {amount}（不会扣除）。请充值后继续。',
       failTopUp: '充值',
       failUseFree: '改用免费模型重试',
       failSwitching: '正在切换…',
@@ -121,7 +123,11 @@ window.__ModuleLoader__.load({
       const model = typeof routing?.servedModel === 'string' ? routing.servedModel : typeof routing?.selectedModel === 'string' ? routing.selectedModel : undefined
       return {
         key: body.key,
-        ...(billing === undefined ? {} : { balanceInr: billing.balanceInr, ...(typeof billing.note === 'string' ? { note: billing.note } : {}) }),
+        ...(billing === undefined ? {} : {
+          balanceInr: billing.balanceInr,
+          ...(typeof billing.note === 'string' ? { note: billing.note } : {}),
+          ...(typeof billing.balanceRequirementInr === 'number' ? { balanceRequirementInr: billing.balanceRequirementInr } : {})
+        }),
         ...(model === undefined ? {} : { model, ...(typeof routing.reason === 'string' ? { reason: routing.reason } : {}) }),
         freeModels: Array.isArray(body.freeModels) ? body.freeModels.filter((id) => typeof id === 'string' && id !== '') : []
       }
@@ -349,9 +355,41 @@ window.__ModuleLoader__.load({
       return available
     }
 
+    /**
+     * unoblox serves its free models only while the balance holds a minimum
+     * (₹1000 on 2026-10-17: "needs a ₹1000.00 balance held (never spent)"),
+     * so "Retry with a free model" would just be refused below it. Reads the
+     * figures from the refusal itself, else from the balance unoblox last
+     * reported. Unknown balance: no offer.
+     */
+    const DEFAULT_FREE_HOLD_INR = 1000
+    function parseRupees(text) {
+      const value = Number(String(text).replace(/,/gu, ''))
+      return Number.isFinite(value) ? value : undefined
+    }
+    function freeAllowance(message, billing) {
+      const said = typeof message === 'string' ? message : ''
+      const balance = parseRupees(/your balance ₹\s?([\d,]+(?:\.\d+)?)/iu.exec(said)?.[1] ?? NaN) ?? billing?.balanceInr
+      const requirement = parseRupees(/needs a ₹\s?([\d,]+(?:\.\d+)?) balance held/iu.exec(said)?.[1] ?? NaN) ?? billing?.balanceRequirementInr ?? DEFAULT_FREE_HOLD_INR
+      return { canUseFree: balance !== undefined && balance >= requirement, requirement, ...(balance === undefined ? {} : { balance }) }
+    }
+    function useFreeAllowance(message, loadBilling) {
+      const fromMessage = freeAllowance(message, undefined)
+      const needsBilling = message !== undefined && /your balance ₹/iu.test(message) === false
+      const [billing, setBilling] = useState(undefined)
+      useEffect(() => {
+        if (!needsBilling || typeof loadBilling !== 'function') return undefined
+        let live = true
+        loadBilling().then((view) => { if (live && view?.balanceInr !== undefined) setBilling(view) })
+        return () => { live = false }
+      }, [needsBilling, loadBilling])
+      return needsBilling ? freeAllowance(message, billing) : fromMessage
+    }
+
     function RefusedTurnActions(props) {
-      const { turn, t, sendText, selectFreeModel } = props
+      const { turn, t, sendText, selectFreeModel, loadBilling } = props
       const refusal = refusalOf(turn?.end?.data?.reason)
+      const allowance = useFreeAllowance(refusal === 'balance' ? turn?.end?.data?.reason?.error?.message : undefined, loadBilling)
       const request = turn?.data?.get(REQUEST_KEY)?.text
       const [working, setWorking] = useState(undefined)
       const [status, setStatus] = useState(undefined)
@@ -417,8 +455,12 @@ window.__ModuleLoader__.load({
       if (resent) {
         // Nothing left to do here.
       } else if (refusal === 'balance') {
-        children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBalanceHint')))
-        children.push(button('free', working === 'free' ? t('failSwitching') : t('failUseFree'), useFree, true))
+        if (allowance.canUseFree) {
+          children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBalanceHint')))
+          children.push(button('free', working === 'free' ? t('failSwitching') : t('failUseFree'), useFree, true))
+        } else {
+          children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failFreeNeedsHold', { amount: formatInr(allowance.requirement) })))
+        }
         // Opens in the system browser through the window-open handler.
         children.push(h('a', { key: 'top-up', className: 'dshUbxFailBtn', href: TOP_UP_URL, target: '_blank', rel: 'noopener noreferrer' }, t('failTopUp')))
       } else if (refusal === 'auth') {
@@ -473,6 +515,8 @@ window.__ModuleLoader__.load({
               return conversation.send(text)
             },
             // Through the picker's own directory, so the composer shows the change.
+            // The balance unoblox last reported, for whether free models can serve.
+            loadBilling: () => service.load(sessionId).then((view) => view, () => undefined),
             selectFreeModel: async () => {
               const directories = ctx.get('modelDirectories')
               if (!directories) throw new Error('model selection is not available')
@@ -506,6 +550,7 @@ window.__ModuleLoader__.load({
     exports.refusalOf = refusalOf
     exports.requestText = requestText
     exports.FREE_MODELS = FREE_MODELS
+    exports.freeAllowance = freeAllowance
     exports.locales = { en, zh }
     return module.exports
   }

@@ -152,6 +152,17 @@
       config:
         freeModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_FREE_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
 
+# Context graph (packages/dsh-desktop-context-graph): durable rules, goals,
+# decisions, facts and tasks kept in a local SQLite graph per workspace. Each
+# compaction call also records graph changes; a size-capped slice is part of
+# the runtime context on every request, and context_lookup searches the rest.
+# Nothing leaves this computer. Safe Mode leaves it out.
+- insert:
+    - id: dsh-desktop-context-graph
+      name: dsh-desktop-context-graph
+      config:
+        root: !!js dshHomePath('context-graph')
+
 # Interactive widgets in the chat (packages/dsh-desktop-widgets): the agent's
 # show_widget tool, rendered in a sandboxed frame with no network. Safe Mode
 # leaves it out.

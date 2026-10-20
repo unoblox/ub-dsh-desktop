@@ -73,7 +73,7 @@ function host() {
     for await (const chunk of waterfall('llm/stream', options, () => (async function* () { yield { type: 'finish', reason: { kind: 'stop' } } })())) chunks.push(chunk)
     return chunks
   }
-  const post = (body, headers = { 'content-type': 'application/json' }) => routes.get(BUDGET_ROUTE)(new Request(`http://127.0.0.1${BUDGET_ROUTE}`, { method: 'POST', headers, body: JSON.stringify(body) }))
+  const post = (body, headers = { 'content-type': 'application/json' }) => routes.get(BUDGET_ROUTE)(new Request(`http://harness.internal${BUDGET_ROUTE}`, { method: 'POST', headers, body: JSON.stringify(body) }))
   const info = async (session) => (await routes.get(INFO_ROUTE)(new Request(`http://127.0.0.1${INFO_ROUTE}?session=${session}`))).json()
   return { emit, waterfall, call, post, info, logs }
 }
@@ -102,6 +102,16 @@ describe('budget', () => {
     h.emit('session/event', { header: { id: 's1' } }, { type: 'turn/start', data: { turn: 2 } })
     expect((await h.call({ sessionId: 's1', agentLoop: true }))[0].reason.kind).toBe('stop')
     expect(await h.info('s1')).toMatchObject({ budgetInr: 0.7, spend: { taskInr: 0, sessionInr: 0.6, stepsCounted: 2 } })
+  })
+
+  it('accepts the app page\'s own POST although the route sees another URL (as in the packaged app)', async () => {
+    const h = host()
+    // The Harness hands the route a request URL that is not the page's origin.
+    const routed = (headers) => h.post({ session: 's1', budgetInr: 2 }, { 'content-type': 'application/json', ...headers })
+    expect((await routed({ origin: 'http://127.0.0.1:43129', 'sec-fetch-site': 'same-origin' })).status).toBe(200)
+    expect((await routed({ origin: 'http://127.0.0.1:43129', host: '127.0.0.1:43129' })).status).toBe(200)
+    expect((await routed({ origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' })).status).toBe(403)
+    expect((await routed({ origin: 'http://127.0.0.1:9999', host: '127.0.0.1:43129' })).status).toBe(403)
   })
 
   it('sets budgets only from same-origin JSON', async () => {

@@ -254,6 +254,10 @@ describe('plugin', () => {
     expect((await post({ session: 's1', id: rule.id, action: 'delete' }, { 'content-type': 'application/json', origin: 'https://evil.example' })).status).toBe(403)
     expect(store.get(rule.id).deletedAt).toBeUndefined()
     expect((await post({ session: 's9', id: rule.id, action: 'delete' })).status).toBe(404)
+    // The app page's own POST, as the packaged app delivers it: the route's URL is not the page origin.
+    const fromPage = await h.routes.get(`POST ${ITEM_ROUTE}`)(new Request(`http://harness.internal${ITEM_ROUTE}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:43129', 'sec-fetch-site': 'same-origin' }, body: JSON.stringify({ session: 's1', id: rule.id, action: 'unpin' }) }))
+    expect(fromPage.status).toBe(200)
+    expect(store.get(rule.id).pinned).toBe(false)
   })
 
   it('leaves the summary alone when the model records nothing or the block is unreadable', async () => {

@@ -40,6 +40,25 @@ export const Config = z.object({
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
+/**
+ * Whether a POST comes from this app's own page. The Harness hands routes a
+ * request whose URL is not the page's origin, so the browser's own signals
+ * decide: Sec-Fetch-Site, else an Origin whose host is the request's Host.
+ * Clients without an Origin (not a browser page) pass on the session cookie.
+ */
+export function fromSameOrigin(request) {
+  const site = request.headers.get('sec-fetch-site')
+  if (site === 'same-origin') return true
+  if (site !== null && site !== 'none') return false
+  const origin = request.headers.get('origin')
+  if (origin === null) return true
+  try {
+    return new URL(origin).host === (request.headers.get('host') ?? new URL(request.url).host)
+  } catch {
+    return false
+  }
+}
+
 function errorText(error) {
   return error instanceof Error ? error.message : String(error)
 }
@@ -236,8 +255,7 @@ export function apply(ctx, config, deps = {}) {
     requestBody: 'buffered',
     fetch: async (request) => {
       // JSON only and same origin: a form post from another site cannot reach this.
-      const origin = request.headers.get('origin')
-      if (!(request.headers.get('content-type') ?? '').includes('application/json') || (origin !== null && origin !== new URL(request.url).origin)) {
+      if (!(request.headers.get('content-type') ?? '').includes('application/json') || !fromSameOrigin(request)) {
         return Response.json({ error: 'refused' }, { status: 403, headers: NO_STORE })
       }
       let body

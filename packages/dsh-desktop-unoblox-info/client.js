@@ -50,6 +50,10 @@ window.__ModuleLoader__.load({
       keyMissingHint: 'No unoblox API key yet. Click to open Settings › Models and add it.',
       failBalanceHint: 'Free models cost ₹0 while your balance stays at {amount} or more.',
       failFreeNeedsHold: 'Free models are free while your balance is {amount} or more; below that they are charged at listed prices. Top up to continue.',
+      failLowCostHint: 'Below {amount}, every model is charged at its listed price. A lower-cost model may still fit your balance of {balance}.',
+      failUseLowCost: 'Retry with a lower-cost model',
+      failSwitchedLowCost: 'Switched to {model}, charged at its listed price. Send your message again to continue.',
+      failSwitchedLowCostSent: 'Switched to {model}, charged at its listed price, and sent your message again. You can change models in the model picker.',
       failTopUp: 'Top up',
       failUseFree: 'Retry with a free model',
       failSwitching: 'Switching…',
@@ -75,6 +79,10 @@ window.__ModuleLoader__.load({
       keyMissingHint: '尚未设置 unoblox API 密钥。点击打开“设置 › 模型”添加。',
       failBalanceHint: '余额保持在 {amount} 或以上时，免费模型不收费（₹0）。',
       failFreeNeedsHold: '余额在 {amount} 或以上时免费模型不收费；低于该金额时按标价收费。请充值后继续。',
+      failLowCostHint: '余额低于 {amount} 时，所有模型均按标价收费。更低价的模型可能仍在你的余额 {balance} 范围内。',
+      failUseLowCost: '改用更低价的模型重试',
+      failSwitchedLowCost: '已切换到 {model}，按标价收费。请重新发送消息以继续。',
+      failSwitchedLowCostSent: '已切换到 {model}，按标价收费，并重新发送了你的消息。可随时在模型选择器中更换模型。',
       failTopUp: '充值',
       failUseFree: '改用免费模型重试',
       failSwitching: '正在切换…',
@@ -129,7 +137,8 @@ window.__ModuleLoader__.load({
           ...(typeof billing.balanceRequirementInr === 'number' ? { balanceRequirementInr: billing.balanceRequirementInr } : {})
         }),
         ...(model === undefined ? {} : { model, ...(typeof routing.reason === 'string' ? { reason: routing.reason } : {}) }),
-        freeModels: Array.isArray(body.freeModels) ? body.freeModels.filter((id) => typeof id === 'string' && id !== '') : []
+        freeModels: Array.isArray(body.freeModels) ? body.freeModels.filter((id) => typeof id === 'string' && id !== '') : [],
+        lowCostModels: Array.isArray(body.lowCostModels) ? body.lowCostModels.filter((id) => typeof id === 'string' && id !== '') : []
       }
     }
 
@@ -284,6 +293,9 @@ window.__ModuleLoader__.load({
     // the route has none (an offline first launch). `unoblox/auto` and
     // `unoblox/free` are left out: they can be refused at ₹0.
     const FREE_MODELS = ['qwen/qwen3.8-27b', 'google/gemma-4-26b-a4b-it']
+    // The cheapest models by listed price come the same way (lowCostModels);
+    // these stand in without a catalog (cheapest on 2026-10-20).
+    const LOW_COST_MODELS = ['openai/gpt-oss-20b', 'google/gemma-4-26b-a4b-it']
     const REQUEST_KEY = 'desktop-unoblox-request'
 
     function turnNumber(location) {
@@ -358,9 +370,11 @@ window.__ModuleLoader__.load({
     /**
      * unoblox's freemium models are charged ₹0 while the balance is at least
      * a threshold (₹1000); below it they are charged at listed prices, like
-     * any model. So the free-model retry is offered only at or above it. Reads the
-     * figures from the refusal itself, else from the balance unoblox last
-     * reported. Unknown balance: no offer.
+     * any model. So the free-model retry is offered only at or above it;
+     * below it, with some balance left, a retry on one of the cheapest models
+     * (charged at its listed price) may still fit. Reads the figures from the
+     * refusal itself, else from the balance unoblox last reported. Unknown
+     * balance: neither is offered.
      */
     const DEFAULT_FREE_HOLD_INR = 1000
     function parseRupees(text) {
@@ -371,7 +385,12 @@ window.__ModuleLoader__.load({
       const said = typeof message === 'string' ? message : ''
       const balance = parseRupees(/your balance ₹\s?([\d,]+(?:\.\d+)?)/iu.exec(said)?.[1] ?? NaN) ?? billing?.balanceInr
       const requirement = parseRupees(/needs a ₹\s?([\d,]+(?:\.\d+)?) balance held/iu.exec(said)?.[1] ?? NaN) ?? billing?.balanceRequirementInr ?? DEFAULT_FREE_HOLD_INR
-      return { canUseFree: balance !== undefined && balance >= requirement, requirement, ...(balance === undefined ? {} : { balance }) }
+      return {
+        canUseFree: balance !== undefined && balance >= requirement,
+        canUseLowCost: balance !== undefined && balance > 0 && balance < requirement,
+        requirement,
+        ...(balance === undefined ? {} : { balance })
+      }
     }
     function useFreeAllowance(message, loadBilling) {
       const fromMessage = freeAllowance(message, undefined)
@@ -387,7 +406,7 @@ window.__ModuleLoader__.load({
     }
 
     function RefusedTurnActions(props) {
-      const { turn, t, sendText, selectFreeModel, loadBilling } = props
+      const { turn, t, sendText, selectFreeModel, selectLowCostModel, loadBilling } = props
       const refusal = refusalOf(turn?.end?.data?.reason)
       const allowance = useFreeAllowance(refusal === 'balance' ? turn?.end?.data?.reason?.error?.message : undefined, loadBilling)
       const request = turn?.data?.get(REQUEST_KEY)?.text
@@ -417,22 +436,25 @@ window.__ModuleLoader__.load({
         setResent(true)
         return { tone: 'ok', text: t('failSent') }
       })
-      const useFree = () => run('free', async () => {
+      // Switch (free or lower-cost), then send the message again.
+      const switchAndResend = (name, select, switched, switchedSent) => run(name, async () => {
         let model
         try {
-          model = await selectFreeModel()
+          model = await select()
         } catch (error) {
           return { tone: 'error', text: t('failSwitchFailed', { message: errorText(error) }) }
         }
-        if (request === undefined) return { tone: 'ok', text: t('failSwitched', { model: shortModel(model) }) }
+        if (request === undefined) return { tone: 'ok', text: t(switched, { model: shortModel(model) }) }
         try {
           await sendText(request)
         } catch (error) {
           return { tone: 'error', text: t('failSendFailed', { message: errorText(error) }) }
         }
         setResent(true)
-        return { tone: 'ok', text: t('failSwitchedSent', { model: shortModel(model) }) }
+        return { tone: 'ok', text: t(switchedSent, { model: shortModel(model) }) }
       })
+      const useFree = () => switchAndResend('free', selectFreeModel, 'failSwitched', 'failSwitchedSent')
+      const useLowCost = () => switchAndResend('low-cost', selectLowCostModel, 'failSwitchedLowCost', 'failSwitchedLowCostSent')
       const signIn = () => run('sign-in', async () => {
         const result = await window.dshDesktop.unobloxSignIn()
         if (result?.ok === true) {
@@ -458,6 +480,9 @@ window.__ModuleLoader__.load({
         if (allowance.canUseFree) {
           children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBalanceHint', { amount: formatInr(allowance.requirement) })))
           children.push(button('free', working === 'free' ? t('failSwitching') : t('failUseFree'), useFree, true))
+        } else if (allowance.canUseLowCost && typeof selectLowCostModel === 'function') {
+          children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failLowCostHint', { amount: formatInr(allowance.requirement), balance: formatInr(allowance.balance) })))
+          children.push(button('low-cost', working === 'low-cost' ? t('failSwitching') : t('failUseLowCost'), useLowCost, true))
         } else {
           children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failFreeNeedsHold', { amount: formatInr(allowance.requirement) })))
         }
@@ -501,6 +526,30 @@ window.__ModuleLoader__.load({
           inject: () => ({ service })
         }, UnobloxInfoDock))
       })
+      /**
+       * Select the first model of a launch list (from the info route, else
+       * the stand-in list) that the picker accepts, skipping the model the
+       * conversation already uses: retrying on it would be refused again.
+       */
+      const selectFirst = async (sessionId, listKey, fallback, none) => {
+        const directories = ctx.get('modelDirectories')
+        if (!directories) throw new Error('model selection is not available')
+        const directory = directories.directoryFor(sessionId)
+        const listed = await service.load(sessionId).then((view) => view[listKey], () => [])
+        let current
+        try {
+          current = directory.store?.getSnapshot?.().current?.model
+        } catch {
+          current = undefined
+        }
+        let refused
+        for (const model of (listed.length > 0 ? listed : fallback).filter((id) => id !== current)) {
+          const result = await directory.select({ provider: UNOBLOX_PROVIDER, model })
+          if (result?.ok === true) return model
+          refused = result?.error
+        }
+        throw new Error(typeof refused?.message === 'string' ? refused.message : none)
+      }
       ctx.inject(['slots', 'locale', 'uiConversation'], (scope) => {
         scope.uiConversation.events.register(requestDefinition)
         scope.slots.inject('conversation.chat.turnTail', () => scope.slots.register({
@@ -514,22 +563,11 @@ window.__ModuleLoader__.load({
               if (!conversation || typeof conversation.send !== 'function') throw new Error('the conversation is not available')
               return conversation.send(text)
             },
-            // Through the picker's own directory, so the composer shows the change.
-            // The balance unoblox last reported, for whether free models can serve.
+            // The balance unoblox last reported, for which retry can serve.
             loadBilling: () => service.load(sessionId).then((view) => view, () => undefined),
-            selectFreeModel: async () => {
-              const directories = ctx.get('modelDirectories')
-              if (!directories) throw new Error('model selection is not available')
-              const directory = directories.directoryFor(sessionId)
-              const listed = await service.load(sessionId).then((view) => view.freeModels, () => [])
-              let refused
-              for (const model of listed.length > 0 ? listed : FREE_MODELS) {
-                const result = await directory.select({ provider: UNOBLOX_PROVIDER, model })
-                if (result?.ok === true) return model
-                refused = result?.error
-              }
-              throw new Error(typeof refused?.message === 'string' ? refused.message : 'no free model is available')
-            }
+            // Through the picker's own directory, so the composer shows the change.
+            selectFreeModel: () => selectFirst(sessionId, 'freeModels', FREE_MODELS, 'no free model is available'),
+            selectLowCostModel: () => selectFirst(sessionId, 'lowCostModels', LOW_COST_MODELS, 'no lower-cost model than the current one is available')
           })
         }, RefusedTurnActions))
       })
@@ -550,6 +588,7 @@ window.__ModuleLoader__.load({
     exports.refusalOf = refusalOf
     exports.requestText = requestText
     exports.FREE_MODELS = FREE_MODELS
+    exports.LOW_COST_MODELS = LOW_COST_MODELS
     exports.freeAllowance = freeAllowance
     exports.locales = { en, zh }
     return module.exports

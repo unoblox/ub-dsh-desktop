@@ -22,6 +22,14 @@ import { dirname } from 'node:path'
 export const UNOBLOX_MODELS_URL = 'https://api.unoblox.ai/v1/models'
 export const UNOBLOX_MODELS_ENV = 'DSH_DESKTOP_UNOBLOX_MODELS'
 export const UNOBLOX_FREE_MODELS_ENV = 'DSH_DESKTOP_UNOBLOX_FREE_MODELS'
+export const UNOBLOX_LOW_COST_MODELS_ENV = 'DSH_DESKTOP_UNOBLOX_LOW_COST_MODELS'
+/** How many of the cheapest models are offered after a balance refusal. */
+export const LOW_COST_COUNT = 3
+/**
+ * Agent requests send far more than they receive (history, tools, files),
+ * so a model's cost is ranked as 20 prompt tokens per completion token.
+ */
+const PROMPT_WEIGHT = 20
 
 export interface UnobloxModelRow {
   readonly id: string
@@ -125,6 +133,44 @@ export function catalogFromListing(body: unknown): UnobloxModelRow[] | undefined
   return [UNOBLOX_AUTO_ROW, ...rows]
 }
 
+function price(value: unknown): number | undefined {
+  const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN
+  return Number.isFinite(number) && number >= 0 ? number : undefined
+}
+
+/**
+ * The cheapest models the agent can use, by listed price, cheapest first:
+ * for "Retry with a lower-cost model" when the balance is below the
+ * freemium threshold and every model is charged. Models without a full
+ * price, or with a per-request price, are left out.
+ */
+export function lowCostModelIds(body: unknown, count = LOW_COST_COUNT): string[] {
+  if (!isRecord(body) || !Array.isArray(body.data)) return []
+  const ranked: { id: string, cost: number }[] = []
+  for (const entry of body.data.slice(0, MAX_MODELS)) {
+    const row = modelRow(entry)
+    if (row === undefined || !isRecord(entry) || !isRecord(entry.pricing)) continue
+    const prompt = price(entry.pricing.prompt)
+    const completion = price(entry.pricing.completion)
+    const request = entry.pricing.request === undefined ? 0 : price(entry.pricing.request)
+    if (prompt === undefined || completion === undefined || request !== 0) continue
+    if (ranked.some((other) => other.id === row.id)) continue
+    ranked.push({ id: row.id, cost: prompt * PROMPT_WEIGHT + completion })
+  }
+  return ranked.sort((a, b) => a.cost - b.cost || a.id.localeCompare(b.id, 'en')).slice(0, count).map((entry) => entry.id)
+}
+
+/** The cached low-cost ids, or [] when the cache has none (older caches). */
+export function parseCachedLowCost(raw: string): string[] {
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!isRecord(value) || !Array.isArray(value.lowCost)) return []
+    return value.lowCost.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= MAX_TEXT).slice(0, LOW_COST_COUNT)
+  } catch {
+    return []
+  }
+}
+
 /** Validate rows read back from the cache file; anything off is no cache. */
 export function parseCachedCatalog(raw: string): UnobloxModelRow[] | undefined {
   let value: unknown
@@ -155,8 +201,15 @@ export type CatalogSource = 'live' | 'cache' | 'fallback'
 
 export interface ResolvedCatalog {
   readonly rows: readonly UnobloxModelRow[]
+  /** The cheapest usable models by listed price; see {@link lowCostModelIds}. */
+  readonly lowCost?: readonly string[]
   readonly source: CatalogSource
   readonly detail?: string
+}
+
+interface Listing {
+  readonly rows: UnobloxModelRow[]
+  readonly lowCost: string[]
 }
 
 export interface CatalogDependencies {
@@ -164,16 +217,17 @@ export interface CatalogDependencies {
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>
 }
 
-async function fetchListing(deps: CatalogDependencies): Promise<UnobloxModelRow[]> {
+async function fetchListing(deps: CatalogDependencies): Promise<Listing> {
   const response = await deps.fetch(UNOBLOX_MODELS_URL, {
     headers: { accept: 'application/json' },
     redirect: 'error',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
   })
   if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
-  const rows = catalogFromListing(await response.json())
+  const body: unknown = await response.json()
+  const rows = catalogFromListing(body)
   if (rows === undefined || rows.length < 2) throw new Error('listing has no usable models')
-  return rows
+  return { rows, lowCost: lowCostModelIds(body) }
 }
 
 // One write at a time per cache file: Windows refuses to rename over a file
@@ -181,19 +235,19 @@ async function fetchListing(deps: CatalogDependencies): Promise<UnobloxModelRow[
 // Harness restarts during a fetch.
 const cacheWrites = new Map<string, Promise<void>>()
 
-async function writeCacheNow(cachePath: string, rows: readonly UnobloxModelRow[]): Promise<void> {
+async function writeCacheNow(cachePath: string, { rows, lowCost }: Listing): Promise<void> {
   await mkdir(dirname(cachePath), { recursive: true })
   // Unique per write, so a failed write never leaves a shared temp name behind.
   const temporary = `${cachePath}.${randomUUID()}.tmp`
-  await writeFile(temporary, `${JSON.stringify({ version: 1, fetchedAt: new Date().toISOString(), models: rows.slice(1) })}\n`, 'utf8')
+  await writeFile(temporary, `${JSON.stringify({ version: 1, fetchedAt: new Date().toISOString(), models: rows.slice(1), lowCost })}\n`, 'utf8')
   await rename(temporary, cachePath)
 }
 
-function writeCache(cachePath: string, rows: readonly UnobloxModelRow[]): Promise<void> {
+function writeCache(cachePath: string, listing: Listing): Promise<void> {
   const previous = cacheWrites.get(cachePath) ?? Promise.resolve()
   // Run after the previous write whether it succeeded or not; its own caller
   // already received that outcome.
-  const next = previous.catch(() => undefined).then(() => writeCacheNow(cachePath, rows))
+  const next = previous.catch(() => undefined).then(() => writeCacheNow(cachePath, listing))
   cacheWrites.set(cachePath, next)
   void next.finally(() => {
     if (cacheWrites.get(cachePath) === next) cacheWrites.delete(cachePath)
@@ -201,9 +255,11 @@ function writeCache(cachePath: string, rows: readonly UnobloxModelRow[]): Promis
   return next
 }
 
-async function readCache(cachePath: string): Promise<UnobloxModelRow[] | undefined> {
+async function readCache(cachePath: string): Promise<Listing | undefined> {
   try {
-    return parseCachedCatalog(await readFile(cachePath, 'utf8'))
+    const raw = await readFile(cachePath, 'utf8')
+    const rows = parseCachedCatalog(raw)
+    return rows === undefined ? undefined : { rows, lowCost: parseCachedLowCost(raw) }
   } catch {
     // No cache yet (first launch offline) is the expected case here.
     return undefined
@@ -217,22 +273,22 @@ async function readCache(cachePath: string): Promise<UnobloxModelRow[] | undefin
  */
 export function refreshUnobloxCatalog(deps: CatalogDependencies): Promise<ResolvedCatalog> {
   return fetchListing(deps).then(
-    async (rows) => {
+    async (listing) => {
       try {
-        await writeCache(deps.cachePath, rows)
+        await writeCache(deps.cachePath, listing)
       } catch (error) {
         // The live list still serves this launch; only the next offline
         // launch loses it.
-        return { rows, source: 'live' as const, detail: `cache not written: ${error instanceof Error ? error.message : String(error)}` }
+        return { ...listing, source: 'live' as const, detail: `cache not written: ${error instanceof Error ? error.message : String(error)}` }
       }
-      return { rows, source: 'live' as const }
+      return { ...listing, source: 'live' as const }
     },
     async (error: unknown) => {
       const detail = error instanceof Error ? error.message : String(error)
       const cached = await readCache(deps.cachePath)
       return cached === undefined
         ? { rows: [UNOBLOX_AUTO_ROW], source: 'fallback' as const, detail }
-        : { rows: cached, source: 'cache' as const, detail }
+        : { ...cached, source: 'cache' as const, detail }
     }
   )
 }
@@ -257,7 +313,7 @@ export async function catalogForLaunch(
   const cached = await readCache(cachePath)
   return cached === undefined
     ? { rows: [UNOBLOX_AUTO_ROW], source: 'fallback', detail: `listing not ready within ${String(waitMs)} ms` }
-    : { rows: cached, source: 'cache', detail: `listing not ready within ${String(waitMs)} ms` }
+    : { ...cached, source: 'cache', detail: `listing not ready within ${String(waitMs)} ms` }
 }
 
 /** The free models' ids, in picker order. */
@@ -269,6 +325,7 @@ export function freeModelIds(rows: readonly UnobloxModelRow[]): string[] {
 export function catalogEnvironment(catalog: ResolvedCatalog): Record<string, string> {
   return {
     [UNOBLOX_MODELS_ENV]: JSON.stringify(catalog.rows),
-    [UNOBLOX_FREE_MODELS_ENV]: JSON.stringify(freeModelIds(catalog.rows))
+    [UNOBLOX_FREE_MODELS_ENV]: JSON.stringify(freeModelIds(catalog.rows)),
+    [UNOBLOX_LOW_COST_MODELS_ENV]: JSON.stringify(catalog.lowCost ?? [])
   }
 }

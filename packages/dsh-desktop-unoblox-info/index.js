@@ -20,7 +20,10 @@ export const Config = z.object({
   apiKeyEnv: z.string().default('UNOBLOX_API_KEY'),
   // unoblox's freemium models in picker order (DSH_DESKTOP_UNOBLOX_FREE_MODELS,
   // see build/dsh-desktop.patch.yml); offered when a turn is refused for balance.
-  freeModels: z.array(z.string()).default([])
+  freeModels: z.array(z.string()).default([]),
+  // The cheapest models by listed price (DSH_DESKTOP_UNOBLOX_LOW_COST_MODELS),
+  // offered below the freemium threshold, where every model is charged.
+  lowCostModels: z.array(z.string()).default([])
 })
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
@@ -38,7 +41,9 @@ export function apply(ctx, config, deps = {}) {
   const provider = config?.provider ?? 'unoblox'
   const ref = credentialRef(config?.apiKeyEnv ?? 'UNOBLOX_API_KEY')
   const turns = createTurnStore(deps.now === undefined ? {} : { now: deps.now })
-  const freeModels = Array.isArray(config?.freeModels) ? config.freeModels.filter((id) => typeof id === 'string' && id !== '') : []
+  const modelList = (value) => Array.isArray(value) ? value.filter((id) => typeof id === 'string' && id !== '') : []
+  const freeModels = modelList(config?.freeModels)
+  const lowCostModels = modelList(config?.lowCostModels)
 
   ctx.on('llm-pi-ai/response', (response) => {
     if (!isRecord(response) || response.provider !== provider) return
@@ -70,7 +75,8 @@ export function apply(ctx, config, deps = {}) {
         key,
         billing: turns.latestBilling() ?? null,
         turn: turn ?? null,
-        freeModels
+        freeModels,
+        lowCostModels
       }, { headers: NO_STORE })
     }
   })

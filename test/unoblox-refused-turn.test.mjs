@@ -134,12 +134,14 @@ describe('free models need a held balance', () => {
   const HOLD_REFUSAL = { message: "This freemium model needs a ₹1000.00 balance held (never spent) to serve free; your balance ₹0.26 is below it, and it's also too low to cover this request at standard rates. Add ₹999.74 to restore free access, or add funds to continue at standard rates. (UB-GW-068)", code: 'UNOBLOX_BALANCE', status: 402 }
 
   it('reads the balance and the hold from the refusal, else from the last reported balance', () => {
-    expect(plugin.freeAllowance(HOLD_REFUSAL.message)).toEqual({ canUseFree: false, requirement: 1000, balance: 0.26 })
-    expect(plugin.freeAllowance(BALANCE.message, { balanceInr: 1200 })).toEqual({ canUseFree: true, requirement: 1000, balance: 1200 })
+    expect(plugin.freeAllowance(HOLD_REFUSAL.message)).toEqual({ canUseFree: false, canUseLowCost: true, requirement: 1000, balance: 0.26 })
+    expect(plugin.freeAllowance(BALANCE.message, { balanceInr: 1200 })).toEqual({ canUseFree: true, canUseLowCost: false, requirement: 1000, balance: 1200 })
     expect(plugin.freeAllowance(BALANCE.message, { balanceInr: 1200, balanceRequirementInr: 2000 })).toMatchObject({ canUseFree: false, requirement: 2000 })
     expect(plugin.freeAllowance('your balance ₹1,250.00 is fine; needs a ₹1,000.00 balance held')).toMatchObject({ canUseFree: true, balance: 1250, requirement: 1000 })
     // Nothing known about the balance: no offer.
-    expect(plugin.freeAllowance(BALANCE.message)).toEqual({ canUseFree: false, requirement: 1000 })
+    expect(plugin.freeAllowance(BALANCE.message)).toEqual({ canUseFree: false, canUseLowCost: false, requirement: 1000 })
+    // Nothing left at all: no retry can be paid for.
+    expect(plugin.freeAllowance('your balance ₹0.00 is below it')).toMatchObject({ canUseFree: false, canUseLowCost: false })
   })
 
   it('offers only Top up below the hold, and says why', async () => {
@@ -148,6 +150,28 @@ describe('free models need a held balance', () => {
     expect(view.button('failUseFree')).toBeUndefined()
     expect(view.container.textContent).toContain('failFreeNeedsHold {"amount":"₹1,000.00"}')
     expect(view.container.querySelector('a')?.getAttribute('href')).toBe('https://unoblox.ai/user/credits/topup')
+  })
+
+  it('below the threshold, offers a lower-cost model charged at its listed price', async () => {
+    const selectLowCostModel = vi.fn(async () => 'openai/gpt-oss-20b')
+    const selectFreeModel = vi.fn()
+    const sendText = vi.fn(async () => {})
+    const view = await render({ turn: failedTurn(HOLD_REFUSAL), selectFreeModel, selectLowCostModel, sendText, loadBilling: HELD })
+    expect(view.button('failUseFree')).toBeUndefined()
+    expect(view.container.textContent).toContain('failLowCostHint {"amount":"₹1,000.00","balance":"₹0.26"}')
+    await view.click(view.button('failUseLowCost'))
+    expect(selectFreeModel).not.toHaveBeenCalled()
+    expect(selectLowCostModel).toHaveBeenCalledTimes(1)
+    expect(sendText).toHaveBeenCalledWith('Reply with exactly the word: pong')
+    expect(view.container.querySelector('[role=status]')?.textContent).toBe('failSwitchedLowCostSent {"model":"gpt-oss-20b"}')
+    expect(view.button('failUseLowCost')).toBeUndefined()
+  })
+
+  it('reports a lower-cost switch that fails, e.g. no cheaper model than the current one', async () => {
+    const view = await render({ turn: failedTurn(HOLD_REFUSAL), selectLowCostModel: async () => { throw new Error('no lower-cost model than the current one is available') }, sendText: vi.fn(), loadBilling: HELD })
+    await view.click(view.button('failUseLowCost'))
+    expect(view.container.querySelector('[role=status]')?.textContent).toBe('failSwitchFailed {"message":"no lower-cost model than the current one is available"}')
+    expect(view.button('failUseLowCost')?.disabled).toBe(false)
   })
 
   it('uses the last reported balance when the refusal does not say', async () => {

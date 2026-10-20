@@ -5,12 +5,15 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   UNOBLOX_AUTO_ROW,
   UNOBLOX_FREE_MODELS_ENV,
+  UNOBLOX_LOW_COST_MODELS_ENV,
   UNOBLOX_MODELS_ENV,
   UNOBLOX_MODELS_URL,
   catalogEnvironment,
   catalogForLaunch,
   catalogFromListing,
   isFreeModel,
+  lowCostModelIds,
+  parseCachedLowCost,
   modelRow,
   parseCachedCatalog,
   refreshUnobloxCatalog
@@ -158,7 +161,7 @@ describe('catalog resolution', () => {
   it('survives overlapping refreshes (a Harness restart during a fetch)', async () => {
     const path = await cachePath()
     const results = await Promise.all(Array.from({ length: 6 }, () => refreshUnobloxCatalog({ cachePath: path, fetch: reply(LISTING) })))
-    for (const result of results) expect(result).toEqual({ rows: expect.any(Array), source: 'live' })
+    for (const result of results) expect(result).toEqual({ rows: expect.any(Array), lowCost: expect.any(Array), source: 'live' })
     expect(parseCachedCatalog(await readFile(path, 'utf8'))).toHaveLength(4)
   })
 
@@ -184,8 +187,30 @@ describe('catalog resolution', () => {
   })
 
   it('hands the rows to the patch files as JSON', () => {
-    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"unoblox Auto · best value"}]', [UNOBLOX_FREE_MODELS_ENV]: '[]' })
+    expect(catalogEnvironment({ rows: [UNOBLOX_AUTO_ROW], source: 'fallback' })).toEqual({ [UNOBLOX_MODELS_ENV]: '[{"id":"unoblox/auto","name":"unoblox Auto · best value"}]', [UNOBLOX_FREE_MODELS_ENV]: '[]', [UNOBLOX_LOW_COST_MODELS_ENV]: '[]' })
     const rows = [UNOBLOX_AUTO_ROW, { id: 'google/gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B Instruct · free' }, { id: 'qwen/qwen3.8-27b', name: 'Qwen3.8-27B · free' }, { id: 'anthropic/claude-fable-5-1', name: 'Claude Fable 5.1' }]
     expect(JSON.parse(catalogEnvironment({ rows, source: 'live' })[UNOBLOX_FREE_MODELS_ENV]!)).toEqual(['google/gemma-4-26b-a4b-it', 'qwen/qwen3.8-27b'])
+    expect(JSON.parse(catalogEnvironment({ rows, lowCost: ['openai/gpt-oss-20b'], source: 'live' })[UNOBLOX_LOW_COST_MODELS_ENV]!)).toEqual(['openai/gpt-oss-20b'])
+  })
+
+  it('ranks the cheapest usable models by listed price, prompt-weighted', () => {
+    // Prices as listed on 2026-10-20 (INR per token).
+    const priced = (entry: object, prompt: string, completion: string, extra: object = {}) => ({ ...entry, pricing: { prompt, completion, ...extra } })
+    const listing = { data: [
+      priced(FABLE, '0.00101582', '0.00507909'),
+      priced(QWEN, '0.00000362', '0.00012217'),
+      priced(GEMMA, '0.00000378', '0.00001984'),
+      priced({ ...LLAMA, id: 'openai/gpt-oss-20b' }, '0.000003', '0.00001397'),
+      // Cheap but unusable here: no tools, a per-request price, or no price.
+      priced(OCR, '0.000001', '0.000001'),
+      priced({ ...LLAMA, id: 'per/request' }, '0', '0', { request: '0.5' }),
+      { ...LLAMA, id: 'no/price' }
+    ] }
+    expect(lowCostModelIds(listing)).toEqual(['openai/gpt-oss-20b', 'google/gemma-4-26b-a4b-it', 'qwen/qwen3.8-27b'])
+    expect(lowCostModelIds(listing, 1)).toEqual(['openai/gpt-oss-20b'])
+    expect(lowCostModelIds({ nope: true })).toEqual([])
+    expect(parseCachedLowCost(JSON.stringify({ version: 1, models: [], lowCost: ['a/b', 7, ''] }))).toEqual(['a/b'])
+    // A cache from before this field has none.
+    expect(parseCachedLowCost(JSON.stringify({ version: 1, models: [] }))).toEqual([])
   })
 })

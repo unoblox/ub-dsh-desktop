@@ -134,7 +134,8 @@ describe('info route', () => {
       key: 'set',
       billing: { ...turnFromHeaders(CHAT_HEADERS).billing, at: 5 },
       turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 },
-      freeModels: []
+      freeModels: [],
+      lowCostModels: []
     })
     // Another conversation sees the account balance but not this routing.
     expect(await read('s2')).toMatchObject({ billing: { balanceInr: 250.5 }, turn: null })

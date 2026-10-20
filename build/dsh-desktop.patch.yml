@@ -144,13 +144,15 @@
 # price, and the balance, charge and routed model from the latest chat
 # response (published by the dsh-llm-pi-ai patch as `llm-pi-ai/response`).
 # The key stays host-side; the strip only learns whether one is stored.
-# It also offers the free models (`freemium` in /v1/models, filled per launch
-# like the catalog) when unoblox refuses a turn for balance.
+# It also offers the free models (`freemium` in /v1/models) and the cheapest
+# models by listed price, both filled per launch like the catalog, when
+# unoblox refuses a turn for balance.
 - insert:
     - id: dsh-desktop-unoblox-info
       name: dsh-desktop-unoblox-info
       config:
         freeModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_FREE_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
+        lowCostModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_LOW_COST_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
 
 # Context graph (packages/dsh-desktop-context-graph): durable rules, goals,
 # decisions, facts and tasks kept in a local SQLite graph per workspace. Each

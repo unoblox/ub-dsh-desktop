@@ -48,8 +48,8 @@ window.__ModuleLoader__.load({
       modelRouted: 'Model {model}. {reason}',
       keyMissing: 'Add API key',
       keyMissingHint: 'No unoblox API key yet. Click to open Settings › Models and add it.',
-      failBalanceHint: 'Free models cost ₹0 and keep working while your balance is low.',
-      failFreeNeedsHold: 'Free models need {amount} held in your unoblox balance (it is not spent). Top up to continue.',
+      failBalanceHint: 'Free models cost ₹0 while your balance stays at {amount} or more.',
+      failFreeNeedsHold: 'Free models are free while your balance is {amount} or more; below that they are charged at listed prices. Top up to continue.',
       failTopUp: 'Top up',
       failUseFree: 'Retry with a free model',
       failSwitching: 'Switching…',
@@ -73,8 +73,8 @@ window.__ModuleLoader__.load({
       modelRouted: '模型 {model}。{reason}',
       keyMissing: '添加 API 密钥',
       keyMissingHint: '尚未设置 unoblox API 密钥。点击打开“设置 › 模型”添加。',
-      failBalanceHint: '免费模型不收费（₹0），余额不足时也能继续使用。',
-      failFreeNeedsHold: '免费模型需要 unoblox 余额中保留 {amount}（不会扣除）。请充值后继续。',
+      failBalanceHint: '余额保持在 {amount} 或以上时，免费模型不收费（₹0）。',
+      failFreeNeedsHold: '余额在 {amount} 或以上时免费模型不收费；低于该金额时按标价收费。请充值后继续。',
       failTopUp: '充值',
       failUseFree: '改用免费模型重试',
       failSwitching: '正在切换…',
@@ -356,9 +356,9 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * unoblox serves its free models only while the balance holds a minimum
-     * (₹1000 on 2026-10-17: "needs a ₹1000.00 balance held (never spent)"),
-     * so "Retry with a free model" would just be refused below it. Reads the
+     * unoblox's freemium models are charged ₹0 while the balance is at least
+     * a threshold (₹1000); below it they are charged at listed prices, like
+     * any model. So the free-model retry is offered only at or above it. Reads the
      * figures from the refusal itself, else from the balance unoblox last
      * reported. Unknown balance: no offer.
      */
@@ -456,7 +456,7 @@ window.__ModuleLoader__.load({
         // Nothing left to do here.
       } else if (refusal === 'balance') {
         if (allowance.canUseFree) {
-          children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBalanceHint')))
+          children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBalanceHint', { amount: formatInr(allowance.requirement) })))
           children.push(button('free', working === 'free' ? t('failSwitching') : t('failUseFree'), useFree, true))
         } else {
           children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failFreeNeedsHold', { amount: formatInr(allowance.requirement) })))

@@ -159,6 +159,8 @@ describe('free models need a held balance', () => {
     document.body.innerHTML = ''
     const held = await render({ turn: failedTurn(BALANCE), selectFreeModel: vi.fn(), sendText: vi.fn(), loadBilling: HELD })
     expect(held.button('failUseFree')).toBeDefined()
+    // The hint states the condition, not "free at any balance".
+    expect(held.container.textContent).toContain('failBalanceHint {"amount":"₹1,000.00"}')
   })
 })
 

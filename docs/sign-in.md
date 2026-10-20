@@ -25,4 +25,4 @@ A second click while the browser is open does not start another sign-in; **Cance
 
 Live in production since 2026-10-13 (checked against unoblox.ai that day): the approval page (`/oauth/authorize` redirects to sign-in), `/oauth/revoke` (200), device keys on the token request, and any-port loopback matching.
 
-- **New accounts start at ₹0.** Free (freemium) models work at ₹0 when named; `unoblox/auto` does not consider the balance and can be refused with 402. A refused turn then offers "Retry with a free model" and "Top up", and a revoked key offers "Sign in again" (docs/unoblox-provider.md, "When unoblox refuses a turn").
+- **New accounts start at ₹0.** Freemium models are charged ₹0 while the balance is ₹1,000 or more, and at their listed price below that, as long as the balance can pay; `unoblox/auto` does not consider the balance and can be refused with 402. A refused turn then offers "Retry with a free model" and "Top up", and a revoked key offers "Sign in again" (docs/unoblox-provider.md, "When unoblox refuses a turn").

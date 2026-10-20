@@ -17,6 +17,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
 import { captureInstruction, parseDelta, rewriteText, sessionUserWords, splitDelta, userWords } from './capture.js'
 import { applyDelta, currentItems, DEFAULT_BUDGET, fileStates, lookup, renderSection, scopeOf } from './graph.js'
+import { decisionLog, importTeamFile, scanProject, writeTeamFile } from './project.js'
 import { GraphStore, KINDS, MAX_TEXT, workspaceKey } from './store.js'
 
 export const name = 'dsh-desktop-context-graph'
@@ -25,6 +26,9 @@ export const inject = ['sessions', 'systemPrompt', 'tools', 'connection']
 export const TOOL_NAME = 'context_lookup'
 export const GRAPH_ROUTE = '/api/desktop-context-graph'
 export const ITEM_ROUTE = '/api/desktop-context-graph/item'
+export const EXPORT_ROUTE = '/api/desktop-context-graph/export'
+/** How long a request waits for a workspace's first scan before going on without it. */
+export const PREPARE_WAIT_MS = 2000
 export const CONTEXT_NAME = 'desktop:context-graph'
 /** After the stock sandbox (110), approval (115) and delegation (120) contexts. */
 export const CONTEXT_ORDER = 130
@@ -50,6 +54,26 @@ export function apply(ctx, config, deps = {}) {
   ctx.effect(() => () => { if (deps.store === undefined) store.close() }, 'context-graph: store')
   const budget = config.budget ?? DEFAULT_BUDGET
   const compactions = new Map()
+  // One scan and team-file import per workspace per Harness run.
+  const prepared = new Map()
+
+  /** Scan the project and import the team file, once per workspace per run. */
+  const prepareWorkspace = (scope) => {
+    let pending = prepared.get(scope.workspace)
+    if (pending === undefined) {
+      pending = (async () => {
+        try {
+          const scan = await scanProject(store, scope)
+          const team = await importTeamFile(store, scope)
+          ctx.logger.info('context-graph: workspace scanned (%d added, %d updated, %d removed)%s', scan.added, scan.updated, scan.removed, team === undefined ? '' : `, ${String(team.imported)} team items imported`)
+        } catch (error) {
+          ctx.logger.warn('context-graph: workspace scan failed: %s', errorText(error))
+        }
+      })()
+      prepared.set(scope.workspace, pending)
+    }
+    return pending
+  }
 
   /** The graph scope of a live session: its workspace folder and id. */
   const scopeOfSession = (session) => {
@@ -122,6 +146,8 @@ export function apply(ctx, config, deps = {}) {
     if (!result.contexts.some((entry) => entry.name === CONTEXT_NAME)) return result
     const scope = scopeOfSession(context?.agent?.session)
     if (scope === undefined) return result
+    // The first request in a workspace waits briefly for its scan.
+    await Promise.race([prepareWorkspace(scope), new Promise((resolve) => setTimeout(resolve, PREPARE_WAIT_MS).unref?.())])
     let text = ''
     try {
       text = await renderSection(store, scope, { budget })
@@ -193,6 +219,18 @@ export function apply(ctx, config, deps = {}) {
   })
 
   ctx.connection.fetch.register({
+    path: EXPORT_ROUTE,
+    methods: ['GET'],
+    requestBody: 'buffered',
+    fetch: async (request) => {
+      const sessionId = new URL(request.url).searchParams.get('session') ?? ''
+      const scope = sessionId === '' ? undefined : scopeOfId(sessionId)
+      if (scope === undefined) return new Response('unknown conversation', { status: 404, headers: NO_STORE })
+      return new Response(decisionLog(store, scope), { headers: { ...NO_STORE, 'content-type': 'text/markdown; charset=utf-8', 'content-disposition': 'attachment; filename="project-context.md"' } })
+    }
+  })
+
+  ctx.connection.fetch.register({
     path: ITEM_ROUTE,
     methods: ['POST'],
     requestBody: 'buffered',
@@ -212,6 +250,10 @@ export function apply(ctx, config, deps = {}) {
       if (scope === undefined) return Response.json({ error: 'unknown conversation' }, { status: 404, headers: NO_STORE })
       const text = typeof body.text === 'string' ? body.text.trim().slice(0, MAX_TEXT) : ''
       try {
+        if (body.action === 'share') {
+          const written = await writeTeamFile(store, scope)
+          return Response.json({ ok: true, ...written }, { headers: NO_STORE })
+        }
         if (body.action === 'add') {
           if (!KINDS.includes(body.kind) || text === '') return Response.json({ error: 'kind and text are required' }, { status: 400, headers: NO_STORE })
           // What the user types is their own words: a rule keeps it as the quote.
@@ -221,7 +263,11 @@ export function apply(ctx, config, deps = {}) {
         const item = typeof body.id === 'string' ? store.get(body.id) : undefined
         if (item === undefined || item.workspace !== scope.workspace || item.deletedAt !== undefined) return Response.json({ error: 'unknown item' }, { status: 404, headers: NO_STORE })
         if (body.action === 'pin' || body.action === 'unpin') store.setPinned(item.id, scope.workspace, body.action === 'pin')
-        else if (body.action === 'delete') store.remove(item.id, scope.workspace)
+        else if (body.action === 'delete') {
+          store.remove(item.id, scope.workspace)
+          // A scanned fact the user removed is not scanned back in.
+          if (item.origin === 'scan') store.setMeta(`scan-dismissed:${item.id}`, '1')
+        }
         else if (body.action === 'edit' && text !== '') {
           store.put({ ...item, workspace: scope.workspace, text, ...(item.kind === 'rule' ? { quote: text } : {}), origin: 'user' })
         } else if (body.action === 'done' && item.kind === 'task') store.put({ ...item, workspace: scope.workspace, status: 'done', origin: 'user' })

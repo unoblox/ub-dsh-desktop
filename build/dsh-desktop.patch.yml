@@ -151,6 +151,7 @@
     - id: dsh-desktop-unoblox-info
       name: dsh-desktop-unoblox-info
       config:
+        root: !!js dshHomePath('desktop-unoblox')
         freeModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_FREE_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
         lowCostModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_LOW_COST_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
 
@@ -164,6 +165,19 @@
       name: dsh-desktop-context-graph
       config:
         root: !!js dshHomePath('context-graph')
+
+# Proof of work (packages/dsh-desktop-receipts): under each finished turn, the
+# commands run with their results, the files changed, and which claims in the
+# reply those back up. Read from session events in the browser; runs nothing.
+- insert:
+    - id: dsh-desktop-receipts
+      name: dsh-desktop-receipts
+
+# Plain-language examples above the composer of a new conversation
+# (packages/dsh-desktop-starters). A click fills the composer; nothing is sent.
+- insert:
+    - id: dsh-desktop-starters
+      name: dsh-desktop-starters
 
 # Interactive widgets in the chat (packages/dsh-desktop-widgets): the agent's
 # show_widget tool, rendered in a sandboxed frame with no network. Safe Mode

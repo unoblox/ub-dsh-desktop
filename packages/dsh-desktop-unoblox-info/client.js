@@ -7,12 +7,15 @@ window.__ModuleLoader__.load({
 
     const React = require('react')
     const { useCallback, useEffect, useRef, useState } = React
-    const { IconSparkleRegular, IconWarningOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
+    const { Button, Modal, IconSparkleRegular, IconWarningOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
     const h = React.createElement
 
     const NS = 'desktop-unoblox-info'
     // Served by index.js; same origin as the page, behind the Harness session cookie.
     const INFO_ROUTE = '/api/desktop-unoblox.info'
+    const BUDGET_ROUTE = '/api/desktop-unoblox.budget'
+    // While a task runs, the spend is refreshed this often.
+    const LIVE_REFRESH_MS = 3000
     const STYLE_ID = 'dsh-desktop-unoblox-info-style'
     // Same metrics as the stock stats pills beside it (dsh-client-ui-chat
     // StatsPills), so balance and model read as part of that one row.
@@ -25,6 +28,19 @@ window.__ModuleLoader__.load({
       .dshUbxInfoLabel{min-width:0;overflow:hidden;text-overflow:ellipsis}
       .dshUbxInfoBalance{flex:none}
       .dshUbxInfoModel .dshUbxInfoLabel{max-width:180px}
+      /* The task's spend never truncates, like the balance. */
+      .dshUbxInfoSpend{flex:none}
+      .dshUbxInfoSpendNear{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-state-error-primary))}
+      .dshUbxBudget.dshUbxBudget{width:min(420px,100%)}
+      .dshUbxBudgetForm{display:flex;flex-direction:column;gap:12px}
+      .dshUbxBudgetText{margin:0;font-size:13px;line-height:19px;color:var(--dsw-alias-label-secondary)}
+      .dshUbxBudgetText[data-tone=error]{color:var(--dsw-alias-state-error-primary)}
+      .dshUbxBudgetField{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--dsw-alias-label-primary)}
+      .dshUbxBudgetInput{display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;color:var(--dsw-alias-label-secondary)}
+      .dshUbxBudgetInput:focus-within{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}
+      .dshUbxBudgetInput input{flex:1;min-width:0;border:0;outline:none;background:none;font:inherit;font-size:14px;color:var(--dsw-alias-label-primary)}
+      .dshUbxBudgetInput input[aria-invalid=true]{color:var(--dsw-alias-state-error-primary)}
+      .dshUbxBudgetRow{display:flex;justify-content:flex-end;gap:8px}
       /* The missing key blocks every reply: error colour, clickable. */
       .dshUbxInfoKey{flex:none;font:inherit;border:1px solid currentColor;background:none;cursor:pointer;color:var(--dsw-alias-state-error-primary)}
       .dshUbxInfoKey:hover{background:var(--dsw-alias-interactive-bg-hover)}
@@ -68,7 +84,26 @@ window.__ModuleLoader__.load({
       failSent: 'Sent again.',
       failSendFailed: 'Could not send: {message}',
       failBusyHint: 'unoblox is busy right now. Wait a moment, then send again.',
-      failServerHint: 'unoblox could not finish this request. Your key is fine; try again.'
+      failServerHint: 'unoblox could not finish this request. Your key is fine; try again.',
+      failBudgetHint: 'The agent stopped before going over this task\'s budget. Going on is your call.',
+      failBudgetContinue: 'Continue',
+      failBudgetRaise: 'Raise to {amount} and continue',
+      failBudgetMessage: 'Continue the task from where you stopped.',
+      failBudgetRaised: 'Budget raised to {amount}; the agent is continuing.',
+      taskSpend: '{amount}',
+      taskSpendBudget: '{amount} / {budget}',
+      spendHint: 'This task has spent {task}; this conversation {conversation}, as unoblox charged.',
+      stepHint: 'Steps here cost about {amount} each (last {count}).',
+      noBudgetHint: 'No budget set: click to set one.',
+      budgetHint: 'Budget {budget} per task: click to change it.',
+      budgetTitle: 'Budget per task',
+      budgetClose: 'Close',
+      budgetIntro: 'Before a task (everything the agent does for one message) spends more than this, the agent stops and asks you. It applies to this conversation.',
+      budgetSteps: 'Steps in this conversation have cost about {amount} each (last {count}).',
+      budgetLabel: 'Budget per task',
+      budgetSave: 'Save',
+      budgetRemove: 'Remove budget',
+      budgetFailed: 'Could not save the budget: {message}'
     }
     const zh = {
       label: 'unoblox',
@@ -97,7 +132,26 @@ window.__ModuleLoader__.load({
       failSent: '已重新发送。',
       failSendFailed: '发送失败：{message}',
       failBusyHint: 'unoblox 当前繁忙。请稍候再重新发送。',
-      failServerHint: 'unoblox 未能完成此请求。你的密钥没有问题，请重试。'
+      failServerHint: 'unoblox 未能完成此请求。你的密钥没有问题，请重试。',
+      failBudgetHint: '智能体在超出此任务预算前停止了。是否继续由你决定。',
+      failBudgetContinue: '继续',
+      failBudgetRaise: '提高到 {amount} 并继续',
+      failBudgetMessage: '从你停下的地方继续这个任务。',
+      failBudgetRaised: '预算已提高到 {amount}，智能体正在继续。',
+      taskSpend: '{amount}',
+      taskSpendBudget: '{amount} / {budget}',
+      spendHint: '此任务已花费 {task}；此对话共 {conversation}（按 unoblox 实际扣费）。',
+      stepHint: '这里每一步约 {amount}（最近 {count} 步）。',
+      noBudgetHint: '未设置预算：点击设置。',
+      budgetHint: '每个任务预算 {budget}：点击修改。',
+      budgetTitle: '每个任务的预算',
+      budgetClose: '关闭',
+      budgetIntro: '一个任务（智能体为一条消息所做的全部工作）花费超过此金额前，智能体会停下来询问你。仅对此对话生效。',
+      budgetSteps: '此对话中每一步约 {amount}（最近 {count} 步）。',
+      budgetLabel: '每个任务的预算',
+      budgetSave: '保存',
+      budgetRemove: '移除预算',
+      budgetFailed: '无法保存预算：{message}'
     }
 
     // ---------- formatting (pure) ----------
@@ -137,6 +191,13 @@ window.__ModuleLoader__.load({
           ...(typeof billing.balanceRequirementInr === 'number' ? { balanceRequirementInr: billing.balanceRequirementInr } : {})
         }),
         ...(model === undefined ? {} : { model, ...(typeof routing.reason === 'string' ? { reason: routing.reason } : {}) }),
+        ...(isRecord(body.spend) && typeof body.spend.taskInr === 'number' ? { spend: {
+          taskInr: body.spend.taskInr,
+          sessionInr: typeof body.spend.sessionInr === 'number' ? body.spend.sessionInr : body.spend.taskInr,
+          estimated: body.spend.estimated === true,
+          ...(typeof body.spend.stepInr === 'number' ? { stepInr: body.spend.stepInr, stepsCounted: Number(body.spend.stepsCounted) || 0 } : {})
+        } } : {}),
+        ...(typeof body.budgetInr === 'number' ? { budgetInr: body.budgetInr } : {}),
         freeModels: Array.isArray(body.freeModels) ? body.freeModels.filter((id) => typeof id === 'string' && id !== '') : [],
         lowCostModels: Array.isArray(body.lowCostModels) ? body.lowCostModels.filter((id) => typeof id === 'string' && id !== '') : []
       }
@@ -154,6 +215,18 @@ window.__ModuleLoader__.load({
           const view = toView(await response.json())
           if (view === undefined) throw new Error('unexpected response shape')
           return view
+        },
+        /** Set this conversation's per-task budget in rupees, or remove it (null). */
+        async setBudget(sessionId, budgetInr) {
+          const response = await doFetch(BUDGET_ROUTE, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ session: sessionId, budgetInr })
+          })
+          let body
+          try { body = await response.json() } catch { body = undefined }
+          if (!response.ok) throw new Error(isRecord(body) && typeof body.error === 'string' ? body.error : `HTTP ${String(response.status)}`)
         }
       }
     }
@@ -190,7 +263,13 @@ window.__ModuleLoader__.load({
         if (wasRunning.current === true && running === false) reload()
         wasRunning.current = running
       }, [running, reload])
-      return view
+      // While the agent works, the task's spend is refreshed live.
+      useEffect(() => {
+        if (running !== true) return undefined
+        const timer = setInterval(reload, LIVE_REFRESH_MS)
+        return () => clearInterval(timer)
+      }, [running, reload])
+      return [view, reload]
     }
 
     // ---------- display ----------
@@ -249,7 +328,7 @@ window.__ModuleLoader__.load({
      * pill. Renders nothing until unoblox has reported a value, so the row
      * never shows placeholders.
      */
-    function UnobloxInfoStrip({ view, t }) {
+    function UnobloxInfoStrip({ view, t, onBudget }) {
       if (view === undefined) return null
       const pills = []
       if (view.key === 'missing') {
@@ -269,14 +348,64 @@ window.__ModuleLoader__.load({
           description: view.reason === undefined ? t('model', { model: view.model }) : t('modelRouted', { model: view.model, reason: view.reason })
         }))
       }
+      if (view.spend !== undefined || view.budgetInr !== undefined) {
+        const task = formatInr(view.spend?.taskInr ?? 0)
+        const text = view.budgetInr === undefined ? t('taskSpend', { amount: task }) : t('taskSpendBudget', { amount: task, budget: formatInr(view.budgetInr) })
+        const parts = [t('spendHint', { task, conversation: formatInr(view.spend?.sessionInr ?? 0) })]
+        if (view.spend?.stepInr !== undefined) parts.push(t('stepHint', { amount: formatInr(view.spend.stepInr), count: view.spend.stepsCounted }))
+        parts.push(view.budgetInr === undefined ? t('noBudgetHint') : t('budgetHint', { budget: formatInr(view.budgetInr) }))
+        const over = view.budgetInr !== undefined && (view.spend?.taskInr ?? 0) >= view.budgetInr * 0.8
+        pills.push(h(Pill, { key: 'spend', className: over ? 'dshUbxInfoSpend dshUbxInfoSpendNear' : 'dshUbxInfoSpend', icon: h(MeterIcon), text, description: parts.join(' '), onActivate: onBudget }))
+      }
       if (pills.length === 0) return null
       return h('div', { className: 'dshUbxInfo', role: 'group', 'aria-label': t('label'), 'data-unoblox-info': '' }, ...pills)
     }
 
+    // Gauge glyph (14px grid, currentColor) for what a task has spent.
+    function MeterIcon() {
+      return h('svg', { viewBox: '0 0 16 16', width: 14, height: 14, 'aria-hidden': 'true', focusable: 'false' },
+        h('path', { d: 'M2.5 11.5a5.5 5.5 0 1 1 11 0M8 11.5l2.6-3.4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }))
+    }
+
+    /** Set or remove the per-task budget for this conversation. */
+    function BudgetDialog({ t, view, onSave, onClose }) {
+      const [value, setValue] = useState(view?.budgetInr === undefined ? '' : String(view.budgetInr))
+      const [busy, setBusy] = useState(false)
+      const [failure, setFailure] = useState(undefined)
+      const amount = Number(value)
+      const valid = value.trim() !== '' && Number.isFinite(amount) && amount > 0 && amount <= 100000
+      const save = async (budgetInr) => {
+        setBusy(true)
+        setFailure(undefined)
+        try {
+          await onSave(budgetInr)
+          onClose()
+        } catch (error) {
+          setFailure(errorText(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+      return h(Modal, { open: true, onClose: () => { if (!busy) onClose() }, title: t('budgetTitle'), closeLabel: t('budgetClose'), className: 'dshUbxBudget' },
+        h('form', { className: 'dshUbxBudgetForm', onSubmit: (event) => { event.preventDefault(); if (valid) save(Math.round(amount * 100) / 100) } },
+          h('p', { className: 'dshUbxBudgetText' }, t('budgetIntro')),
+          view?.spend?.stepInr === undefined ? null : h('p', { className: 'dshUbxBudgetText' }, t('budgetSteps', { amount: formatInr(view.spend.stepInr), count: view.spend.stepsCounted })),
+          h('label', { className: 'dshUbxBudgetField' },
+            h('span', null, t('budgetLabel')),
+            h('span', { className: 'dshUbxBudgetInput' }, '₹', h('input', { type: 'number', min: '0.01', max: '100000', step: '0.01', inputMode: 'decimal', value, 'data-modal-autofocus': '', onChange: (event) => setValue(event.target.value), 'aria-invalid': value.trim() !== '' && !valid }))),
+          failure === undefined ? null : h('p', { className: 'dshUbxBudgetText', role: 'alert', 'data-tone': 'error' }, t('budgetFailed', { message: failure })),
+          h('div', { className: 'dshUbxBudgetRow' },
+            view?.budgetInr === undefined ? null : h(Button, { type: 'button', size: 'sm', variant: 'ghost', disabled: busy, onClick: () => save(null) }, t('budgetRemove')),
+            h(Button, { type: 'submit', size: 'sm', variant: 'primary', disabled: busy || !valid }, t('budgetSave')))))
+    }
+
     function UnobloxInfoDock(props) {
       const sessionId = props.session?.sessionId ?? props.sessionId
-      const view = useUnobloxInfo(props.service, sessionId, props.session?.running)
-      return h(UnobloxInfoStrip, { view, t: props.t })
+      const [view, reload] = useUnobloxInfo(props.service, sessionId, props.session?.running)
+      const [editing, setEditing] = useState(false)
+      return h(React.Fragment, null,
+        h(UnobloxInfoStrip, { view, t: props.t, onBudget: sessionId === undefined ? undefined : () => setEditing(true) }),
+        editing ? h(BudgetDialog, { t: props.t, view, onClose: () => setEditing(false), onSave: async (budgetInr) => { await props.service.setBudget(sessionId, budgetInr); reload() } }) : null)
     }
 
     // ---------- refused turns ----------
@@ -343,6 +472,7 @@ window.__ModuleLoader__.load({
       if (!isRecord(reason) || reason.kind !== 'error' || !isRecord(reason.error)) return undefined
       const { code, message } = reason.error
       if (code === 'UNOBLOX_BALANCE') return 'balance'
+      if (code === 'UNOBLOX_BUDGET') return 'budget'
       if (typeof message !== 'string' || !/\(UB-[A-Z]+-\d+\)$/u.test(message)) return undefined
       if (code === 'AUTH') return 'auth'
       if (code === 'RATE_LIMIT') return 'busy'
@@ -406,7 +536,7 @@ window.__ModuleLoader__.load({
     }
 
     function RefusedTurnActions(props) {
-      const { turn, t, sendText, selectFreeModel, selectLowCostModel, loadBilling } = props
+      const { turn, t, sendText, selectFreeModel, selectLowCostModel, loadBilling, setBudget } = props
       const refusal = refusalOf(turn?.end?.data?.reason)
       const allowance = useFreeAllowance(refusal === 'balance' ? turn?.end?.data?.reason?.error?.message : undefined, loadBilling)
       const request = turn?.data?.get(REQUEST_KEY)?.text
@@ -453,6 +583,26 @@ window.__ModuleLoader__.load({
         setResent(true)
         return { tone: 'ok', text: t(switchedSent, { model: shortModel(model) }) }
       })
+      // Each message is a new task with its own budget, so going on is the user's call.
+      const continueTask = () => run('continue', async () => {
+        try {
+          await sendText(t('failBudgetMessage'))
+        } catch (error) {
+          return { tone: 'error', text: t('failSendFailed', { message: errorText(error) }) }
+        }
+        setResent(true)
+        return { tone: 'ok', text: t('failSent') }
+      })
+      const raiseAndContinue = (amount) => run('raise', async () => {
+        try {
+          await setBudget(Math.round(amount * 100) / 100)
+          await sendText(t('failBudgetMessage'))
+        } catch (error) {
+          return { tone: 'error', text: t('failSendFailed', { message: errorText(error) }) }
+        }
+        setResent(true)
+        return { tone: 'ok', text: t('failBudgetRaised', { amount: formatInr(amount) }) }
+      })
       const useFree = () => switchAndResend('free', selectFreeModel, 'failSwitched', 'failSwitchedSent')
       const useLowCost = () => switchAndResend('low-cost', selectLowCostModel, 'failSwitchedLowCost', 'failSwitchedLowCostSent')
       const signIn = () => run('sign-in', async () => {
@@ -488,6 +638,13 @@ window.__ModuleLoader__.load({
         }
         // Opens in the system browser through the window-open handler.
         children.push(h('a', { key: 'top-up', className: 'dshUbxFailBtn', href: TOP_UP_URL, target: '_blank', rel: 'noopener noreferrer' }, t('failTopUp')))
+      } else if (refusal === 'budget') {
+        const budget = parseRupees(/of ₹([\d,]+(?:\.\d+)?)/u.exec(turn?.end?.data?.reason?.error?.message ?? '')?.[1] ?? NaN)
+        children.push(h('span', { key: 'hint', className: 'dshUbxFailHint' }, t('failBudgetHint')))
+        children.push(button('continue', t('failBudgetContinue'), continueTask, true))
+        if (budget !== undefined && typeof setBudget === 'function') {
+          children.push(button('raise', t('failBudgetRaise', { amount: formatInr(budget * 2) }), () => raiseAndContinue(budget * 2), false))
+        }
       } else if (refusal === 'auth') {
         if (!signedIn) children.push(button('sign-in', working === 'sign-in' ? t('failSigningIn') : t('failSignIn'), signIn, true))
         else if (request !== undefined) children.push(button('send', t('failRetry'), sendAgain, true))
@@ -565,6 +722,7 @@ window.__ModuleLoader__.load({
             },
             // The balance unoblox last reported, for which retry can serve.
             loadBilling: () => service.load(sessionId).then((view) => view, () => undefined),
+            setBudget: (budgetInr) => service.setBudget(sessionId, budgetInr),
             // Through the picker's own directory, so the composer shows the change.
             selectFreeModel: () => selectFirst(sessionId, 'freeModels', FREE_MODELS, 'no free model is available'),
             selectLowCostModel: () => selectFirst(sessionId, 'lowCostModels', LOW_COST_MODELS, 'no lower-cost model than the current one is available')

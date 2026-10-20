@@ -49,6 +49,13 @@ Items can name workspace files and symbols, and link to each other: `about`, `de
    - It uses two routes behind the Harness session cookie: `GET /api/desktop-context-graph?session=…` and `POST /api/desktop-context-graph/item`.
    - The POST route accepts JSON only and refuses another origin.
 
+## Project scan, decision log and team file
+
+See docs/trust-cost-memory.md, "Project memory". In short:
+- A scan records the project's build and test commands from its own files.
+- **Copy decision log** exports Markdown.
+- **Share with team** writes `.unoblox/context.json` for teammates to import.
+
 ## Storage
 
 - **Location:** one SQLite database (Node's built-in `node:sqlite` with FTS5, so no native package to build per platform) at `$DSH_HOME/context-graph/graph.sqlite`, where `DSH_HOME` is `<userData>/harness` in the app.

@@ -109,6 +109,15 @@ export class GraphStore {
     }
   }
 
+  /** A small persistent value (scan and import bookkeeping). */
+  getMeta(key) {
+    return this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key)?.value
+  }
+
+  setMeta(key, value) {
+    this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value))
+  }
+
   /** Remember which workspace folder a conversation works in, for when it is not loaded. */
   rememberSession(sessionId, workspace, root) {
     this.db.prepare(`INSERT INTO sessions (session_id, workspace, root, seen_at) VALUES (?, ?, ?, ?)
@@ -256,6 +265,11 @@ export class GraphStore {
     const files = this.db.prepare('SELECT path FROM node_files WHERE node_id = ?').all(id).map((file) => file.path)
     const symbols = this.db.prepare('SELECT symbol FROM node_symbols WHERE node_id = ?').all(id).map((symbol) => symbol.symbol)
     this.db.prepare('INSERT INTO nodes_fts (node_id, body) VALUES (?, ?)').run(id, searchBody(row, files, symbols))
+  }
+
+  /** Links an item makes itself (hydrated items list both directions). */
+  outgoing(id) {
+    return this.db.prepare('SELECT dst AS id, rel FROM edges WHERE src = ? ORDER BY dst, rel').all(id).map((edge) => ({ id: edge.id, rel: edge.rel }))
   }
 
   link(src, dst, rel) {

@@ -76,7 +76,15 @@ window.__ModuleLoader__.load({
       paraphrased: 'paraphrased',
       fileChanged: 'changed since recorded',
       fileMissing: 'no longer exists',
-      changeFailed: 'Could not save the change: {message}'
+      changeFailed: 'Could not save the change: {message}',
+      copyLog: 'Copy decision log',
+      copied: 'Copied the decision log as Markdown.',
+      copyFailed: 'Could not copy: {message}',
+      share: 'Share with team',
+      shared: 'Saved {count} items to {path}. Commit it to share them with everyone who opens this folder.',
+      shareFailed: 'Could not save the team file: {message}',
+      scanBadge: 'from project files',
+      teamBadge: 'from team'
     }
     const zh = {
       pill: '上下文 {count}',
@@ -122,7 +130,15 @@ window.__ModuleLoader__.load({
       paraphrased: '转述',
       fileChanged: '记录后已修改',
       fileMissing: '已不存在',
-      changeFailed: '无法保存更改：{message}'
+      changeFailed: '无法保存更改：{message}',
+      copyLog: '复制决策记录',
+      copied: '已将决策记录复制为 Markdown。',
+      copyFailed: '无法复制：{message}',
+      share: '与团队共享',
+      shared: '已将 {count} 项保存到 {path}。提交该文件即可与打开此文件夹的所有人共享。',
+      shareFailed: '无法保存团队文件：{message}',
+      scanBadge: '来自项目文件',
+      teamBadge: '来自团队'
     }
 
     const STYLE = `
@@ -198,6 +214,7 @@ window.__ModuleLoader__.load({
           ...(typeof item.status === 'string' ? { status: item.status } : {}),
           pinned: item.pinned === true,
           mine: item.origin === 'user',
+          origin: typeof item.origin === 'string' ? item.origin : 'model',
           shared: item.shared !== false,
           files: Array.isArray(item.files) ? item.files.filter((file) => isRecord(file) && typeof file.path === 'string').map((file) => ({ path: file.path, state: typeof file.state === 'string' ? file.state : 'unknown' })) : []
         }))
@@ -228,6 +245,18 @@ window.__ModuleLoader__.load({
           const view = toView(await response.json())
           if (view === undefined) throw new Error('unexpected response shape')
           return view
+        },
+        async exportLog(sessionId) {
+          const response = await doFetch(`${GRAPH_ROUTE}/export?${new URLSearchParams({ session: sessionId }).toString()}`, { credentials: 'same-origin', cache: 'no-store' })
+          if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
+          return response.text()
+        },
+        async share(sessionId) {
+          const response = await doFetch(ITEM_ROUTE, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ session: sessionId, action: 'share' }) })
+          let body
+          try { body = await response.json() } catch { body = undefined }
+          if (!response.ok || !isRecord(body)) throw new Error(isRecord(body) && typeof body.error === 'string' ? body.error : `HTTP ${String(response.status)}`)
+          return { path: String(body.path), count: Number(body.count) }
         },
         async change(sessionId, change) {
           const response = await doFetch(ITEM_ROUTE, {
@@ -299,6 +328,8 @@ window.__ModuleLoader__.load({
       if (item.pinned) meta.push(h('span', { key: 'pinned', className: 'dshCtxBadge' }, t('pinnedBadge')))
       if (item.status === 'done') meta.push(h('span', { key: 'done', className: 'dshCtxBadge' }, t('doneBadge')))
       if (item.mine) meta.push(h('span', { key: 'mine', className: 'dshCtxBadge' }, t('yoursBadge')))
+      if (item.origin === 'scan') meta.push(h('span', { key: 'scan', className: 'dshCtxBadge' }, t('scanBadge')))
+      if (item.origin === 'team') meta.push(h('span', { key: 'team', className: 'dshCtxBadge' }, t('teamBadge')))
       if (!item.shared) meta.push(h('span', { key: 'session', className: 'dshCtxBadge' }, t('sessionBadge')))
       if (item.kind === 'rule' && item.quote === undefined) meta.push(h('span', { key: 'para', className: 'dshCtxBadge' }, t('paraphrased')))
       for (const file of item.files) {
@@ -359,6 +390,26 @@ window.__ModuleLoader__.load({
       const [state, reload] = useGraph(service, sessionId, undefined, debounced)
       const [busy, setBusy] = useState(false)
       const [failure, setFailure] = useState(undefined)
+      const [notice, setNotice] = useState(undefined)
+      const copyLog = async () => {
+        try {
+          await navigator.clipboard.writeText(await service.exportLog(sessionId))
+          setNotice({ tone: 'ok', text: t('copied') })
+        } catch (error) {
+          setNotice({ tone: 'error', text: t('copyFailed', { message: errorText(error) }) })
+        }
+      }
+      const share = async () => {
+        setBusy(true)
+        try {
+          const written = await service.share(sessionId)
+          setNotice({ tone: 'ok', text: t('shared', written) })
+        } catch (error) {
+          setNotice({ tone: 'error', text: t('shareFailed', { message: errorText(error) }) })
+        } finally {
+          setBusy(false)
+        }
+      }
       const change = async (request) => {
         setBusy(true)
         setFailure(undefined)
@@ -394,7 +445,11 @@ window.__ModuleLoader__.load({
             h('input', { type: 'search', value: query, placeholder: t('search'), 'data-modal-autofocus': '', onChange: (event) => setQuery(event.target.value) })),
           list,
           failure === undefined ? null : h('p', { className: 'dshCtxStatus', role: 'alert', 'data-tone': 'error' }, failure),
-          h(AddForm, { t, busy, onAdd: change })))
+          h(AddForm, { t, busy, onAdd: change }),
+          h('div', { className: 'dshCtxRow' },
+            h(Button, { size: 'sm', variant: 'ghost', disabled: busy, onClick: copyLog }, t('copyLog')),
+            h(Button, { size: 'sm', variant: 'ghost', disabled: busy, onClick: share }, t('share'))),
+          notice === undefined ? null : h('p', { className: 'dshCtxStatus', role: 'status', 'data-tone': notice.tone }, notice.text)))
     }
 
     function ContextDock(props) {

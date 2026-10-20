@@ -50,6 +50,8 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 
 - The unoblox API key: in the Harness credential store, never sent anywhere but `api.unoblox.ai`, and never to the renderer. A key from **Sign in with unoblox** goes from the token response straight into that store in the main process. **Sign Out of unoblox…** revokes it on unoblox.ai, then removes it from this computer even when unoblox.ai cannot be reached (the dialog then says to delete it at unoblox.ai/user/keys). To be able to revoke it, the app keeps a copy of the signed-in key encrypted by the operating system (macOS Keychain, Windows DPAPI, the Linux secret service) in `unoblox-device.json` in its data folder, next to the random install id; without such a service (Linux `basic_text`) no copy is kept.
 - Conversations, workspaces and settings: under the app's user-data folder.
+- Task budgets per conversation: `harness/desktop-unoblox/budgets.json` under the app's user-data folder. The spend shown is what unoblox reported on its own responses; nothing extra is sent.
+- **Share with team** in the Context panel writes `.unoblox/context.json` into the workspace folder, only when clicked. What happens to it next is the project's own version control.
 - The context graph (docs/context-graph.md): rules, decisions, facts and tasks recorded at each compaction, in `harness/context-graph/graph.sqlite` under the app's user-data folder. Items name workspace file paths and keep a SHA-256 fingerprint of each file, never its contents. It is shown only to the model the user already chats with, as part of each request, and the Context panel shows, edits or removes every item.
 - Local diagnostics: the harness log, used only by the app's own recovery screens.
 

@@ -109,7 +109,7 @@ function host(credential: { value?: string, throws?: boolean } | undefined, conf
     },
     logger: { warn: (...args: unknown[]) => warnings.push(args) },
     connection: { fetch: { register: (route: { path: string, methods: string[], fetch: (request: Request) => Promise<Response> }) => {
-      expect(route.methods).toEqual(['GET'])
+      expect(route.methods).toEqual([route.path === INFO_ROUTE ? 'GET' : 'POST'])
       routes.set(route.path, route.fetch)
     } } }
   }
@@ -134,6 +134,8 @@ describe('info route', () => {
       key: 'set',
       billing: { ...turnFromHeaders(CHAT_HEADERS).billing, at: 5 },
       turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 },
+      spend: expect.objectContaining({ sessionInr: expect.any(Number) }),
+      budgetInr: null,
       freeModels: [],
       lowCostModels: []
     })

@@ -9,7 +9,11 @@
  * - Adds up what each task (turn) and conversation spent, from unoblox's own
  *   per-response charge, and enforces the per-task budget the user set: the
  *   agent's next model call in a task over budget is not made, and the turn
- *   ends asking the user (spend.js).
+ *   ends asking the user (spend.js). A default budget (session `*`) covers
+ *   conversations that set none of their own.
+ * - Keeps this computer's usage history (usage.js) for Settings › Usage: one
+ *   line per charged response, served as daily, per-model and
+ *   per-conversation totals.
  */
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import z from '@deepseek-ai/schemastery'
@@ -17,12 +21,16 @@ import { join } from 'node:path'
 import { isAgentLoopRequest } from '@deepseek-ai/dsh-llm'
 import { createTurnStore, turnFromHeaders } from './info.js'
 import { createBudgetStore, createSpendTracker } from './spend.js'
+import { createUsageLedger } from './usage.js'
 
 export const name = 'dsh-desktop-unoblox-info'
 export const inject = ['connection']
 export const INFO_ROUTE = '/api/desktop-unoblox.info'
 export const BUDGET_ROUTE = '/api/desktop-unoblox.budget'
+export const USAGE_ROUTE = '/api/desktop-unoblox.usage'
 export const BUDGET_CODE = 'UNOBLOX_BUDGET'
+/** The budget store's key for the default task budget. */
+export const DEFAULT_BUDGET = '*'
 
 export const Config = z.object({
   provider: z.string().default('unoblox'),
@@ -33,7 +41,7 @@ export const Config = z.object({
   // The cheapest models by listed price (DSH_DESKTOP_UNOBLOX_LOW_COST_MODELS),
   // offered below the freemium threshold, where every model is charged.
   lowCostModels: z.array(z.string()).default([]),
-  // Folder for the per-conversation task budgets; none keeps them in memory.
+  // Folder for the task budgets and usage history; none keeps them in memory.
   root: z.string().default('')
 })
 
@@ -75,17 +83,40 @@ export function apply(ctx, config, deps = {}) {
   const freeModels = modelList(config?.freeModels)
   const lowCostModels = modelList(config?.lowCostModels)
   const spend = createSpendTracker(deps.now === undefined ? {} : { now: deps.now })
-  const budgets = createBudgetStore(typeof config?.root === 'string' && config.root !== '' ? join(config.root, 'budgets.json') : undefined)
+  const root = typeof config?.root === 'string' && config.root !== '' ? config.root : undefined
+  const budgets = createBudgetStore(root === undefined ? undefined : join(root, 'budgets.json'))
+  const usage = createUsageLedger(root === undefined ? undefined : join(root, 'usage.jsonl'), deps.now === undefined ? {} : { now: deps.now })
+  // Conversation titles seen this run, for the usage list.
+  const titles = new Map()
+  // The conversation's own budget, else the default one.
+  const budgetFor = async (sessionId) => (await budgets.get(sessionId)) ?? (await budgets.get(DEFAULT_BUDGET))
 
   ctx.on('llm-pi-ai/response', (response) => {
     if (!isRecord(response) || response.provider !== provider) return
     const turn = turnFromHeaders(response.headers)
     if (turn !== undefined) turns.record(response.sessionId, turn)
     if (turn?.billing !== undefined) spend.charge(response.sessionId, turn.billing)
+    if (turn?.billing?.chargedInr !== undefined) {
+      const sessionId = typeof response.sessionId === 'string' ? response.sessionId : undefined
+      usage.record({
+        session: sessionId,
+        title: sessionId === undefined ? undefined : titles.get(sessionId),
+        model: turn.routing?.servedModel ?? turn.routing?.selectedModel,
+        chargedInr: turn.billing.chargedInr,
+        estimated: turn.billing.chargedEstimated,
+        balanceInr: turn.billing.balanceInr
+      }).catch((error) => ctx.logger.warn('unoblox-info: usage not recorded: %s', error instanceof Error ? error.message : String(error)))
+    }
   })
 
   ctx.on('session/event', (session, event) => {
-    if (event?.type === 'turn/start') spend.turnStarted(String(session?.header?.id ?? session?.id), event.data?.turn)
+    const sessionId = String(session?.header?.id ?? session?.id)
+    if (event?.type === 'turn/start') spend.turnStarted(sessionId, event.data?.turn)
+    if (event?.type === 'session/title' && typeof event.data?.title === 'string') {
+      titles.delete(sessionId)
+      titles.set(sessionId, event.data.title)
+      while (titles.size > 500) titles.delete(titles.keys().next().value)
+    }
   })
 
   // Budget: before each of the agent's own model calls (not compaction or
@@ -97,7 +128,7 @@ export function apply(ctx, config, deps = {}) {
     return (async function* () {
       let budget
       try {
-        budget = await budgets.get(sessionId)
+        budget = await budgetFor(sessionId)
       } catch (error) {
         ctx.logger.warn('unoblox-info: budget unreadable, not enforced: %s', error instanceof Error ? error.message : String(error))
       }
@@ -134,16 +165,42 @@ export function apply(ctx, config, deps = {}) {
       const sessionId = new URL(request.url).searchParams.get('session') ?? undefined
       const key = await keyState()
       const turn = turns.session(sessionId)
-      const budgetInr = sessionId === undefined ? undefined : await budgets.get(sessionId).catch(() => undefined)
+      const ownBudget = sessionId === undefined ? undefined : await budgets.get(sessionId).catch(() => undefined)
+      const defaultBudgetInr = await budgets.get(DEFAULT_BUDGET).catch(() => undefined)
+      const budgetInr = sessionId === undefined ? undefined : ownBudget ?? defaultBudgetInr
       return Response.json({
         key,
         billing: turns.latestBilling() ?? null,
         turn: turn ?? null,
         spend: spend.view(sessionId) ?? null,
         budgetInr: budgetInr ?? null,
+        budgetIsDefault: budgetInr !== undefined && ownBudget === undefined,
+        defaultBudgetInr: defaultBudgetInr ?? null,
         freeModels,
         lowCostModels
       }, { headers: NO_STORE })
+    }
+  })
+
+  ctx.connection.fetch.register({
+    path: USAGE_ROUTE,
+    methods: ['GET'],
+    requestBody: 'buffered',
+    fetch: async (request) => {
+      const params = new URL(request.url).searchParams
+      const days = Number(params.get('days') ?? 30)
+      const offset = params.get('offset')
+      const offsetMinutes = offset === null ? undefined : Number(offset)
+      if (!Number.isInteger(days) || days < 1 || days > 366 || (offsetMinutes !== undefined && (!Number.isInteger(offsetMinutes) || Math.abs(offsetMinutes) > 900))) {
+        return Response.json({ error: 'days must be 1–366 and offset a whole number of minutes' }, { status: 400, headers: NO_STORE })
+      }
+      try {
+        const summary = await usage.summary({ days, offsetMinutes, titles })
+        return Response.json({ ...summary, billing: turns.latestBilling() ?? null, key: await keyState() }, { headers: NO_STORE })
+      } catch (error) {
+        ctx.logger.warn('unoblox-info: usage unreadable: %s', error instanceof Error ? error.message : String(error))
+        return Response.json({ error: 'usage history unreadable' }, { status: 500, headers: NO_STORE })
+      }
     }
   })
 

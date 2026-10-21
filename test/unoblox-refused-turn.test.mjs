@@ -55,7 +55,7 @@ describe('refused unoblox turns', () => {
     const view = await render({ loadBilling: HELD, turn: failedTurn(BALANCE), selectFreeModel, sendText })
     expect(view.container.querySelector('[data-unoblox-refusal]')?.getAttribute('data-unoblox-refusal')).toBe('balance')
     const topUp = view.container.querySelector('a')
-    expect(topUp?.getAttribute('href')).toBe('https://unoblox.ai/user/credits/topup')
+    expect(topUp?.getAttribute('href')).toBe('https://unoblox.ai/user/credits')
     expect(topUp?.getAttribute('target')).toBe('_blank')
     expect(topUp?.getAttribute('rel')).toContain('noopener')
     expect(selectFreeModel).not.toHaveBeenCalled()
@@ -149,7 +149,7 @@ describe('free models need a held balance', () => {
     const view = await render({ turn: failedTurn(HOLD_REFUSAL), selectFreeModel, sendText: vi.fn(), loadBilling: HELD })
     expect(view.button('failUseFree')).toBeUndefined()
     expect(view.container.textContent).toContain('failFreeNeedsHold {"amount":"₹1,000.00"}')
-    expect(view.container.querySelector('a')?.getAttribute('href')).toBe('https://unoblox.ai/user/credits/topup')
+    expect(view.container.querySelector('a')?.getAttribute('href')).toBe('https://unoblox.ai/user/credits')
   })
 
   it('below the threshold, offers a lower-cost model charged at its listed price', async () => {

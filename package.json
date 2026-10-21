@@ -295,6 +295,7 @@
     "dsh-desktop-starters": "file:packages/dsh-desktop-starters",
     "dsh-desktop-unoblox-info": "file:packages/dsh-desktop-unoblox-info",
     "dsh-desktop-unoblox-search": "file:packages/dsh-desktop-unoblox-search",
+    "dsh-desktop-unoblox-settings": "file:packages/dsh-desktop-unoblox-settings",
     "dsh-desktop-widgets": "file:packages/dsh-desktop-widgets",
     "dsh-desktop-workbenches": "file:packages/dsh-desktop-workbenches",
     "dsh-image-generation": "file:packages/dsh-image-generation",

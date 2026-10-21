@@ -583,7 +583,9 @@ contextBridge.exposeInMainWorld(
     // key itself; the page only learns whether it worked.
     unobloxSignInAvailable: (): Promise<boolean> => ipcRenderer.invoke('unoblox:sign-in-available'),
     unobloxSignIn: (): Promise<{ ok: true } | { ok: false; code: string; message: string }> => ipcRenderer.invoke('unoblox:sign-in'),
-    unobloxSignInCancel: (): Promise<void> => ipcRenderer.invoke('unoblox:sign-in-cancel')
+    unobloxSignInCancel: (): Promise<void> => ipcRenderer.invoke('unoblox:sign-in-cancel'),
+    // Asks the user to confirm in a native dialog, then revokes and removes the key.
+    unobloxSignOut: (): Promise<{ signedOut: boolean }> => ipcRenderer.invoke('unoblox:sign-out')
   })
 )
 

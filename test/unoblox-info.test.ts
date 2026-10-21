@@ -7,7 +7,7 @@ import { resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { projectRoot } from './patch-path'
 // @ts-expect-error Local host plugins are authored as ESM JavaScript.
-import { apply as applyInfo, INFO_ROUTE } from '../packages/dsh-desktop-unoblox-info/index.js'
+import { apply as applyInfo, BUDGET_ROUTE, INFO_ROUTE } from '../packages/dsh-desktop-unoblox-info/index.js'
 // @ts-expect-error Local host plugins are authored as ESM JavaScript.
 import { createTurnStore, parseBilling, turnFromHeaders, utf8HeaderValue } from '../packages/dsh-desktop-unoblox-info/info.js'
 
@@ -109,7 +109,7 @@ function host(credential: { value?: string, throws?: boolean } | undefined, conf
     },
     logger: { warn: (...args: unknown[]) => warnings.push(args) },
     connection: { fetch: { register: (route: { path: string, methods: string[], fetch: (request: Request) => Promise<Response> }) => {
-      expect(route.methods).toEqual([route.path === INFO_ROUTE ? 'GET' : 'POST'])
+      expect(route.methods).toEqual([route.path === BUDGET_ROUTE ? 'POST' : 'GET'])
       routes.set(route.path, route.fetch)
     } } }
   }
@@ -136,6 +136,8 @@ describe('info route', () => {
       turn: { ...turnFromHeaders(CHAT_HEADERS), at: 5 },
       spend: expect.objectContaining({ sessionInr: expect.any(Number) }),
       budgetInr: null,
+      budgetIsDefault: false,
+      defaultBudgetInr: null,
       freeModels: [],
       lowCostModels: []
     })

@@ -52,13 +52,23 @@ The patched `@deepseek-ai/dsh-client-ui-settings-models` hides the Models page's
 - The search privacy notice is not repeated in the strip, because no API response carries it. It stays in the first-run dialog.
 - Safe Mode does not load the strip.
 
+## Settings tabs
+
+`packages/dsh-desktop-unoblox-settings` adds three sections to Settings (slot `settings.section`, orders 30–32, after Agent presets). It has no host half: it reads the info plugin's routes and the Desktop bridge.
+
+- **Usage:** today, the last 7 and 30 days, a bar per day for 30 days (hover or focus a bar for its figures; a table view lists the days with charges), and the top models and conversations. The source is `GET /api/desktop-unoblox.usage?days=30&offset=<minutes>`, served from `usage.jsonl` (docs/privacy.md), which the info plugin appends to for every charged response. It counts this computer only; **All devices on unoblox.ai** opens https://unoblox.ai/user/usage.
+- **Billing:** the balance (this run's latest report, otherwise the last one recorded, with its time) and the freemium status: free models cost ₹0 while the balance is at least `balance_requirement_inr` (₹1,000), and below that every model is charged at its listed price while the wallet can pay. **Top up** and **Payment history** open https://unoblox.ai/user/credits (unoblox.ai has no separate top-up or invoices page), and **Pricing** opens https://unoblox.ai/pricing. The default task budget (docs/trust-cost-memory.md) is set here too.
+- **unoblox account:** whether a key is stored (never the key), **Sign in with unoblox** / **Sign in again** and **Sign out** through `window.dshDesktop` (the sign-out asks for confirmation in the main process), and links to https://unoblox.ai/user/keys, /user/settings and /user/activity. Without the Desktop bridge (a plain browser) it points to Settings › Models instead.
+
+unoblox has no usage or balance API, so these tabs show only what unoblox reported on this computer's own responses.
+
 ## When unoblox refuses a turn
 
 The stock error row under a failed turn shows unoblox's own sentence and code. `packages/dsh-desktop-unoblox-info` adds a row of actions under it (slot `conversation.chat.turnTail`):
 
 | Refusal | Shown | What the click does |
 | --- | --- | --- |
-| Any 402: balance or spending limit (`UB-GW-003`/`295`/`068`/`004`/`005`/`306`) | "Retry with a free model", "Top up" | Switches this conversation to the first free model (`freemium` in `/v1/models`, in picker order) that the picker accepts, and sends the user's message again. Top up opens `https://unoblox.ai/user/credits/topup` in the browser. |
+| Any 402: balance or spending limit (`UB-GW-003`/`295`/`068`/`004`/`005`/`306`) | "Retry with a free model", "Top up" | Switches this conversation to the first free model (`freemium` in `/v1/models`, in picker order) that the picker accepts, and sends the user's message again. Top up opens `https://unoblox.ai/user/credits` in the browser. |
 | 401 with an unoblox code (e.g. `UB-GW-007`, revoked key) | "Sign in again" | Only when this build can sign in (docs/sign-in.md). After sign-in: "Send again". |
 | 429 / 5xx with an unoblox code (busy, `UB-GW-009`) | A short note and "Send again" | Sends the message again. The key is not touched. |
 

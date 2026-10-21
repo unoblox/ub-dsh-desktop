@@ -3147,7 +3147,8 @@ async function signInFromMenu(): Promise<void> {
  * Remove the key from this computer. Identity has no endpoint an app can use
  * to revoke its key yet, so the dialog says where to delete it.
  */
-async function signOutFromMenu(): Promise<void> {
+/** Sign out after the user confirms; true when the key was removed from this computer. */
+async function signOutFromMenu(): Promise<boolean> {
   const isChinese = harnessLocale() === 'zh'
   const confirm = await dialog.showMessageBox({
     type: 'question',
@@ -3159,7 +3160,7 @@ async function signOutFromMenu(): Promise<void> {
       ? '这台电脑的 API 密钥会被撤销并移除。退出后，unoblox works 在你重新登录或粘贴密钥之前无法使用模型。'
       : 'This computer’s API key is revoked and removed. unoblox works cannot use models until you sign in again or paste a key.'
   })
-  if (confirm.response !== 0) return
+  if (confirm.response !== 0) return false
   const result = await unobloxSignIn.signOut()
   if (!result.ok) {
     await dialog.showMessageBox({
@@ -3167,9 +3168,9 @@ async function signOutFromMenu(): Promise<void> {
       message: isChinese ? '未能移除密钥' : 'Could not remove the key',
       detail: result.message
     })
-    return
+    return false
   }
-  if (result.revoked === 'yes') return
+  if (result.revoked === 'yes') return true
   // Removed here, but still active on the account: offline, a pasted key, or no keychain to keep a copy.
   const followUp = await dialog.showMessageBox({
     type: 'info',
@@ -3186,6 +3187,7 @@ async function signOutFromMenu(): Promise<void> {
           : 'The key is still active on your unoblox account. If you no longer need it, delete it on unoblox.ai under Settings › API keys.')
   })
   if (followUp.response === 0) await shell.openExternal(UNOBLOX_KEYS_PAGE_URL)
+  return true
 }
 
 function installMenu(): void {
@@ -3600,6 +3602,11 @@ async function bootstrap(): Promise<void> {
   ipcMain.handle('unoblox:sign-in-cancel', (event) => {
     assertTrustedMainWindowEvent(event)
     unobloxSignIn.cancel()
+  })
+  // Settings › unoblox account: the same confirmed sign-out as the Harness menu.
+  ipcMain.handle('unoblox:sign-out', async (event) => {
+    assertTrustedMainWindowEvent(event)
+    return { signedOut: await signOutFromMenu() }
   })
   ipcMain.handle('harness:show-log', () => {
     shell.showItemInFolder(join(app.getPath('logs'), 'harness.log'))

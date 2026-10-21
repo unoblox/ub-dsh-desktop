@@ -155,6 +155,13 @@
         freeModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_FREE_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
         lowCostModels: !!js "(() => { try { const ids = JSON.parse(process.env.DSH_DESKTOP_UNOBLOX_LOW_COST_MODELS || '[]'); if (Array.isArray(ids)) return ids.filter((id) => typeof id === 'string') } catch {} return [] })()"
 
+# Settings tabs for unoblox (packages/dsh-desktop-unoblox-settings): Usage,
+# Billing & payments and unoblox account. They read the info plugin's routes
+# above and the Desktop sign-in bridge; payments happen on unoblox.ai.
+- insert:
+    - id: dsh-desktop-unoblox-settings
+      name: dsh-desktop-unoblox-settings
+
 # Context graph (packages/dsh-desktop-context-graph): durable rules, goals,
 # decisions, facts and tasks kept in a local SQLite graph per workspace. Each
 # compaction call also records graph changes; a size-capped slice is part of

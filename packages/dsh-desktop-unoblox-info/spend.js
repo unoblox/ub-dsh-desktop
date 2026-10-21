@@ -91,7 +91,10 @@ export function createBudgetStore(path) {
   }
   const save = () => {
     if (path === undefined) return Promise.resolve()
-    const body = `${JSON.stringify({ version: 1, budgets: Object.fromEntries([...budgets].slice(-MAX_TRACKED)) })}\n`
+    // The default budget ('*') is kept whatever the number of conversations.
+    const kept = [...budgets].filter(([sessionId]) => sessionId !== '*').slice(-MAX_TRACKED)
+    if (budgets.has('*')) kept.push(['*', budgets.get('*')])
+    const body = `${JSON.stringify({ version: 1, budgets: Object.fromEntries(kept) })}\n`
     writing = writing.catch(() => {}).then(async () => {
       await mkdir(dirname(path), { recursive: true })
       const temporary = `${path}.${process.pid}.tmp`

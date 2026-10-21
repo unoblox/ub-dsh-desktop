@@ -14,7 +14,9 @@ let dir = ''
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'ubx-budget-')) })
 afterEach(async () => {
   document.body.innerHTML = ''
-  await rm(dir, { recursive: true, force: true })
+  // Usage records are written in the background; let them land first.
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  await rm(dir, { recursive: true, force: true, maxRetries: 3 })
 })
 
 /** The x-unoblox-freemium header of one charged response. */
@@ -171,6 +173,17 @@ describe('budget UI', () => {
     await ui.click(ui.button('budgetSave'))
     expect(service.setBudget).toHaveBeenCalledWith('s1', 12.5)
     expect(ui.container.querySelector('[role=dialog]')).toBeNull()
+  })
+
+  it('says when the budget is the default one, and offers no Remove for it', async () => {
+    const view = client.toView({ key: 'set', billing: null, turn: null, spend: null, budgetInr: 3, budgetIsDefault: true, freeModels: [], lowCostModels: [] })
+    expect(view).toMatchObject({ budgetInr: 3, budgetIsDefault: true })
+    const ui = await render(React.createElement(client.BudgetDialog, { t, view, onSave: async () => {}, onClose: () => {} }))
+    expect(ui.container.textContent).toContain('budgetDefault')
+    expect(ui.button('budgetRemove')).toBeUndefined()
+    const own = await render(React.createElement(client.BudgetDialog, { t, view: client.toView({ key: 'set', billing: null, turn: null, spend: null, budgetInr: 3, budgetIsDefault: false, freeModels: [], lowCostModels: [] }), onSave: async () => {}, onClose: () => {} }))
+    expect(own.container.textContent).not.toContain('budgetDefault')
+    expect(own.button('budgetRemove')).toBeDefined()
   })
 
   it('after a budget stop, continues or raises the budget and continues, only on click', async () => {

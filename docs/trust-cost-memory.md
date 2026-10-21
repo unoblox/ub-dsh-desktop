@@ -30,7 +30,7 @@ The receipt then checks the claims in the final reply ("tests pass", "the build 
 ## Cost: spend meter and task budget (`packages/dsh-desktop-unoblox-info`)
 
 - **Spend pill:** a pill under the composer shows what the current task (one message and everything the agent does for it) has spent, as unoblox charged it (`charged_inr` in each response's `x-unoblox-freemium` header). Its tooltip adds the conversation's total and the average cost of recent steps. It refreshes every 3 s while the agent works.
-- **Budget:** clicking the pill sets a per-task budget for the conversation. It is kept in `<DSH_HOME>/desktop-unoblox/budgets.json`.
+- **Budget:** clicking the pill sets a per-task budget for the conversation. **Settings › Billing** sets a default task budget for conversations that set none of their own; a conversation's own budget wins. Both are kept in `<DSH_HOME>/desktop-unoblox/budgets.json` (the default under the key `*`, kept however many conversations have one).
 - **How the stop works:**
   - Before each of the agent's own model calls (not compaction or titles), the plugin checks the budget. A task that has spent its budget is stopped, and so is one whose next step would go over it at the recent average step cost. Only the first step of a task always runs.
   - The stop is a `UNOBLOX_BUDGET` failure that is never retried, even under an "always retry" policy.

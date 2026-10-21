@@ -103,7 +103,8 @@ window.__ModuleLoader__.load({
       budgetLabel: 'Budget per task',
       budgetSave: 'Save',
       budgetRemove: 'Remove budget',
-      budgetFailed: 'Could not save the budget: {message}'
+      budgetFailed: 'Could not save the budget: {message}',
+      budgetDefault: 'This is your default budget from Settings › Billing. Saving here sets this conversation\'s own.'
     }
     const zh = {
       label: 'unoblox',
@@ -151,7 +152,8 @@ window.__ModuleLoader__.load({
       budgetLabel: '每个任务的预算',
       budgetSave: '保存',
       budgetRemove: '移除预算',
-      budgetFailed: '无法保存预算：{message}'
+      budgetFailed: '无法保存预算：{message}',
+      budgetDefault: '这是你在 设置 › 账单 中设置的默认预算。在此保存会为此对话单独设置预算。'
     }
 
     // ---------- formatting (pure) ----------
@@ -198,6 +200,8 @@ window.__ModuleLoader__.load({
           ...(typeof body.spend.stepInr === 'number' ? { stepInr: body.spend.stepInr, stepsCounted: Number(body.spend.stepsCounted) || 0 } : {})
         } } : {}),
         ...(typeof body.budgetInr === 'number' ? { budgetInr: body.budgetInr } : {}),
+        // The budget is the default one from Settings › Billing, not this conversation's own.
+        ...(typeof body.budgetInr === 'number' && body.budgetIsDefault === true ? { budgetIsDefault: true } : {}),
         freeModels: Array.isArray(body.freeModels) ? body.freeModels.filter((id) => typeof id === 'string' && id !== '') : [],
         lowCostModels: Array.isArray(body.lowCostModels) ? body.lowCostModels.filter((id) => typeof id === 'string' && id !== '') : []
       }
@@ -389,13 +393,14 @@ window.__ModuleLoader__.load({
       return h(Modal, { open: true, onClose: () => { if (!busy) onClose() }, title: t('budgetTitle'), closeLabel: t('budgetClose'), className: 'dshUbxBudget' },
         h('form', { className: 'dshUbxBudgetForm', onSubmit: (event) => { event.preventDefault(); if (valid) save(Math.round(amount * 100) / 100) } },
           h('p', { className: 'dshUbxBudgetText' }, t('budgetIntro')),
+          view?.budgetIsDefault === true ? h('p', { className: 'dshUbxBudgetText' }, t('budgetDefault')) : null,
           view?.spend?.stepInr === undefined ? null : h('p', { className: 'dshUbxBudgetText' }, t('budgetSteps', { amount: formatInr(view.spend.stepInr), count: view.spend.stepsCounted })),
           h('label', { className: 'dshUbxBudgetField' },
             h('span', null, t('budgetLabel')),
             h('span', { className: 'dshUbxBudgetInput' }, '₹', h('input', { type: 'number', min: '0.01', max: '100000', step: '0.01', inputMode: 'decimal', value, 'data-modal-autofocus': '', onChange: (event) => setValue(event.target.value), 'aria-invalid': value.trim() !== '' && !valid }))),
           failure === undefined ? null : h('p', { className: 'dshUbxBudgetText', role: 'alert', 'data-tone': 'error' }, t('budgetFailed', { message: failure })),
           h('div', { className: 'dshUbxBudgetRow' },
-            view?.budgetInr === undefined ? null : h(Button, { type: 'button', size: 'sm', variant: 'ghost', disabled: busy, onClick: () => save(null) }, t('budgetRemove')),
+            view?.budgetInr === undefined || view.budgetIsDefault === true ? null : h(Button, { type: 'button', size: 'sm', variant: 'ghost', disabled: busy, onClick: () => save(null) }, t('budgetRemove')),
             h(Button, { type: 'submit', size: 'sm', variant: 'primary', disabled: busy || !valid }, t('budgetSave')))))
     }
 
@@ -416,7 +421,7 @@ window.__ModuleLoader__.load({
     // revoked key, send again when unoblox was busy. Nothing switches models
     // or resends without a click.
     const UNOBLOX_PROVIDER = 'unoblox'
-    const TOP_UP_URL = 'https://unoblox.ai/user/credits/topup'
+    const TOP_UP_URL = 'https://unoblox.ai/user/credits'
     // The free models come from /v1/models (`freemium`) through the info
     // route; the first one the picker accepts is used. These stand in when
     // the route has none (an offline first launch). `unoblox/auto` and
@@ -741,6 +746,7 @@ window.__ModuleLoader__.load({
     exports.shortModel = shortModel
     exports.UnobloxInfoStrip = UnobloxInfoStrip
     exports.UnobloxInfoDock = UnobloxInfoDock
+    exports.BudgetDialog = BudgetDialog
     exports.RefusedTurnActions = RefusedTurnActions
     exports.requestDefinition = requestDefinition
     exports.refusalOf = refusalOf

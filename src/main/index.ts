@@ -3144,10 +3144,9 @@ async function signInFromMenu(): Promise<void> {
 }
 
 /**
- * Remove the key from this computer. Identity has no endpoint an app can use
- * to revoke its key yet, so the dialog says where to delete it.
+ * Sign out after the user confirms: revoke the key on unoblox.ai when this app
+ * keeps a copy to revoke, then remove it here. True when the key was removed.
  */
-/** Sign out after the user confirms; true when the key was removed from this computer. */
 async function signOutFromMenu(): Promise<boolean> {
   const isChinese = harnessLocale() === 'zh'
   const confirm = await dialog.showMessageBox({

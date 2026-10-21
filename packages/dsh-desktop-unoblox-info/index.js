@@ -196,7 +196,8 @@ export function apply(ctx, config, deps = {}) {
       }
       try {
         const summary = await usage.summary({ days, offsetMinutes, titles })
-        return Response.json({ ...summary, billing: turns.latestBilling() ?? null, key: await keyState() }, { headers: NO_STORE })
+        const defaultBudgetInr = await budgets.get(DEFAULT_BUDGET).catch(() => undefined)
+        return Response.json({ ...summary, billing: turns.latestBilling() ?? null, key: await keyState(), defaultBudgetInr: defaultBudgetInr ?? null }, { headers: NO_STORE })
       } catch (error) {
         ctx.logger.warn('unoblox-info: usage unreadable: %s', error instanceof Error ? error.message : String(error))
         return Response.json({ error: 'usage history unreadable' }, { status: 500, headers: NO_STORE })

@@ -312,7 +312,7 @@ describe('settings sections', () => {
     let key = 'missing'
     const signIn = vi.fn(async () => { key = 'set'; return { ok: true } })
     const signOut = vi.fn(async () => { key = 'missing'; return { signedOut: true } })
-    window.dshDesktop = { unobloxSignIn: signIn, unobloxSignOut: signOut }
+    window.dshDesktop = { unobloxSignIn: signIn, unobloxSignOut: signOut, unobloxSignInAvailable: async () => true }
     const { container, click, flush } = await render(React.createElement(client.AccountSection, { t, service: service(() => body({ key })) }))
     expect(container.textContent).toContain('keyMissing')
     expect(container.textContent).not.toContain('signOut')
@@ -334,7 +334,7 @@ describe('settings sections', () => {
   })
 
   it('Account reports a failed sign-in, stays quiet on cancel, and has no buttons without the bridge', async () => {
-    window.dshDesktop = { unobloxSignIn: async () => ({ ok: false, code: 'timeout', message: 'took too long' }), unobloxSignOut: async () => ({ signedOut: false }) }
+    window.dshDesktop = { unobloxSignIn: async () => ({ ok: false, code: 'timeout', message: 'took too long' }), unobloxSignOut: async () => ({ signedOut: false }), unobloxSignInAvailable: async () => true }
     const failed = await render(React.createElement(client.AccountSection, { t, service: service(body({ key: 'missing' })) }))
     await failed.click([...failed.container.querySelectorAll('button')].find((button) => button.textContent === 'signIn'))
     await failed.flush()
@@ -346,9 +346,120 @@ describe('settings sections', () => {
     await cancelled.flush()
     expect(cancelled.container.textContent).not.toContain('signInFailed')
 
+    // A build without sign-in: Sign out still works, Sign in is not offered.
+    window.dshDesktop.unobloxSignInAvailable = async () => false
+    const noSignIn = await render(React.createElement(client.AccountSection, { t, service: service(body({ key: 'set' })) }))
+    expect([...noSignIn.container.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['signOut'])
+    expect(noSignIn.container.textContent).toContain('noSignIn')
+
     delete window.dshDesktop
     const web = await render(React.createElement(client.AccountSection, { t, service: service(body()) }))
     expect(web.container.querySelectorAll('button')).toHaveLength(0)
     expect(web.container.textContent).toContain('noBridge')
+  })
+})
+
+describe('usage ledger under load', () => {
+  it('waits for the file on concurrent first calls, and writes each entry once', async () => {
+    const file = join(dir, 'usage.jsonl')
+    await writeFile(file, `${JSON.stringify({ at: NOON - DAY, inr: 5, session: 'old' })}\n`)
+    const ledger = createUsageLedger(file, { now: () => NOON })
+    const results = await Promise.all([
+      ...Array.from({ length: 50 }, (_, index) => ledger.record({ session: `s${String(index % 5)}`, chargedInr: 0.1 })),
+      ledger.summary({ days: 7, offsetMinutes: 0 })
+    ])
+    const summary = results.at(-1)
+    // The summary that raced the first records still saw the file.
+    expect(summary.weekInr).toBeGreaterThanOrEqual(5)
+    const lines = (await readFile(file, 'utf8')).trim().split('\n')
+    expect(lines).toHaveLength(51)
+    expect((await createUsageLedger(file, { now: () => NOON }).summary({ days: 7, offsetMinutes: 0 })).weekInr).toBe(10)
+  })
+
+  it('compacts past the record limit without losing or duplicating entries recorded meanwhile', async () => {
+    const file = join(dir, 'usage.jsonl')
+    const { MAX_RECORDS } = await import('../packages/dsh-desktop-unoblox-info/usage.js')
+    const body = Array.from({ length: MAX_RECORDS }, (_, index) => JSON.stringify({ at: NOON - DAY + index, inr: 0.01 })).join('\n') + '\n'
+    await writeFile(file, body)
+    let tick = 0
+    const ledger = createUsageLedger(file, { now: () => NOON + tick++ })
+    await ledger.summary()
+    await Promise.all([1, 2, 3].map((n) => ledger.record({ session: `new${String(n)}`, chargedInr: 1 })))
+    const lines = (await readFile(file, 'utf8')).trim().split('\n').map((line) => JSON.parse(line))
+    expect(lines.length).toBeLessThan(MAX_RECORDS)
+    const fresh = lines.filter((line) => line.session?.startsWith('new'))
+    expect(fresh.map((line) => line.session).sort()).toEqual(['new1', 'new2', 'new3'])
+    const reread = await createUsageLedger(file, { now: () => NOON + 10 }).summary({ days: 7, offsetMinutes: 0 })
+    expect(reread.recorded).toBe(lines.length)
+  })
+
+  it('keeps an entry whose write failed and writes it with the next one', async () => {
+    // A directory where the file should be makes the append fail.
+    const file = join(dir, 'usage.jsonl')
+    const { mkdir: makeDir, rmdir } = await import('node:fs/promises')
+    await makeDir(file)
+    const ledger = createUsageLedger(file, { now: () => NOON })
+    await ledger.summary()
+    await expect(ledger.record({ session: 'a', chargedInr: 1 })).rejects.toThrow()
+    await rmdir(file)
+    await ledger.record({ session: 'b', chargedInr: 2 })
+    const lines = (await readFile(file, 'utf8')).trim().split('\n').map((line) => JSON.parse(line).session)
+    expect(lines).toEqual(['a', 'b'])
+  })
+})
+
+describe('review fixes', () => {
+  it('counts the 7- and 30-day totals by calendar day, like the chart', async () => {
+    // 21 Oct 10:00 UTC; a charge on 21 Sep (day -30) is outside, one on 22 Sep 00:30 inside.
+    const time = Date.UTC(2026, 9, 21, 10)
+    const file = join(dir, 'usage.jsonl')
+    await writeFile(file, [
+      JSON.stringify({ at: Date.UTC(2026, 8, 21, 20), inr: 5 }),
+      JSON.stringify({ at: Date.UTC(2026, 8, 22, 0, 30), inr: 2 }),
+      JSON.stringify({ at: Date.UTC(2026, 9, 15, 0, 30), inr: 1 }),
+      JSON.stringify({ at: Date.UTC(2026, 9, 14, 23, 30), inr: 3 })
+    ].join('\n') + '\n')
+    const summary = await createUsageLedger(file, { now: () => time }).summary({ days: 30, offsetMinutes: 0 })
+    expect(summary.monthInr).toBe(6)
+    expect(summary.days.reduce((sum, row) => sum + row.inr, 0)).toBe(6)
+    expect(summary.weekInr).toBe(1)
+  })
+
+  it('writes an entry recorded during a compaction rewrite exactly once', async () => {
+    const { MAX_RECORDS } = await import('../packages/dsh-desktop-unoblox-info/usage.js')
+    const file = join(dir, 'usage.jsonl')
+    await writeFile(file, Array.from({ length: MAX_RECORDS }, (_, index) => JSON.stringify({ at: NOON - DAY + index, inr: 0 })).join('\n') + '\n')
+    const ledger = createUsageLedger(file, { now: () => NOON })
+    await ledger.summary()
+    const first = ledger.record({ session: 'A', chargedInr: 7 })
+    // Let the rewrite start (it awaits mkdir), then record during it.
+    await new Promise((resolve) => setImmediate(resolve))
+    const second = ledger.record({ session: 'C', chargedInr: 9 })
+    await Promise.all([first, second])
+    const lines = (await readFile(file, 'utf8')).trim().split('\n').map((line) => JSON.parse(line))
+    expect(lines.filter((line) => line.session === 'A')).toHaveLength(1)
+    expect(lines.filter((line) => line.session === 'C')).toHaveLength(1)
+  })
+
+  it('budget store: callers during the first read wait for the file and never save over it', async () => {
+    const file = join(dir, 'budgets.json')
+    await writeFile(file, JSON.stringify({ version: 1, budgets: { '*': 5, s1: 2 } }))
+    const budgets = createBudgetStore(file)
+    const [a, b] = await Promise.all([budgets.get('*'), budgets.get('*'), budgets.set('s9', 3)])
+    expect([a, b]).toEqual([5, 5])
+    expect(JSON.parse(await readFile(file, 'utf8')).budgets).toEqual({ '*': 5, s1: 2, s9: 3 })
+  })
+
+  it('the usage route returns the default budget the Billing tab saved', async () => {
+    const { post, usage } = host()
+    expect((await (await usage()).json()).defaultBudgetInr).toBeNull()
+    await post({ session: DEFAULT_BUDGET, budgetInr: 50 })
+    const body = await (await usage()).json()
+    expect(body.defaultBudgetInr).toBe(50)
+    // And the Billing tab, fed by the real route, shows it with Remove.
+    const routed = client.createSettingsService(async () => usage())
+    const ui = await render(React.createElement(client.BillingSection, { t, service: routed }))
+    expect(ui.container.querySelector('.dshUbxSetBudget input').value).toBe('50')
+    expect([...ui.container.querySelectorAll('button')].some((button) => button.textContent === 'budgetRemove')).toBe(true)
   })
 })

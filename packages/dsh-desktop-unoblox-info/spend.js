@@ -73,21 +73,25 @@ export function createSpendTracker({ now = Date.now } = {}) {
 
 /** Per-conversation task budgets, kept in one small JSON file. */
 export function createBudgetStore(path) {
-  let budgets
+  const budgets = new Map()
   let writing = Promise.resolve()
-  const load = async () => {
-    if (budgets !== undefined) return budgets
-    budgets = new Map()
-    if (path === undefined) return budgets
-    try {
-      const value = JSON.parse(await readFile(path, 'utf8'))
-      for (const [sessionId, inr] of Object.entries(value?.budgets ?? {})) {
-        if (finite(inr) !== undefined && inr > 0 && inr <= MAX_BUDGET_INR) budgets.set(sessionId, inr)
+  // One shared load: a caller during the first read waits for the file
+  // instead of seeing (or saving over it) an empty map.
+  let loading
+  const load = () => {
+    loading ??= (async () => {
+      if (path === undefined) return budgets
+      try {
+        const value = JSON.parse(await readFile(path, 'utf8'))
+        for (const [sessionId, inr] of Object.entries(value?.budgets ?? {})) {
+          if (finite(inr) !== undefined && inr > 0 && inr <= MAX_BUDGET_INR && !budgets.has(sessionId)) budgets.set(sessionId, inr)
+        }
+      } catch {
+        // No file yet, or an unreadable one: no budgets.
       }
-    } catch {
-      // No file yet, or an unreadable one: no budgets.
-    }
-    return budgets
+      return budgets
+    })()
+    return loading
   }
   const save = () => {
     if (path === undefined) return Promise.resolve()

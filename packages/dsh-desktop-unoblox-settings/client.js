@@ -135,10 +135,10 @@ window.__ModuleLoader__.load({
       signedOut: 'Signed out. The key was removed from this computer.',
       signOutFailed: 'Could not sign out: {message}',
       noBridge: 'Sign in from the unoblox works desktop app, or add a key in Settings › Models.',
+      noSignIn: 'This build cannot sign in with unoblox. Add a key in Settings › Models.',
       manageKeys: 'API keys',
       accountSettings: 'Account settings',
-      activity: 'Sign-in activity',
-      refresh: 'Refresh'
+      activity: 'Sign-in activity'
     }
     const zh = {
       usageNav: '用量',
@@ -199,10 +199,10 @@ window.__ModuleLoader__.load({
       signedOut: '已退出登录，密钥已从这台电脑移除。',
       signOutFailed: '无法退出登录：{message}',
       noBridge: '请在 unoblox works 桌面应用中登录，或在 设置 › 模型 中添加密钥。',
+      noSignIn: '此版本无法使用 unoblox 登录。请在 设置 › 模型 中添加密钥。',
       manageKeys: 'API 密钥',
       accountSettings: '账户设置',
-      activity: '登录记录',
-      refresh: '刷新'
+      activity: '登录记录'
     }
 
     function isRecord(value) {
@@ -449,7 +449,19 @@ window.__ModuleLoader__.load({
 
     function desktopBridge() {
       const bridge = typeof window === 'undefined' ? undefined : window.dshDesktop
-      return typeof bridge?.unobloxSignIn === 'function' && typeof bridge.unobloxSignOut === 'function' ? bridge : undefined
+      return typeof bridge?.unobloxSignIn === 'function' && typeof bridge.unobloxSignOut === 'function' && typeof bridge.unobloxSignInAvailable === 'function' ? bridge : undefined
+    }
+
+    /** Whether this build can sign in (it has a client id); undefined until known. */
+    function useSignInAvailable(bridge) {
+      const [available, setAvailable] = useState(undefined)
+      useEffect(() => {
+        if (bridge === undefined) return undefined
+        let live = true
+        bridge.unobloxSignInAvailable().then((value) => { if (live) setAvailable(value === true) }, () => { if (live) setAvailable(false) })
+        return () => { live = false }
+      }, [bridge])
+      return bridge === undefined ? false : available
     }
 
     function AccountSection(props) {
@@ -457,7 +469,8 @@ window.__ModuleLoader__.load({
       const [state, reload] = useUsage(service)
       const [working, setWorking] = useState(undefined)
       const [status, setStatus] = useState(undefined)
-      const bridge = desktopBridge()
+      const [bridge] = useState(desktopBridge)
+      const available = useSignInAvailable(bridge)
       const key = state.usage?.key
       const run = (name, action) => {
         setWorking(name)
@@ -489,12 +502,14 @@ window.__ModuleLoader__.load({
             h('span', null, t('key')),
             h('span', { className: 'dshUbxSetMuted', role: 'status' }, key === undefined ? t('loading') : t(key === 'set' ? 'keySet' : key === 'missing' ? 'keyMissing' : 'keyUnknown'))),
           h('p', { className: 'dshUbxSetNote' }, t('keyHint')),
-          bridge === undefined
-            ? h('p', { className: 'dshUbxSetNote' }, t('noBridge'))
-            : h('div', { className: 'dshUbxSetActions' },
-              h(Button, { type: 'button', variant: key === 'set' ? 'outline' : 'primary', disabled: working !== undefined, onClick: signIn },
-                working === 'sign-in' ? t('signingIn') : t(key === 'set' ? 'signInAgain' : 'signIn')),
-              key === 'set' ? h(Button, { type: 'button', variant: 'outline', disabled: working !== undefined, onClick: signOut }, t('signOut')) : null),
+          // Sign out needs only the bridge; sign in also needs a build that has it.
+          available === false ? h('p', { className: 'dshUbxSetNote' }, t(bridge === undefined ? 'noBridge' : 'noSignIn')) : null,
+          available !== true && !(bridge !== undefined && key === 'set') ? null : h('div', { className: 'dshUbxSetActions' },
+            available === true
+              ? h(Button, { type: 'button', variant: key === 'set' ? 'outline' : 'primary', disabled: working !== undefined, onClick: signIn },
+                working === 'sign-in' ? t('signingIn') : t(key === 'set' ? 'signInAgain' : 'signIn'))
+              : null,
+            bridge !== undefined && key === 'set' ? h(Button, { type: 'button', variant: 'outline', disabled: working !== undefined, onClick: signOut }, t('signOut')) : null),
           status === undefined ? null : h('p', { className: 'dshUbxSetNote', role: 'status', 'data-tone': status.tone }, status.text)),
         h('div', { className: 'dshUbxSetActions' },
           h(ExternalLink, { href: LINKS.keys, label: t('manageKeys') }),

@@ -48,37 +48,59 @@ function parseLine(line) {
 }
 
 export function createUsageLedger(path, { now = Date.now } = {}) {
-  let records
+  let records = []
+  // Entries recorded but not yet on disk; each write takes all of them, so an
+  // entry is written once even when a compaction rewrite runs in between.
+  let pending = []
   let writing = Promise.resolve()
-  const load = async () => {
-    if (records !== undefined) return records
-    records = []
-    if (path === undefined) return records
-    let text = ''
-    try {
-      text = await readFile(path, 'utf8')
-    } catch {
-      return records
-    }
-    const oldest = now() - KEEP_DAYS * DAY_MS
-    for (const line of text.split('\n')) {
-      if (line.trim() === '') continue
-      const record = parseLine(line)
-      if (record !== undefined && record.at >= oldest) records.push(record)
-    }
-    return records
+  // One shared load: a second caller waits for the file, not a half-read list.
+  let loading
+  const load = () => {
+    loading ??= (async () => {
+      if (path === undefined) return
+      let text = ''
+      try {
+        text = await readFile(path, 'utf8')
+      } catch {
+        return
+      }
+      const oldest = now() - KEEP_DAYS * DAY_MS
+      const read = []
+      for (const line of text.split('\n')) {
+        if (line.trim() === '') continue
+        const record = parseLine(line)
+        if (record !== undefined && record.at >= oldest) read.push(record)
+      }
+      records = [...read, ...records]
+    })()
+    return loading
   }
-  const persist = (record) => {
-    if (path === undefined) return Promise.resolve()
+  const persist = () => {
+    if (path === undefined) {
+      pending = []
+      return Promise.resolve()
+    }
     writing = writing.catch(() => {}).then(async () => {
+      if (pending.length === 0) return
       await mkdir(dirname(path), { recursive: true })
-      if (records.length > MAX_RECORDS) {
-        records = records.slice(-Math.floor(MAX_RECORDS * 0.9))
-        const temporary = `${path}.${process.pid}.tmp`
-        await writeFile(temporary, records.map((entry) => JSON.stringify(entry)).join('\n') + '\n', 'utf8')
-        await rename(temporary, path)
-      } else {
-        await appendFile(path, `${JSON.stringify(record)}\n`, 'utf8')
+      // Take the batch and, for a rewrite, the snapshot together with no await
+      // in between: an entry recorded during the write goes to the next one.
+      const batch = pending
+      pending = []
+      try {
+        if (records.length > MAX_RECORDS) {
+          records = records.slice(-Math.floor(MAX_RECORDS * 0.9))
+          const snapshot = records
+          const temporary = `${path}.${process.pid}.tmp`
+          await writeFile(temporary, snapshot.map((entry) => JSON.stringify(entry)).join('\n') + '\n', 'utf8')
+          await rename(temporary, path)
+        } else {
+          await appendFile(path, batch.map((entry) => `${JSON.stringify(entry)}\n`).join(''), 'utf8')
+        }
+      } catch (error) {
+        // Not on disk: the next write tries these again.
+        pending = [...batch, ...pending]
+        throw error
       }
     })
     return writing
@@ -88,7 +110,7 @@ export function createUsageLedger(path, { now = Date.now } = {}) {
     async record({ session, title, model, chargedInr, estimated, balanceInr }) {
       const inr = finite(chargedInr)
       if (inr === undefined || inr < 0) return
-      const list = await load()
+      await load()
       const entry = {
         at: now(),
         inr,
@@ -100,8 +122,9 @@ export function createUsageLedger(path, { now = Date.now } = {}) {
         // unoblox reported even before this run's first reply.
         ...(finite(balanceInr) === undefined ? {} : { balance: balanceInr })
       }
-      list.push(entry)
-      await persist(entry)
+      records.push(entry)
+      pending.push(entry)
+      await persist()
     },
     /**
      * Totals for today, the last 7 and 30 days, a per-day series for the last
@@ -110,10 +133,13 @@ export function createUsageLedger(path, { now = Date.now } = {}) {
      * the titles recorded with the charges, which may be older.
      */
     async summary({ days = 30, offsetMinutes, titles } = {}) {
-      const list = await load()
+      await load()
+      const list = records
       const time = now()
       const offset = offsetMinutes ?? new Date(time).getTimezoneOffset()
       const today = localDay(time, offset)
+      const weekStart = localDay(time - 6 * DAY_MS, offset)
+      const monthStart = localDay(time - 29 * DAY_MS, offset)
       const dayList = []
       for (let back = days - 1; back >= 0; back--) dayList.push(localDay(time - back * DAY_MS, offset))
       const inWindow = new Set(dayList)
@@ -128,10 +154,10 @@ export function createUsageLedger(path, { now = Date.now } = {}) {
       for (const record of list) {
         if (record.balance !== undefined && (lastBalance === undefined || record.at >= lastBalance.at)) lastBalance = { inr: record.balance, at: record.at }
         const day = localDay(record.at, offset)
-        const age = time - record.at
+        // Calendar days in the user's time zone, like Today and the chart.
         if (day === today) todayInr += record.inr
-        if (age < 7 * DAY_MS) week += record.inr
-        if (age < 30 * DAY_MS) month += record.inr
+        if (day >= weekStart && day <= today) week += record.inr
+        if (day >= monthStart && day <= today) month += record.inr
         if (!inWindow.has(day)) continue
         if (record.estimated) estimated = true
         const slot = daily.get(day)

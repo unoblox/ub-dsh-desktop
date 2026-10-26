@@ -70,7 +70,7 @@ Drift (`buildTrace`):
 - a test names an unknown id;
 - a task names an unknown id;
 - a criterion no task plans;
-- a task ticked done with untested or failing criteria;
+- a task ticked done with untested or failing criteria, or with criteria that have no passing run since the last change (not run, stale);
 - a failed run after tasks were ticked.
 
 Edits to approved documents made outside the app are logged as such on the agent's next request. The panel only reads.
@@ -98,6 +98,13 @@ This run used the real Harness, a scripted stand-in model, and Chromium clicking
 - The agent shipped a bug and a test tagged `AC-9.9`; both were reported back to it. It fixed the code, retagged the test and reran the tests.
 - It said "done" with both tasks unticked and was steered on once. It ticked them and ran `spec verify`: 3/3 criteria passing, no drift, and the tasks linked to `greet.js` and `test/greet.test.js`.
 - It ran in light and dark mode with no page errors.
+
+The same flow was then run in the packaged Linux app (`dist/linux-unpacked`), driven over CDP. A local stand-in for `api.unoblox.ai` used a test certificate, a hosts entry and a fake key, so nothing reached unoblox:
+- every approval was clicked in the app's own window;
+- test runs went through the app's sandboxed shell;
+- it ended with 3/3 criteria passing, no drift and no page errors.
+
+On the first packaged try the shell refused to run at all: the Harness will not run commands unconfined, and that host had no bubblewrap or Landlock. The agent ticked its tasks anyway, and the spec still read as finished. A task ticked done whose criteria have no passing run since the last change is now drift ("unverified"), and the agent is told to say so instead of ticking.
 
 A code review then found 17 problems, all fixed with a test that fails without the fix:
 - test runs on Windows (`pwsh`) were never recorded;

@@ -104,6 +104,10 @@ describe('trace', () => {
     expect(passed.drift[1].text).toBe('T-1 is ticked done, but no test checks AC-1.2.')
     const stale = buildTrace({ texts, scan, run: { at: 10, ok: true, failingIds: [], command: 'npm test' }, lastChangeAt: 20 })
     expect(stale.criteria[0].status).toBe('stale')
+    expect(stale.drift.find((d) => d.kind === 'unverified')?.text).toBe('T-1 is ticked done, but AC-1.1 has no passing test run since the last change.')
+    // Ticked with no test run at all (the shell could not run them) is not done either.
+    const notRun = buildTrace({ texts, scan, run: undefined })
+    expect(notRun.drift.find((d) => d.kind === 'unverified')?.ids).toEqual(['T-1', 'AC-1.1'])
     const failed = buildTrace({ texts, scan, run: { at: 30, ok: false, failingIds: ['AC-1.1'], command: 'npm test' }, lastChangeAt: 20 })
     expect(failed.drift.map((d) => d.kind)).toContain('failing')
     // A criterion no task plans is drift too.

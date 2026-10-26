@@ -216,6 +216,9 @@ export function buildTrace({ texts, scan, run, lastChangeAt = 0, taskFiles = {},
     const failing = ids.filter((id) => status.get(id) === 'failing')
     if (untested.length > 0) add('untested', [task.id, ...untested], `${task.id} is ticked done, but no test checks ${untested.join(', ')}.`, `Write tests named for ${untested.join(', ')} and run them.`)
     if (failing.length > 0) add('failing', [task.id, ...failing], `${task.id} is ticked done, but the last test run failed for ${failing.join(', ')}.`, 'Fix the code (or the test, if the test is wrong) until it passes, then run the tests again.')
+    // Done means tested: a tick with no passing run since the last change is unverified.
+    const unverified = ids.filter((id) => status.get(id) === 'not-run' || status.get(id) === 'stale')
+    if (unverified.length > 0) add('unverified', [task.id, ...unverified], `${task.id} is ticked done, but ${unverified.join(', ')} ${unverified.length === 1 ? 'has' : 'have'} no passing test run since the last change.`, 'Run the tests. If they cannot run here, say so to the user instead of ticking the task.')
   }
   if (run !== undefined && !run.ok && run.failingIds.length === 0 && tasks.some((t) => t.done)) {
     add('failing', [], `The last test run (${run.command}) failed.`, 'Fix the failures and run the tests again.')

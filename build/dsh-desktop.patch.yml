@@ -180,6 +180,17 @@
     - id: dsh-desktop-receipts
       name: dsh-desktop-receipts
 
+# Spec-driven development (packages/dsh-desktop-specs): requirements, design
+# and tasks in specs/<slug>/ of the project, each approved by the user; code
+# changes wait for the approved tasks; tests named for acceptance criteria;
+# drift reported after each write and test run and fixed by the agent.
+# Nothing leaves the computer. Safe Mode leaves it out.
+- insert:
+    - id: dsh-desktop-specs
+      name: dsh-desktop-specs
+      config:
+        root: !!js dshHomePath('specs')
+
 # Plain-language examples above the composer of a new conversation
 # (packages/dsh-desktop-starters). A click fills the composer; nothing is sent.
 - insert:

@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'desktop-starters'
     const STYLE_ID = 'dsh-desktop-starters-style'
-    const STARTERS = ['report', 'slides', 'notes', 'calculator', 'cleanup', 'summary', 'email', 'bug']
+    const STARTERS = ['report', 'slides', 'notes', 'calculator', 'cleanup', 'summary', 'email', 'bug', 'spec']
 
     const en = {
       label: 'Start from an example',
@@ -34,7 +34,9 @@ window.__ModuleLoader__.load({
       'title.email': 'Draft an email',
       'prompt.email': 'Draft a clear, polite email to [who] about [what]. Keep it under 150 words and end with one clear request.',
       'title.bug': 'Fix a problem in code',
-      'prompt.bug': 'Something is wrong in this project: [describe what happens and what you expected]. Find the cause, fix it, and run the tests to show it works.'
+      'prompt.bug': 'Something is wrong in this project: [describe what happens and what you expected]. Find the cause, fix it, and run the tests to show it works.',
+      'title.spec': 'Build a feature with a spec',
+      'prompt.spec': 'Use a spec to build [the feature] for [who it is for]. Start with the requirements and ask me what is unclear; I will approve the requirements, design and tasks before you code.'
     }
     const zh = {
       label: '从示例开始',
@@ -53,7 +55,9 @@ window.__ModuleLoader__.load({
       'title.email': '起草邮件',
       'prompt.email': '给 [收件人] 起草一封关于 [事项] 的邮件，清晰礼貌，不超过 150 字，结尾提出一个明确的请求。',
       'title.bug': '修复代码问题',
-      'prompt.bug': '这个项目出了问题：[描述发生了什么、你期望的结果]。找出原因并修复，然后运行测试证明问题已解决。'
+      'prompt.bug': '这个项目出了问题：[描述发生了什么、你期望的结果]。找出原因并修复，然后运行测试证明问题已解决。',
+      'title.spec': '按规格构建功能',
+      'prompt.spec': '用规格为 [使用者] 构建 [功能]。先写需求，有不清楚的地方先问我；需求、设计和任务都由我批准后再开始编码。'
     }
 
     const STYLE = `

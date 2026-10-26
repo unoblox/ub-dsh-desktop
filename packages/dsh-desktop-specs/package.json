@@ -1,0 +1,37 @@
+{
+  "name": "dsh-desktop-specs",
+  "version": "0.1.0",
+  "description": "Spec-driven development: requirements, design and tasks approved by the user, code and tests traced to them, and drift fixed as it appears.",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./parse": "./parse.js",
+    "./state": "./state.js",
+    "./trace": "./trace.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "react": "^18.2.0"
+  }
+}

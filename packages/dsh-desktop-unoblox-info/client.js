@@ -21,7 +21,8 @@ window.__ModuleLoader__.load({
     // StatsPills), so balance and model read as part of that one row.
     const STYLE = `
       /* Give up room before the stock pills do; only the model name truncates. */
-      .dshUbxInfo{box-sizing:border-box;flex:0 100 auto;min-width:0;display:inline-flex;align-items:center;gap:12px;font-size:calc(var(--dsh-content-font-size-secondary,13px) - 1px);line-height:calc(20px + var(--dsh-content-font-delta-secondary,0px))}
+      /* Clip rather than paint over the pills beside it when the row is tight. */
+      .dshUbxInfo{box-sizing:border-box;flex:0 100 auto;min-width:0;overflow:hidden;display:inline-flex;align-items:center;gap:12px;font-size:calc(var(--dsh-content-font-size-secondary,13px) - 1px);line-height:calc(20px + var(--dsh-content-font-delta-secondary,0px))}
       .dshUbxInfoPill{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;min-width:0;padding:1px 8px;border-radius:999px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;white-space:nowrap}
       .dshUbxInfoPill svg{flex:none;width:14px;height:14px}
       .dshUbxInfoPill:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
@@ -30,6 +31,9 @@ window.__ModuleLoader__.load({
       .dshUbxInfoModel .dshUbxInfoLabel{max-width:180px}
       /* The task's spend never truncates, like the balance. */
       .dshUbxInfoSpend{flex:none}
+      /* The spend pill is a button: no browser border or fill. */
+      button.dshUbxInfoPill{border:0;background:none;font:inherit;cursor:pointer}
+      button.dshUbxInfoPill:hover{background:var(--dsw-alias-interactive-bg-hover)}
       .dshUbxInfoSpendNear{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-state-error-primary))}
       .dshUbxBudget.dshUbxBudget{width:min(420px,100%)}
       .dshUbxBudgetForm{display:flex;flex-direction:column;gap:12px}

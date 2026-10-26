@@ -22,9 +22,9 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { DOC_FILES, DOCS, diffRequirements, parseRequirements, parseTasks, TEMPLATES, validate } from './parse.js'
+import { DOC_FILES, DOCS, diffRequirements, parseRequirements, parseTasks, slugify, TEMPLATES, validate } from './parse.js'
 import { ConflictError, createSessionMap, createSpecStore, phaseOf, sha256, specPath, STATE_FILE, TRACE_FILE } from './state.js'
-import { buildTrace, isTestCommand, isTestPath, scanTests, testRunFrom } from './trace.js'
+import { buildTrace, isTestCommand, isTestPath, scanFor, scanTests, testRunFrom } from './trace.js'
 
 export const name = 'dsh-desktop-specs'
 export const inject = ['sessions', 'systemPrompt', 'tools', 'connection']
@@ -37,6 +37,10 @@ const CONTEXT_NAME = 'desktop-specs'
 const CONTEXT_ORDER = 46
 const STEER_SOURCE = { kind: 'desktop-specs' }
 const FILE_TOOLS = new Set(['write', 'edit', 'str_replace_editor'])
+// bash everywhere; pwsh replaces it on Windows. Both end failures with [exit code: N].
+const SHELL_TOOLS = new Set(['bash', 'pwsh'])
+// How far a subagent's session is followed up to the conversation that owns the spec.
+const MAX_LINEAGE = 5
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
 export const Config = z.object({
@@ -60,6 +64,11 @@ function argsOf(exec) {
     }
   }
   return typeof value === 'object' && value !== null ? value : {}
+}
+
+/** tasks.md with every box unticked: ticking alone is progress, not a change. */
+function untick(text) {
+  return String(text ?? '').replace(/^(\s*[-*]\s+\[)[xX](\])/gmu, '$1 $2')
 }
 
 function textOf(result) {
@@ -97,7 +106,8 @@ const WORKFLOW = [
   'After each submit, stop and ask the user to review it in the Spec panel; do not start the next document until it is approved. Code changes are blocked until the tasks are approved.',
   '4. Build task by task: write the code and tests, name each test after the criterion it checks (AC-1.2, or ac_1_2 where names cannot hold "-" or "."), run the tests, and tick the task ([x]) only when they pass.',
   'Drift: when code, tests and an approved document disagree, fix whichever side is wrong: code that breaks a criterion is fixed; a document the user\'s newer instructions or the facts have overtaken is updated (and the change is logged). Say which you changed and why.',
-  'Run spec verify before saying the work is done.'
+  'Run spec verify before saying the work is done.',
+  'Before tasks.md is approved only the user can stop or switch the spec (from the Spec panel).'
 ].join('\n')
 
 /**
@@ -135,6 +145,9 @@ export function apply(ctx, config, deps = {}) {
     return entry
   }
   const steers = new Map()
+  // Conversations whose current turn changed code or tests or ran the tests:
+  // only those are steered on, so a question or "pause" is not overridden.
+  const worked = new Set()
 
   const sessionIdOf = (session) => {
     const id = session?.header?.id ?? session?.id
@@ -142,45 +155,69 @@ export function apply(ctx, config, deps = {}) {
   }
   const rootOf = (session) => (typeof session?.header?.cwd === 'string' && session.header.cwd !== '' ? session.header.cwd : undefined)
 
-  /** The conversation's active spec: { sessionId, root, slug, state } or undefined. */
-  const activeOf = async (session) => {
-    const sessionId = sessionIdOf(session)
-    if (sessionId === undefined) return undefined
+  const activeOfId = async (sessionId) => {
     const entry = await sessions.get(sessionId)
     if (entry === undefined) return undefined
     const state = await store.load(entry.root, entry.slug)
     return state === undefined ? undefined : { sessionId, root: entry.root, slug: entry.slug, state }
   }
-  const activeOfId = async (sessionId) => {
-    const session = ctx.sessions.get(sessionId)
-    if (session !== undefined) return activeOf(session)
-    const entry = await sessions.get(sessionId)
-    if (entry === undefined) return undefined
-    const state = await store.load(entry.root, entry.slug)
-    return state === undefined ? undefined : { sessionId, root: entry.root, slug: entry.slug, state }
+  /**
+   * The conversation's active spec: { sessionId, root, slug, state } or
+   * undefined. A subagent works under the spec of the conversation that
+   * started it (its session's parentSession), gate included.
+   */
+  const activeOf = async (session) => {
+    let sessionId = sessionIdOf(session)
+    let parent = session?.header?.parentSession
+    for (let depth = 0; sessionId !== undefined && depth < MAX_LINEAGE; depth++) {
+      const active = await activeOfId(sessionId)
+      if (active !== undefined) return active
+      if (typeof parent !== 'string' || parent === '') return undefined
+      sessionId = parent
+      parent = ctx.sessions.get(parent)?.header?.parentSession
+    }
+    return undefined
   }
 
   /**
    * The documents, with approved ones edited outside the app logged first,
    * then the trace (test scan cached until a test file changes).
    */
-  const snapshot = async (active, { rescan = false } = {}) => {
+  const snapshot = async (active, { rescan = false, record = 'outside the app' } = {}) => {
     const texts = await store.readDocs(active.root, active.slug)
     let state = active.state
-    for (const doc of DOCS) {
-      const approval = state.approvals[doc]
-      if (approval !== undefined && approval.sha256 !== sha256(texts[doc])) {
-        const summary = await changeSummary(doc, approval.sha256, texts[doc])
-        state = await store.recordChange(active.root, active.slug, doc, texts[doc], summary, 'outside the app')
-        await keepText(texts[doc]).catch(() => {})
-      }
-    }
+    if (record !== null) state = await followChanges(active, texts, record)
     const entry = liveOf(active.root, active.slug)
     // The tasks already done when this process first saw the spec.
     entry.done ??= new Set(parseTasks(texts.tasks).filter((t) => t.done).map((t) => t.id))
-    if (rescan || entry.scan === undefined) entry.scan = await scanTests(active.root)
-    const trace = buildTrace({ texts, scan: entry.scan, run: entry.run, lastChangeAt: entry.lastChangeAt, taskFiles: state.taskFiles })
+    if (rescan || entry.scan === undefined) {
+      entry.scan = await scanTests(active.root)
+      entry.specCount = (await store.list(active.root)).length
+    }
+    const scan = scanFor(entry.scan, active.slug, entry.specCount ?? 1)
+    const trace = buildTrace({ texts, scan, run: entry.run, lastChangeAt: entry.lastChangeAt, taskFiles: state.taskFiles })
     return { texts, state, phase: phaseOf(state), trace, entry }
+  }
+
+  /** Approved documents whose text moved on: follow ticks, log the rest. */
+  const followChanges = async (active, texts, by) => {
+    let state = active.state
+    const notes = []
+    for (const doc of DOCS) {
+      const approval = state.approvals[doc]
+      if (approval === undefined || approval.sha256 === sha256(texts[doc])) continue
+      const approvedText = await keptText(approval.base ?? approval.sha256)
+      if (doc === 'tasks' && approvedText !== undefined && untick(approvedText) === untick(texts[doc])) {
+        state = await store.followTicks(active.root, active.slug, doc, texts[doc])
+        continue
+      }
+      const summary = await changeSummary(doc, approval.base ?? approval.sha256, texts[doc])
+      state = await store.recordChange(active.root, active.slug, doc, texts[doc], summary, by)
+      await keepText(texts[doc]).catch(() => {})
+      notes.push(`Logged a change to the approved ${DOC_FILES[doc]}: ${summary} Make the code, tests and the other documents agree with it, and tell the user what changed and why.`)
+    }
+    active.notes = notes
+    return state
   }
 
   const describe = (active, view) => {
@@ -202,6 +239,7 @@ export function apply(ctx, config, deps = {}) {
       lines.push('Drift to fix:')
       for (const item of trace.drift.slice(0, 12)) lines.push(`- ${item.text} ${item.fix}`)
     }
+    if ((view.entry?.specCount ?? 1) > 1) lines.push(`This project has ${String(view.entry.specCount)} specs and their ids overlap: put "spec: ${state.slug}" in a comment in each test file for this spec, or its tests do not count here.`)
     const recent = state.changes.slice(-3)
     if (recent.length > 0) lines.push(`Recent spec changes: ${recent.map((c) => `${DOC_FILES[c.doc]} (${c.by}): ${c.summary}`).join(' | ')}`)
     return lines.join('\n')
@@ -238,11 +276,13 @@ export function apply(ctx, config, deps = {}) {
     const args = argsOf(exec)
     const path = projectPath(active.root, args.file_path ?? args.path)
     const own = specPath(active.slug, '')
-    if (path === specPath(active.slug, STATE_FILE) || path === specPath(active.slug, TRACE_FILE)) {
+    // Case-insensitive: SPEC.JSON is the same file on macOS and Windows.
+    const lower = path?.toLowerCase()
+    if (lower === specPath(active.slug, STATE_FILE).toLowerCase() || lower === specPath(active.slug, TRACE_FILE).toLowerCase()) {
       return { kind: 'deny', reason: `${path} is kept by the app. Use the spec tool (submit, verify) instead of editing it.` }
     }
     const phase = phaseOf(active.state)
-    if (phase === 'build' || (path !== undefined && path.startsWith(own))) return next()
+    if (phase === 'build' || (lower !== undefined && lower.startsWith(own.toLowerCase()))) return next()
     if (exec.name === 'str_replace_editor' && args.command === 'view') return next()
     return {
       kind: 'deny',
@@ -261,7 +301,7 @@ export function apply(ctx, config, deps = {}) {
 
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const tool = exec?.name
-    if ((!FILE_TOOLS.has(tool) && tool !== 'bash') || result?.isError) return next()
+    if ((!FILE_TOOLS.has(tool) && !SHELL_TOOLS.has(tool)) || result?.isError) return next()
     let note
     try {
       const active = await activeOf(exec.agent?.session)
@@ -277,10 +317,20 @@ export function apply(ctx, config, deps = {}) {
     const entry = liveOf(active.root, active.slug)
     const notes = []
     let rescan = false
-    if (tool === 'bash') {
+    if (SHELL_TOOLS.has(tool)) {
+      // A shell command may have edited the spec's documents too.
+      const texts = await store.readDocs(active.root, active.slug)
+      active.state = await followChanges(active, texts, 'agent (shell)')
+      notes.push(...active.notes)
       const command = typeof args.command === 'string' ? args.command : ''
-      if (!isTestCommand(command)) return undefined
-      entry.run = testRunFrom(command, textOf(result), now())
+      if (!isTestCommand(command)) return notes.length === 0 ? undefined : notes.join('\n')
+      // Started in the background, still running or stopped: no outcome yet.
+      const run = args.run_in_background === true ? undefined : testRunFrom(command, textOf(result), now())
+      if (run === undefined) return notes.length === 0 ? undefined : notes.join('\n')
+      entry.run = run
+      worked.add(active.sessionId)
+      // Tests may have been written or checked out by the shell.
+      rescan = true
     } else {
       const path = projectPath(active.root, args.file_path ?? args.path)
       if (path === undefined || (tool === 'str_replace_editor' && args.command === 'view')) return undefined
@@ -301,23 +351,22 @@ export function apply(ctx, config, deps = {}) {
             entry.pending.clear()
           }
         }
-        if (approval !== undefined && approval.sha256 !== sha256(texts[doc])) {
-          const summary = await changeSummary(doc, approval.sha256, texts[doc])
-          await store.recordChange(active.root, active.slug, doc, texts[doc], summary, 'agent')
-          await keepText(texts[doc]).catch(() => {})
-          notes.push(`Logged a change to the approved ${DOC_FILES[doc]}: ${summary} Make the code, tests and the other documents agree with it, and tell the user what changed and why.`)
+        if (approval !== undefined) {
+          active.state = await followChanges(active, texts, 'agent')
+          notes.push(...active.notes)
         }
         const issues = validate(doc, texts).filter((issue) => issue.level === 'error')
         if (issues.length > 0 && approval !== undefined) notes.push(`${DOC_FILES[doc]} now has problems: ${issues.map((i) => i.text).join(' ')}`)
       } else {
         entry.pending.add(path)
         entry.lastChangeAt = now()
+        worked.add(active.sessionId)
         rescan = isTestPath(path)
       }
     }
     if (phaseOf(active.state) !== 'build') return notes.length === 0 ? undefined : notes.join('\n')
     const view = await snapshot(active, { rescan })
-    if (tool === 'bash' && entry.run !== undefined) {
+    if (SHELL_TOOLS.has(tool) && entry.run !== undefined) {
       const failing = view.trace.criteria.filter((c) => c.status === 'failing').map((c) => c.id)
       notes.push(entry.run.ok
         ? `Spec: tests passed (${String(view.trace.counts.passing)} of ${String(view.trace.counts.total)} criteria passing, ${String(view.trace.counts.untested)} untested).`
@@ -354,6 +403,13 @@ export function apply(ctx, config, deps = {}) {
 
   // ---------- keep going while building ----------
 
+  ctx.on('session/event', (session, event) => {
+    if (event?.type === 'turn/start') {
+      const id = sessionIdOf(session)
+      if (id !== undefined) worked.delete(id)
+    }
+  })
+
   ctx.on('agent/turn-stopping', async ({ agent, turn, signal }) => {
     if (maxContinues === 0 || signal?.aborted) return
     let active
@@ -362,7 +418,7 @@ export function apply(ctx, config, deps = {}) {
     } catch {
       return
     }
-    if (active === undefined || active.state.awaiting !== null || phaseOf(active.state) !== 'build') return
+    if (active === undefined || active.state.awaiting !== null || phaseOf(active.state) !== 'build' || !worked.has(active.sessionId)) return
     const view = await snapshot(active)
     const open = view.trace.tasks.filter((t) => !t.done)
     if (open.length === 0 && view.trace.drift.length === 0) return
@@ -408,9 +464,17 @@ export function apply(ctx, config, deps = {}) {
       const root = rootOf(session)
       if (sessionId === undefined || root === undefined) throw new Error('specs need a conversation with a workspace folder')
       const action = args.action
+      const current = await activeOf(session)
+      // Before the tasks are approved the agent may not leave the spec (that
+      // would lift the gate); the user can, from the panel.
+      const locked = current !== undefined && phaseOf(current.state) !== 'build'
+      const refuseSwitch = (slug) => {
+        if (locked && slug !== current.slug) throw new Error(`the spec "${current.state.title}" is in the ${phaseOf(current.state)} phase: only the user can stop or switch it, from the Spec panel`)
+      }
       if (action === 'start') {
         const title = typeof args.title === 'string' ? args.title.trim().slice(0, 80) : ''
         if (title === '') throw new Error('give the feature a title')
+        refuseSwitch(slugify(title))
         const { state, created } = await store.create(root, title)
         await sessions.set(sessionId, { root, slug: state.slug })
         const phase = phaseOf(state)
@@ -422,7 +486,9 @@ export function apply(ctx, config, deps = {}) {
       }
       if (action === 'open') {
         const slug = typeof args.slug === 'string' ? args.slug.trim() : ''
-        const state = slug === '' ? undefined : await store.load(root, slug)
+        if (slug === '' || slugify(slug) !== slug) throw new Error(`"${slug}" is not a spec folder name; spec list shows them`)
+        refuseSwitch(slug)
+        const state = await store.load(root, slug)
         if (state === undefined) throw new Error(`no spec "${slug}" in specs/; spec list shows them`)
         await sessions.set(sessionId, { root, slug })
         return { text: describe({ sessionId, root, slug, state }, await snapshot({ sessionId, root, slug, state })) }
@@ -431,9 +497,10 @@ export function apply(ctx, config, deps = {}) {
         const specs = await store.list(root)
         return { text: specs.length === 0 ? 'No specs in this project yet.' : specs.map((s) => `${s.slug}: "${s.title}" (${phaseOf(s)})`).join('\n') }
       }
-      const active = await activeOf(session)
+      const active = current
       if (active === undefined) throw new Error('no active spec in this conversation: spec start (or spec open) first')
       if (action === 'close') {
+        refuseSwitch(null)
         await sessions.set(sessionId, null)
         return { text: `Spec mode ended for this conversation. ${specPath(active.slug, '')} stays in the project.` }
       }
@@ -490,7 +557,8 @@ export function apply(ctx, config, deps = {}) {
         const active = sessionId === '' ? undefined : await activeOfId(sessionId)
         const specs = root === undefined ? [] : (await store.list(root)).map((s) => ({ slug: s.slug, title: s.title, phase: phaseOf(s) }))
         if (active === undefined) return json({ active: null, specs })
-        const view = await snapshot(active)
+        // Read-only: the agent's turn and its tools record changes, not the panel.
+        const view = await snapshot(active, { record: null })
         const docs = {}
         for (const doc of DOCS) docs[doc] = { file: specPath(active.slug, DOC_FILES[doc]), text: view.texts[doc], sha256: sha256(view.texts[doc]), issues: validate(doc, view.texts) }
         return json({
@@ -557,7 +625,7 @@ export function apply(ctx, config, deps = {}) {
       await sessions.set(body.session, null)
       return json({ ok: true })
     }
-    if (typeof body.slug !== 'string' || (await store.load(root, body.slug)) === undefined) return json({ error: 'no such spec' }, 404)
+    if (typeof body.slug !== 'string' || slugify(body.slug) !== body.slug || (await store.load(root, body.slug)) === undefined) return json({ error: 'no such spec' }, 404)
     await sessions.set(body.session, { root, slug: body.slug })
     return json({ ok: true })
   })

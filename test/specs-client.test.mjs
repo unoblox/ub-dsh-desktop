@@ -140,3 +140,61 @@ describe('spec panel', () => {
     expect(Object.keys(client.locales.zh).sort()).toEqual(Object.keys(client.locales.en).sort())
   })
 })
+
+describe('review fixes (client)', () => {
+  it('says when the approval worked but the agent could not be told', async () => {
+    const svc = service([{ active: active(), specs: [] }, { active: active({ awaiting: null }), specs: [] }])
+    const sendText = vi.fn(async () => { throw new Error('the conversation is not available') })
+    const view = { active: active(), specs: [] }
+    const ui = await render(React.createElement(client.SpecPanel, { t, view, sessionId: 's1', service: svc, sendText, onClose: () => {}, onChanged: () => {} }))
+    await ui.click(ui.button('approve'))
+    expect(svc.calls[0][0]).toBe('approve')
+    expect(ui.container.textContent).toContain('approvedNotSent')
+    expect(ui.container.textContent).not.toContain('approveFailed')
+  })
+
+  it('keeps the panel\'s Approve off while the document differs from what was submitted', async () => {
+    const view = { active: active({ awaiting: { doc: 'requirements', current: false } }), specs: [] }
+    const ui = await render(React.createElement(client.SpecPanel, { t, view, sessionId: 's1', service: service([view]), sendText: vi.fn(), onClose: () => {}, onChanged: () => {} }))
+    expect(ui.button('approve').disabled).toBe(true)
+  })
+
+  it('opens the picked spec on its own first tab', async () => {
+    const svc = service([])
+    const picked = active({ phase: 'build', awaiting: null })
+    const Host = () => {
+      const [view, setView] = React.useState({ active: null, specs: [{ slug: 'greeter', title: 'Greeter', phase: 'build' }] })
+      return React.createElement(client.SpecPanel, { t, view, sessionId: 's1', service: svc, onClose: () => {}, onChanged: () => setView({ active: picked, specs: [] }) })
+    }
+    const ui = await render(React.createElement(Host))
+    await ui.click(ui.button('use'))
+    expect(ui.container.querySelector('[data-criterion="AC-1.1"]')).not.toBeNull()
+  })
+
+  it('shares one request between the pill and the banner', async () => {
+    let calls = 0
+    const svc = client.createSpecService(async () => { calls++; return Response.json({ active: null, specs: [] }) })
+    await Promise.all([svc.load('s1'), svc.load('s1')])
+    expect(calls).toBe(1)
+    await svc.load('s1', { fresh: true })
+    expect(calls).toBe(2)
+  })
+})
+
+describe('end of a turn', () => {
+  it('shows a document the agent submitted just before its turn ended', async () => {
+    let submitted = false
+    const svc = client.createSpecService(async () => Response.json({ active: submitted ? active() : active({ awaiting: null }), specs: [] }))
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const props = (running) => ({ t, service: svc, sendText: vi.fn(), session: { sessionId: 's1', running }, inputActions: { setDraft: vi.fn() } })
+    await act(async () => { root.render(React.createElement(client.SpecReview, props(true))); await new Promise((resolve) => setTimeout(resolve, 0)) })
+    expect(container.querySelector('[data-spec-review]')).toBeNull()
+    // Submitted within the sharing window, then the turn ends.
+    submitted = true
+    await act(async () => { root.render(React.createElement(client.SpecReview, props(false))); await new Promise((resolve) => setTimeout(resolve, 0)) })
+    expect(container.querySelector('[data-spec-review="requirements"]')).not.toBeNull()
+  })
+})

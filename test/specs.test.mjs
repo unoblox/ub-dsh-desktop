@@ -123,8 +123,13 @@ describe('spec state', () => {
     await expect(readFile(join(dir, 'specs', 'greeter', 'requirements.md'), 'utf8')).rejects.toThrow()
     expect((await store.create(dir, 'Greeter')).created).toBe(false)
     await writeFile(join(dir, 'specs', 'greeter', 'requirements.md'), REQUIREMENTS)
-    await expect(store.approve(dir, 'greeter', 'design', sha256(''))).rejects.toThrow(/changed since|first/u)
-    await expect(store.approve(dir, 'greeter', 'requirements', sha256('something else'))).rejects.toThrow('changed since it was shown')
+    // Only a submitted document, exactly as submitted and shown, in order.
+    await expect(store.approve(dir, 'greeter', 'requirements', sha256(REQUIREMENTS))).rejects.toThrow('has not been submitted')
+    await store.submit(dir, 'greeter', 'requirements', REQUIREMENTS)
+    await expect(store.approve(dir, 'greeter', 'requirements', sha256('something else'))).rejects.toThrow('changed since it was submitted or shown')
+    await writeFile(join(dir, 'specs', 'greeter', 'requirements.md'), `${REQUIREMENTS}- AC-2.2: WHEN x THE SYSTEM SHALL delete everything.\n`)
+    await expect(store.approve(dir, 'greeter', 'requirements', sha256(`${REQUIREMENTS}- AC-2.2: WHEN x THE SYSTEM SHALL delete everything.\n`))).rejects.toThrow('changed since it was submitted')
+    await writeFile(join(dir, 'specs', 'greeter', 'requirements.md'), REQUIREMENTS)
     const approved = await store.approve(dir, 'greeter', 'requirements', sha256(REQUIREMENTS))
     expect(phaseOf(approved)).toBe('design')
     time = 200
@@ -155,15 +160,16 @@ function harness() {
   }
   apply(ctx, { root: join(dir, '.appdata'), maxContinues: 2 })
   const agent = { session, steered: [], steer(message) { this.steered.push(message) } }
-  const tool = (args) => tools.get('spec').execute(args, { agent })
-  const pre = (name, args) => handlers.get('tools/pre-execute')[0]({ name, arguments: args, agent }, async () => ({ kind: 'allow' }))
-  const post = (name, args, text = '') => handlers.get('tools/post-execute')[0]({ name, arguments: args, agent }, { content: [{ type: 'text', text }], isError: false }, async () => ({ kind: 'accept' }))
+  const tool = (args, as = agent) => tools.get('spec').execute(args, { agent: as })
+  const pre = (name, args, as = agent) => handlers.get('tools/pre-execute')[0]({ name, arguments: args, agent: as }, async () => ({ kind: 'allow' }))
+  const post = (name, args, text = '', as = agent) => handlers.get('tools/post-execute')[0]({ name, arguments: args, agent: as }, { content: [{ type: 'text', text }], isError: false }, async () => ({ kind: 'accept' }))
   const stopping = (turn) => handlers.get('agent/turn-stopping')[0]({ agent, turn })
+  const turnStart = (turn) => handlers.get('session/event').forEach((fn) => fn(session, { type: 'turn/start', data: { turn } }))
   const assemble = async () => (await handlers.get('system-prompt/assemble')[0]({}, { agent }, async () => ({ contexts: [{ name: 'desktop-specs', text: '' }] }))).contexts[0].text
   const get = async () => (await routes.get(ROUTE)(new Request(`http://harness.internal${ROUTE}?session=s1`))).json()
   const postJson = (path, body) => routes.get(path)(new Request(`http://harness.internal${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
   const write = async (rel, text) => { await mkdir(join(dir, rel, '..'), { recursive: true }); await writeFile(join(dir, rel), text) }
-  return { tool, pre, post, stopping, assemble, get, postJson, write, agent, logs }
+  return { tool, pre, post, stopping, turnStart, assemble, get, postJson, write, agent, logs }
 }
 
 describe('spec plugin', () => {
@@ -217,8 +223,9 @@ describe('spec plugin', () => {
     view = await h.get()
     expect(view.active.trace.tasks[0]).toMatchObject({ id: 'T-1', done: true, files: ['greet.js', 'test/greet.test.js'] })
     expect(Object.fromEntries(view.active.trace.criteria.map((c) => [c.id, c.status]))).toEqual({ 'AC-1.1': 'passing', 'AC-1.2': 'passing', 'AC-2.1': 'untested' })
-    // Changing the approved tasks is logged, not refused.
-    expect(view.active.changes.at(-1)).toMatchObject({ doc: 'tasks', by: 'agent', summary: '1/2 tasks done.' })
+    // Ticking a task is progress, not a change to the approved plan.
+    expect(view.active.changes).toEqual([])
+    expect(view.active.approvals.tasks.changedAt).toBeNull()
 
     // The turn would end with T-2 open: it is steered on, but not forever.
     await h.stopping(1)
@@ -242,8 +249,11 @@ describe('spec plugin', () => {
     await h.write('specs/greeter/requirements.md', `${REQUIREMENTS}\n### REQ-3: Wave\n- AC-3.1: WHEN asked THE SYSTEM SHALL wave.\n`)
     const note = await h.post('edit', { file_path: 'specs/greeter/requirements.md' })
     expect(note.additionalContexts[0].content[0].text).toContain('added REQ-3, AC-3.1')
-    // The user edits the file in their editor.
+    // The user edits the file in their editor: the panel only reads; the
+    // agent's next request records it.
     await h.write('specs/greeter/requirements.md', REQUIREMENTS.replace('upper case', 'capitals'))
+    expect((await h.get()).active.changes).toHaveLength(1)
+    await h.assemble()
     const changes = (await h.get()).active.changes
     expect(changes.map((c) => [c.by, c.summary])).toEqual([
       ['agent', 'added REQ-3, AC-3.1.'],
@@ -263,5 +273,107 @@ describe('spec plugin', () => {
     void routes
     expect(projectPath(dir, '../outside.js')).toBeUndefined()
     expect(projectPath(dir, join(dir, 'a', 'b.js'))).toBe('a/b.js')
+  })
+})
+
+/** A spec through approval of all three documents, ready to build. */
+async function approvedSpec(h) {
+  await h.tool({ action: 'start', title: 'Greeter' })
+  for (const [doc, text] of [['requirements', REQUIREMENTS], ['design', DESIGN], ['tasks', TASKS]]) {
+    await h.write(`specs/greeter/${doc}.md`, text)
+    await h.tool({ action: 'submit', doc })
+    await h.postJson(APPROVE_ROUTE, { session: 's1', doc, sha256: (await h.get()).active.docs[doc].sha256 })
+  }
+  expect((await h.get()).active.phase).toBe('build')
+}
+
+describe('review fixes', () => {
+  it('reads ids and outcomes carefully', () => {
+    expect(idsIn('// covers AC-1.1.')).toEqual(['AC-1.1'])
+    expect(idsIn('const req_1 = await request(app); AC-1.10.2')).toEqual([])
+    expect(testRunFrom('npm test', ' ✓ AC-2.1 rejects failed logins\n ✓ AC-3.1 shows Error: banner\n × AC-1.2 empty\n[exit code: 1]', 1).failingIds).toEqual(['AC-1.2'])
+    // No outcome yet: not a pass.
+    expect(testRunFrom('npm test', 'partial\n[still running after 120000ms; moved to background job j1]', 1)).toBeUndefined()
+    expect(testRunFrom('npm test', '[stopped: user]', 1)).toBeUndefined()
+    expect(['.\\mvnw test', '.\\gradlew.bat test', './mvnw -q test'].map(isTestCommand)).toEqual([true, true, true])
+  })
+
+  it('records test runs from pwsh, skips background runs, and rescans tests the shell wrote', async () => {
+    const h = harness()
+    await approvedSpec(h)
+    await h.post('bash', { command: 'npm test', run_in_background: true }, 'Started job j1')
+    expect((await h.get()).active.trace.run).toBeNull()
+    // Tests written by the shell (cat >, git checkout) count after the run.
+    await h.write('test/greet.test.js', "test('AC-1.1 greets', () => {})\n")
+    await h.post('pwsh', { command: 'npm test' }, 'ok\n')
+    const view = (await h.get()).active.trace
+    expect(view.run).toMatchObject({ ok: true, command: 'npm test' })
+    expect(view.criteria.find((c) => c.id === 'AC-1.1').status).toBe('passing')
+  })
+
+  it('gates a subagent of the conversation like the conversation', async () => {
+    const h = harness()
+    await h.tool({ action: 'start', title: 'Greeter' })
+    const sub = { session: { header: { id: 'sub-1', cwd: dir, parentSession: 's1' } } }
+    expect(await h.pre('write', { file_path: 'greet.js' }, sub)).toMatchObject({ kind: 'deny' })
+    expect(await h.pre('write', { file_path: 'specs/greeter/design.md' }, sub)).toEqual({ kind: 'allow' })
+  })
+
+  it('does not let the agent leave or switch the spec before the tasks are approved', async () => {
+    const h = harness()
+    await h.tool({ action: 'start', title: 'Greeter' })
+    await expect(h.tool({ action: 'close' })).rejects.toThrow('only the user can stop or switch it')
+    await expect(h.tool({ action: 'start', title: 'Other' })).rejects.toThrow('only the user')
+    await expect(h.tool({ action: 'open', slug: '..' })).rejects.toThrow('not a spec folder name')
+    expect((await h.postJson(ACTIVATE_ROUTE, { session: 's1', slug: '..' })).status).toBe(404)
+    expect(await h.pre('write', { file_path: 'greet.js' })).toMatchObject({ kind: 'deny' })
+    // The user can, from the panel.
+    expect((await h.postJson(ACTIVATE_ROUTE, { session: 's1', slug: null })).status).toBe(200)
+    expect(await h.pre('write', { file_path: 'greet.js' })).toEqual({ kind: 'allow' })
+  })
+
+  it('protects spec.json whatever its case', async () => {
+    const h = harness()
+    await h.tool({ action: 'start', title: 'Greeter' })
+    expect(await h.pre('write', { file_path: 'specs/greeter/SPEC.JSON' })).toMatchObject({ kind: 'deny' })
+    expect(await h.pre('write', { file_path: 'specs/Greeter/Trace.json' })).toMatchObject({ kind: 'deny' })
+  })
+
+  it('logs a shell edit of an approved document as the agent\'s', async () => {
+    const h = harness()
+    await approvedSpec(h)
+    await h.write('specs/greeter/requirements.md', REQUIREMENTS.replace('upper case', 'capitals'))
+    const note = await h.post('bash', { command: "sed -i 's/upper case/capitals/' specs/greeter/requirements.md" })
+    expect(note.additionalContexts[0].content[0].text).toContain('reworded AC-2.1')
+    expect((await h.get()).active.changes.map((c) => [c.by, c.summary])).toEqual([['agent (shell)', 'reworded AC-2.1.']])
+  })
+
+  it('steers on only after the turn did spec work, so a question or a pause is not overridden', async () => {
+    const h = harness()
+    await approvedSpec(h)
+    h.turnStart(5)
+    await h.stopping(5)
+    expect(h.agent.steered).toHaveLength(0)
+    await h.write('greet.js', 'x\n')
+    await h.post('write', { file_path: 'greet.js' })
+    await h.stopping(5)
+    expect(h.agent.steered).toHaveLength(1)
+    h.turnStart(6)
+    await h.stopping(6)
+    expect(h.agent.steered).toHaveLength(1)
+  })
+
+  it('keeps the specs of one project apart: only tests marked for this spec count', async () => {
+    const h = harness()
+    await approvedSpec(h)
+    await mkdir(join(dir, 'specs', 'billing'), { recursive: true })
+    await writeFile(join(dir, 'specs', 'billing', 'spec.json'), JSON.stringify({ version: 1, slug: 'billing', title: 'Billing', approvals: {}, awaiting: null, changes: [] }))
+    await h.write('test/billing.test.js', "// spec: billing\ntest('AC-1.1 charges', () => {})\ntest('AC-5.1 refunds', () => {})\n")
+    await h.write('test/greet.test.js', "// spec: greeter\ntest('AC-1.2 empty', () => {})\n")
+    await h.post('write', { file_path: 'test/greet.test.js' })
+    const trace = (await h.get()).active.trace
+    expect(Object.fromEntries(trace.criteria.map((c) => [c.id, c.status]))).toEqual({ 'AC-1.1': 'untested', 'AC-1.2': 'not-run', 'AC-2.1': 'untested' })
+    expect(trace.drift.filter((d) => d.kind === 'unknown-id')).toEqual([])
+    expect(await h.assemble()).toContain('put "spec: greeter" in a comment')
   })
 })

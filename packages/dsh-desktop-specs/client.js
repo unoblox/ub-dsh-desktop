@@ -27,6 +27,7 @@ window.__ModuleLoader__.load({
     const ACTIVATE_ROUTE = '/api/desktop-specs/activate'
     const DOCS = ['requirements', 'design', 'tasks']
     const LIVE_REFRESH_MS = 4000
+    const SHARE_MS = 1500
     const STYLE_ID = 'dsh-desktop-specs-style'
 
     const en = {
@@ -57,6 +58,7 @@ window.__ModuleLoader__.load({
       askChanges: 'Ask for changes',
       approving: 'Approving…',
       approveFailed: 'Could not approve: {message}',
+      approvedNotSent: 'Approved, but the agent could not be told to continue ({message}). Send a message to go on.',
       approvedMessage: 'Approved {file}. Continue with the next step.',
       approvedTasksMessage: 'Approved tasks.md. Start building, task by task, with tests for each acceptance criterion.',
       changesDraft: 'Changes to {file}: ',
@@ -125,6 +127,7 @@ window.__ModuleLoader__.load({
       askChanges: '要求修改',
       approving: '正在批准…',
       approveFailed: '无法批准：{message}',
+      approvedNotSent: '已批准，但无法通知智能体继续（{message}）。请发送一条消息继续。',
       approvedMessage: '已批准 {file}。继续下一步。',
       approvedTasksMessage: '已批准 tasks.md。开始逐个任务构建，并为每条验收标准编写测试。',
       changesDraft: '{file} 需要修改：',
@@ -245,13 +248,24 @@ window.__ModuleLoader__.load({
         if (!response.ok) throw new Error(isRecord(json) && typeof json.error === 'string' ? json.error : `HTTP ${String(response.status)}`)
         return json
       }
+      // The pill and the banner both show this view: one request serves both
+      // when they ask within a moment of each other.
+      const recent = new Map()
+      const fetchView = async (sessionId) => {
+        const response = await doFetch(`${ROUTE}?session=${encodeURIComponent(sessionId)}`, { credentials: 'same-origin', cache: 'no-store' })
+        if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
+        const body = await response.json()
+        if (!isRecord(body)) throw new Error('unexpected response')
+        return { active: isRecord(body.active) ? body.active : null, specs: Array.isArray(body.specs) ? body.specs : [] }
+      }
       return {
-        async load(sessionId, signal) {
-          const response = await doFetch(`${ROUTE}?session=${encodeURIComponent(sessionId)}`, { credentials: 'same-origin', cache: 'no-store', signal })
-          if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
-          const body = await response.json()
-          if (!isRecord(body)) throw new Error('unexpected response')
-          return { active: isRecord(body.active) ? body.active : null, specs: Array.isArray(body.specs) ? body.specs : [] }
+        load(sessionId, { fresh = false } = {}) {
+          const cached = recent.get(sessionId)
+          if (!fresh && cached !== undefined && Date.now() - cached.at < SHARE_MS) return cached.promise
+          const promise = fetchView(sessionId)
+          recent.set(sessionId, { at: Date.now(), promise })
+          promise.catch(() => recent.delete(sessionId))
+          return promise
         },
         approve: (sessionId, doc, sha256) => post(APPROVE_ROUTE, { session: sessionId, doc, sha256 }),
         reopen: (sessionId, doc) => post(REOPEN_ROUTE, { session: sessionId, doc }),
@@ -266,23 +280,22 @@ window.__ModuleLoader__.load({
     function useSpec(service, sessionId, running) {
       const [state, setState] = useState({ status: 'loading' })
       const controller = useRef(undefined)
-      const reload = useCallback(() => {
+      const reload = useCallback((fresh = false) => {
         if (sessionId === undefined) return
         controller.current?.abort()
         const current = new AbortController()
         controller.current = current
-        service.load(sessionId, current.signal).then(
+        service.load(sessionId, { fresh }).then(
           (view) => { if (!current.signal.aborted) setState({ status: 'ready', view }) },
           (error) => { if (!current.signal.aborted) setState((previous) => (previous.status === 'ready' ? previous : { status: 'error', message: errorText(error) })) }
         )
       }, [service, sessionId])
-      useEffect(() => {
-        reload()
-        return () => controller.current?.abort()
-      }, [reload])
+      useEffect(() => () => controller.current?.abort(), [])
       useEffect(() => {
         if (running !== true) {
-          reload()
+          // The turn just ended (or never ran): the agent may have submitted a
+          // document a moment ago, so never reuse a request from before.
+          reload(true)
           return undefined
         }
         const timer = setInterval(reload, LIVE_REFRESH_MS)
@@ -408,16 +421,21 @@ window.__ModuleLoader__.load({
         setStatus(undefined)
         try {
           await service.approve(sessionId, doc, active.docs[doc].sha256)
-          onChanged()
-          await sendText(doc === 'tasks' ? t('approvedTasksMessage') : t('approvedMessage', { file: FILES[doc] }))
-          return true
         } catch (error) {
           setStatus({ tone: 'error', text: t('approveFailed', { message: errorText(error) }) })
+          setWorking(false)
           onChanged()
           return false
+        }
+        onChanged()
+        try {
+          await sendText(doc === 'tasks' ? t('approvedTasksMessage') : t('approvedMessage', { file: FILES[doc] }))
+        } catch (error) {
+          setStatus({ tone: 'error', text: t('approvedNotSent', { message: errorText(error) }) })
         } finally {
           setWorking(false)
         }
+        return true
       }
       return { working, status, approve }
     }
@@ -473,7 +491,7 @@ window.__ModuleLoader__.load({
         active.awaiting?.doc === doc
           ? h('div', { className: 'dshSpecFoot' },
             approval.status === undefined ? null : h('p', { className: 'dshSpecStatus', role: 'status', 'data-tone': approval.status.tone }, approval.status.text),
-            h('button', { type: 'button', className: 'dshSpecBtn dshSpecBtnPrimary', disabled: approval.working || errors.length > 0, onClick: () => approval.approve(doc) }, approval.working ? t('approving') : t('approve')))
+            h('button', { type: 'button', className: 'dshSpecBtn dshSpecBtnPrimary', disabled: approval.working || errors.length > 0 || active.awaiting.current !== true, onClick: () => approval.approve(doc) }, approval.working ? t('approving') : t('approve')))
           : null)
     }
 
@@ -526,7 +544,15 @@ window.__ModuleLoader__.load({
     function SpecPanel(props) {
       const { t, view, initialTab, onClose, sessionId, service, onChanged } = props
       const active = view.active
-      const [tab, setTab] = useState(initialTab ?? (active === null ? 'pick' : active.awaiting?.doc ?? (active.phase === 'build' ? 'trace' : active.phase)))
+      const firstTab = (spec) => (spec === null ? 'pick' : spec.awaiting?.doc ?? (spec.phase === 'build' ? 'trace' : spec.phase))
+      const [tab, setTab] = useState(initialTab ?? firstTab(active))
+      // Picking a spec swaps the panel's subject: start on its own first tab.
+      const slug = active?.slug ?? null
+      const shownSlug = useRef(slug)
+      useEffect(() => {
+        if (shownSlug.current !== slug) setTab(firstTab(active))
+        shownSlug.current = slug
+      }, [slug])
       if (active === null) {
         return h(Modal, { open: true, onClose, title: t('pickTitle'), closeLabel: t('close'), className: 'dshSpecModal' },
           h('div', { className: 'dshSpecPanel' }, h(PickView, { t, view, sessionId, service, onChanged })))
@@ -557,7 +583,9 @@ window.__ModuleLoader__.load({
 
     function SpecDock(props) {
       const sessionId = props.session?.sessionId ?? props.sessionId
-      const [state, reload] = useSpec(props.service, sessionId, props.session?.running)
+      const [state, load] = useSpec(props.service, sessionId, props.session?.running)
+      // After the user changed something, read it back now, not from the shared copy.
+      const reload = () => load(true)
       const [open, setOpen] = useState(undefined)
       if (sessionId === undefined) return null
       const view = state.status === 'ready' ? state.view : undefined
@@ -571,7 +599,8 @@ window.__ModuleLoader__.load({
     // route; it keeps its own copy so each slot stays independent.
     function SpecReview(props) {
       const sessionId = props.session?.sessionId ?? props.sessionId
-      const [state, reload] = useSpec(props.service, sessionId, props.session?.running)
+      const [state, load] = useSpec(props.service, sessionId, props.session?.running)
+      const reload = () => load(true)
       const [open, setOpen] = useState(undefined)
       if (sessionId === undefined || state.status !== 'ready') return null
       const sendText = props.sendText ?? props.sendTextFor?.(sessionId)

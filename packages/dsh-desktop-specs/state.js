@@ -66,7 +66,14 @@ function readState(value, slug) {
   const approvals = {}
   for (const doc of DOCS) {
     const entry = value.approvals?.[doc]
-    if (isRecord(entry) && typeof entry.sha256 === 'string' && typeof entry.at === 'number') approvals[doc] = { at: entry.at, sha256: entry.sha256 }
+    if (isRecord(entry) && typeof entry.sha256 === 'string' && typeof entry.at === 'number') {
+      approvals[doc] = {
+        at: entry.at,
+        sha256: entry.sha256,
+        ...(typeof entry.base === 'string' ? { base: entry.base } : {}),
+        ...(typeof entry.changedAt === 'number' ? { changedAt: entry.changedAt } : {})
+      }
+    }
   }
   const awaiting = isRecord(value.awaiting) && DOCS.includes(value.awaiting.doc) && typeof value.awaiting.sha256 === 'string' ? { doc: value.awaiting.doc, sha256: value.awaiting.sha256, at: Number(value.awaiting.at) || 0 } : null
   const changes = Array.isArray(value.changes) ? value.changes.filter((c) => isRecord(c) && DOCS.includes(c.doc) && typeof c.summary === 'string').slice(-MAX_CHANGES) : []
@@ -165,13 +172,15 @@ export function createSpecStore({ now = Date.now } = {}) {
     submit: (root, slug, doc, text) => update(root, slug, (state) => ({ ...state, awaiting: { doc, sha256: sha256(text), at: now() } })),
 
     /**
-     * Approve a document, only if its text is what the user saw (`seen` is
-     * the SHA-256 the panel showed). Earlier documents must be approved first.
+     * Approve a submitted document, only if its text is what was submitted
+     * and what the user saw (`seen` is the SHA-256 the panel showed).
+     * Earlier documents must be approved first.
      */
     approve: (root, slug, doc, seen) => update(root, slug, async (state) => {
       const texts = await readDocs(root, slug)
       const current = sha256(texts[doc])
-      if (seen !== current) throw new ConflictError(`${DOC_FILES[doc]} changed since it was shown; review it again`)
+      if (state.awaiting?.doc !== doc) throw new ConflictError(`${DOC_FILES[doc]} has not been submitted for approval`)
+      if (seen !== current || seen !== state.awaiting.sha256) throw new ConflictError(`${DOC_FILES[doc]} changed since it was submitted or shown; review it again`)
       const before = DOCS.slice(0, DOCS.indexOf(doc)).find((d) => state.approvals[d] === undefined)
       if (before !== undefined) throw new ConflictError(`approve ${DOC_FILES[before]} first`)
       return { ...state, approvals: { ...state.approvals, [doc]: { at: now(), sha256: current } }, awaiting: state.awaiting?.doc === doc ? null : state.awaiting }
@@ -188,6 +197,16 @@ export function createSpecStore({ now = Date.now } = {}) {
       if (hash === approval.sha256) return state
       const change = { at: now(), doc, summary, by, from: approval.sha256.slice(0, 12), to: hash.slice(0, 12) }
       return { ...state, approvals: { ...state.approvals, [doc]: { at: approval.at, sha256: hash, changedAt: change.at } }, changes: [...state.changes, change].slice(-MAX_CHANGES) }
+    }),
+
+    /**
+     * Follow an approved document whose only change is ticked task boxes: no
+     * change entry; `base` keeps pointing at the text the user approved.
+     */
+    followTicks: (root, slug, doc, text) => update(root, slug, (state) => {
+      const approval = state.approvals[doc]
+      if (approval === undefined) return state
+      return { ...state, approvals: { ...state.approvals, [doc]: { ...approval, sha256: sha256(text), base: approval.base ?? approval.sha256 } } }
     }),
 
     /** Record the files changed for tasks just ticked done. */

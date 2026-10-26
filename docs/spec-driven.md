@@ -14,11 +14,15 @@ The user approves each of the first three documents. The app keeps code, tests a
 - **Start:** ask for it ("use a spec to build …"), or pick **Build a feature with a spec** among the starters of a new conversation. The agent asks about anything unclear, then writes the requirements.
 - **Approve:** when a document is ready, a banner above the composer says so, with a short summary.
   - **Review** opens it in the Spec panel.
-  - **Approve** approves exactly the text shown. If it changed since, the app asks for another look.
+  - **Approve** approves exactly the text that was submitted and shown. If the agent changed it after submitting, Approve stays off until the panel shows the new text and the agent submits it again.
   - **Ask for changes** puts "Changes to requirements.md: " in the composer.
   - After an approval, the agent moves on to the next document by itself.
-- **Code waits:** until the tasks are approved, the agent can't change files outside the spec.
-- **Building:** the agent works task by task. Each test is named for the acceptance criterion it checks, and a task is ticked only when its tests pass. If the agent stops with tasks open or drift left, it is told to go on, at most three times per turn and only while it is making progress.
+- **Code waits:** until the tasks are approved, the agent's file tools can't change files outside the spec, and neither can subagents it starts. Only the user can stop or switch the spec before then (from the panel).
+  - This is a guard rail for an agent following the workflow, not a security boundary: shell commands are not gated, and `spec.json` is a plain file in the project.
+- **Building:** the agent works task by task. Each test is named for the acceptance criterion it checks, and a task is ticked only when its tests pass. If the agent stops with tasks open or drift left, it is told to go on:
+  - only in a turn where it changed code or tests or ran the tests, so a question or "pause" from the user is not overridden;
+  - at most three times per turn, and only while it is making progress.
+- **Several specs in one project:** their ids overlap (each starts at REQ-1), so each test file says which spec it belongs to with a `spec: <slug>` comment. With one spec, every test file counts.
 - **The Spec pill** (under the composer) shows the phase, "Review" while a document waits, then tasks done and drift. It opens the panel, which has:
   - the three documents, with problems to fix before approval;
   - **Trace:** each criterion with its status, its tests and its tasks, the last test run, and the drift list;
@@ -47,11 +51,11 @@ In the app's data folder (`<DSH_HOME>/specs/`): `sessions.json` (which spec each
 | Seam | Use |
 | --- | --- |
 | `spec` tool | `start`, `open`, `list`, `status`, `submit` (validates; then the agent stops for approval), `verify` (writes trace.json), `close` |
-| `tools/pre-execute` | until tasks.md is approved, `write` / `edit` / `str_replace_editor` may only touch `specs/<slug>/`; `spec.json` and `trace.json` are never theirs. The shell is not gated. |
-| `tools/post-execute` | after a write: logs changes to approved documents (by id, for requirements); links files to the tasks ticked next; reports new drift once. After a test command (`npm test`, `pytest`, `go test`, …): records the run from its `[exit code]` and failing lines. The note reaches the agent as context on that tool result. |
-| `agent/turn-stopping` | while building, with tasks open or drift left: `agent.steer` a short "not finished" message, at most `maxContinues` (3) times per turn, and never twice with nothing changed |
+| `tools/pre-execute` | until tasks.md is approved, `write` / `edit` / `str_replace_editor` may only touch `specs/<slug>/`; `spec.json` and `trace.json` (any case) are never theirs. A subagent is gated by the spec of the conversation that started it (`parentSession`). The shell is not gated. |
+| `tools/post-execute` | after a file write: logs changes to approved documents (by id for requirements; ticking tasks is not a change); links files to the tasks ticked next; reports new drift once. After a shell command (`bash`, or `pwsh` on Windows): logs any edit it made to an approved document, as the agent's; after a test command (`npm test`, `pytest`, `go test`, …) records the run from its `[exit code]` and failing lines (pass lines excluded) and rescans the tests. A run still going, moved to the background or stopped has no outcome and is not recorded. The note reaches the agent as context on that tool result. |
+| `agent/turn-stopping` | while building, with tasks open or drift left, in a turn that changed code or tests or ran them: `agent.steer` a short "not finished" message, at most `maxContinues` (3) times per turn, and never twice with nothing changed |
 | `system-prompt/assemble` | the workflow, plus the active spec's phase, approvals, open tasks, criteria counts and drift, on every request (survives compaction) |
-| `GET /api/desktop-specs?session=` | the panel's view; `POST …/approve` (`{session, doc, sha256}`, 409 if the text changed), `…/reopen`, `…/activate`; JSON and same-origin only |
+| `GET /api/desktop-specs?session=` | the panel's view (read only); `POST …/approve` (`{session, doc, sha256}`: only the submitted document, only as submitted and shown, else 409), `…/reopen`, `…/activate` (folder names only); JSON and same-origin only |
 
 Criterion status (`trace.js`):
 - **untested:** no test names it.
@@ -60,7 +64,7 @@ Criterion status (`trace.js`):
 - **stale:** passed, but code changed since.
 - **passing.**
 
-A test may use `AC-1.2` or `ac_1_2`. A test named only for the requirement (`REQ-1`) covers all its criteria.
+A test may use `AC-1.2` or `ac_1_2`. A test named only for the requirement (`REQ-1` or `REQ_1`) covers all its criteria. The scan skips dependency and build folders and stops after 40,000 directory entries or 4,000 test files.
 
 Drift (`buildTrace`):
 - a test names an unknown id;
@@ -69,7 +73,7 @@ Drift (`buildTrace`):
 - a task ticked done with untested or failing criteria;
 - a failed run after tasks were ticked.
 
-Edits to approved documents made outside the app are logged as such the next time the spec is read.
+Edits to approved documents made outside the app are logged as such on the agent's next request. The panel only reads.
 
 Safe Mode does not load the plugin.
 
@@ -94,6 +98,19 @@ This run used the real Harness, a scripted stand-in model, and Chromium clicking
 - The agent shipped a bug and a test tagged `AC-9.9`; both were reported back to it. It fixed the code, retagged the test and reran the tests.
 - It said "done" with both tasks unticked and was steered on once. It ticked them and ran `spec verify`: 3/3 criteria passing, no drift, and the tasks linked to `greet.js` and `test/greet.test.js`.
 - It ran in light and dark mode with no page errors.
+
+A code review then found 17 problems, all fixed with a test that fails without the fix:
+- test runs on Windows (`pwsh`) were never recorded;
+- a run still in progress counted as a pass;
+- subagents bypassed the gate;
+- the agent could lift the gate with `spec close`;
+- a document changed after submitting could be approved;
+- the specs of one project shared ids;
+- every user turn was steered on;
+- tests changed by the shell were missed;
+- and smaller issues: id and failure-line parsing, case, tick logging, panel state, slug checks, duplicate polling.
+
+The live run was repeated after these fixes and passed.
 
 The same runs found and fixed two issues:
 - The Harness lets the agent overwrite only files it has read, so the documents are no longer pre-filled with templates. The shape is in the tool's answer and the runtime context instead.

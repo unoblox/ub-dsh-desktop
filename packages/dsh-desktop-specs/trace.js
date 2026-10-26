@@ -14,13 +14,19 @@ import { definedIds, parseRequirements, parseTasks } from './parse.js'
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.venv', 'venv', '__pycache__', 'target', 'vendor', '.unoblox', 'specs', '.idea', '.vscode'])
 const MAX_FILES = 4000
+// Directory entries read in one scan, so a large repository with few tests stays cheap.
+const MAX_ENTRIES = 40000
 const MAX_FILE_BYTES = 512 * 1024
 const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|spec|e2e)\/|[._-](?:test|spec)\.[a-z0-9]+$|(?:^|\/)test_[^/]+\.py$|_test\.(?:go|py|rb|exs?)$|Tests?\.(?:java|kt|cs|swift)$/iu
 const CODE_EXT = /\.(?:[cm]?[jt]sx?|py|go|rs|rb|java|kt|cs|swift|php|exs?|scala|c|cc|cpp|h|hpp|vue|svelte)$/iu
 // AC-1.1, ac_1_1, AC_1_1; REQ-1, req_1.
-// Not \b: test_ac_1_1_greets has no word boundary around the id.
-const AC_ANY = /(?<![A-Za-z0-9])[Aa][Cc][-_](\d+)[._](\d+)(?![\d.])/gu
-const REQ_ANY = /(?<![A-Za-z0-9])[Rr][Ee][Qq][-_](\d+)(?![\d.])/gu
+// Not \b: test_ac_1_1_greets has no word boundary around the id. A
+// sentence's full stop after an id is fine (AC-1.1.), a further number is not.
+const AC_ANY = /(?<![A-Za-z0-9])[Aa][Cc][-_](\d+)[._](\d+)(?!\d|\.\d)/gu
+// Requirements only as REQ-1 or REQ_1: lower-case req_1 is a common variable name.
+const REQ_ANY = /(?<![A-Za-z0-9])REQ[-_](\d+)(?!\d|\.\d)/gu
+// A test file says which spec it belongs to when a project has several.
+const OWNER = /\bspec:\s*([a-z0-9][a-z0-9-]{0,47})\b/gu
 
 export function isTestPath(path) {
   return TEST_PATH.test(path) && CODE_EXT.test(path)
@@ -34,20 +40,21 @@ export function idsIn(text) {
   return [...ids]
 }
 
-async function walk(root, dir, out) {
-  if (out.length >= MAX_FILES) return
+async function walk(root, dir, out, budget) {
+  if (out.length >= MAX_FILES || budget.left <= 0) return
   let entries
   try {
     entries = await readdir(dir, { withFileTypes: true })
   } catch {
     return
   }
+  budget.left -= entries.length
   for (const entry of entries) {
-    if (out.length >= MAX_FILES) return
+    if (out.length >= MAX_FILES || budget.left <= 0) return
     if (entry.name.startsWith('.') && entry.name !== '.github') continue
     const path = join(dir, entry.name)
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) await walk(root, path, out)
+      if (!SKIP_DIRS.has(entry.name)) await walk(root, path, out, budget)
     } else if (entry.isFile()) {
       const rel = relative(root, path).split(sep).join('/')
       if (isTestPath(rel)) out.push(rel)
@@ -55,11 +62,16 @@ async function walk(root, dir, out) {
   }
 }
 
-/** Every spec id the project's test files name, with where. */
+/**
+ * Every spec id the project's test files name, with where, and which spec
+ * each file says it belongs to (`spec: <slug>` in a comment).
+ */
 export async function scanTests(root) {
   const files = []
-  await walk(root, root, files)
+  const budget = { left: MAX_ENTRIES }
+  await walk(root, root, files, budget)
   const refs = new Map()
+  const owners = new Map()
   for (const file of files) {
     let text
     try {
@@ -68,6 +80,8 @@ export async function scanTests(root) {
     } catch {
       continue
     }
+    const owned = [...text.matchAll(OWNER)].map((match) => match[1])
+    if (owned.length > 0) owners.set(file, new Set(owned))
     const lines = text.split('\n')
     for (let index = 0; index < lines.length; index++) {
       for (const id of idsIn(lines[index])) {
@@ -77,11 +91,26 @@ export async function scanTests(root) {
       }
     }
   }
-  return { files: files.length, refs }
+  return { files: files.length, refs, owners, truncated: budget.left <= 0 || files.length >= MAX_FILES }
+}
+
+/**
+ * The part of a scan that counts for one spec. With one spec in the project
+ * every test file counts; with several, only files marked `spec: <slug>`
+ * (the ids of different specs overlap: each starts at REQ-1).
+ */
+export function scanFor(scan, slug, specCount) {
+  if (specCount <= 1) return scan
+  const refs = new Map()
+  for (const [id, places] of scan.refs) {
+    const mine = places.filter((place) => scan.owners.get(place.file)?.has(slug) === true)
+    if (mine.length > 0) refs.set(id, mine)
+  }
+  return { ...scan, refs }
 }
 
 // The usual test runners; a project script named test counts too.
-const TEST_COMMAND = /(?:^|[\s;&|(])(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test\b|npx\s+(?:vitest|jest|mocha|playwright\s+test)\b|vitest\b|jest\b|mocha\b|pytest\b|python3?\s+-m\s+(?:pytest|unittest)\b|go\s+test\b|cargo\s+test\b|(?:mvn|\.\/mvnw)\s+(?:\S+\s+)*test\b|(?:gradle|\.\/gradlew)\s+(?:\S+\s+)*test\b|dotnet\s+test\b|rspec\b|bundle\s+exec\s+rspec\b|mix\s+test\b|phpunit\b|swift\s+test\b|deno\s+test\b|node\s+--test\b|make\s+test\b)/u
+const TEST_COMMAND = /(?:^|[\s;&|(])(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test\b|npx\s+(?:vitest|jest|mocha|playwright\s+test)\b|vitest\b|jest\b|mocha\b|pytest\b|python3?\s+-m\s+(?:pytest|unittest)\b|go\s+test\b|cargo\s+test\b|(?:mvn|\.[\\/]mvnw(?:\.cmd)?)\s+(?:\S+\s+)*test\b|(?:gradle|\.[\\/]gradlew(?:\.bat)?)\s+(?:\S+\s+)*test\b|dotnet\s+test\b|rspec\b|bundle\s+exec\s+rspec\b|mix\s+test\b|phpunit\b|swift\s+test\b|deno\s+test\b|node\s+--test\b|make\s+test\b)/u
 
 export function isTestCommand(command) {
   return typeof command === 'string' && TEST_COMMAND.test(command)
@@ -89,20 +118,26 @@ export function isTestCommand(command) {
 
 // Lines that report one failing test, in the common runners' formats.
 const FAIL_LINE = /(?:^|\s)(?:✕|✖|×|✗|✘|FAIL(?:ED)?\b|not ok\b|--- FAIL|[Ff]ailed\b|Error:|AssertionError|panicked)/u
+// A passing test's line ("✓ AC-2.1 rejects failed logins") is never a failure.
+const PASS_LINE = /^\s*(?:✓|✔|√|ok\s+\d|PASS\b|--- PASS|\[\s*OK\s*\])/u
+// A command still running, moved to the background or stopped has no outcome yet.
+const UNFINISHED = /\[still running after|moved to background job|\[stopped:/u
 
 /**
- * One test run from the shell tool's result text. The shell result ends
+ * One test run from the shell tool's result text, or undefined while the
+ * command has no outcome (still running, in the background, stopped). The shell result ends
  * with `[exit code: N]` unless the command succeeded; timeouts and signals
  * are failures.
  */
 export function testRunFrom(command, output, at) {
   const text = String(output ?? '')
+  if (UNFINISHED.test(text)) return undefined
   const code = /\[exit code: (-?\d+)\]/u.exec(text)
   const killed = /\[(?:timed out|timeout|killed|signal)[^\]]*\]/iu.test(text)
   const ok = code === null && !killed
   const failingIds = new Set()
   if (!ok) {
-    for (const line of text.split('\n')) if (FAIL_LINE.test(line)) for (const id of idsIn(line)) failingIds.add(id)
+    for (const line of text.split('\n')) if (FAIL_LINE.test(line) && !PASS_LINE.test(line)) for (const id of idsIn(line)) failingIds.add(id)
   }
   const tail = text.trim().split('\n').slice(-12).join('\n').slice(-1500)
   return { at, command: command.slice(0, 300), ok, exitCode: code === null ? (killed ? null : 0) : Number(code[1]), failingIds: [...failingIds], tail }
@@ -141,8 +176,9 @@ export function criteriaOfTask(task, requirements) {
  * @param run - the last test run, if any.
  * @param lastChangeAt - when code or tests last changed.
  * @param taskFiles - task id → files changed for it.
+ * @param otherIds - ids other specs of the project define (not unknown here).
  */
-export function buildTrace({ texts, scan, run, lastChangeAt = 0, taskFiles = {} }) {
+export function buildTrace({ texts, scan, run, lastChangeAt = 0, taskFiles = {}, otherIds = new Set() }) {
   const requirements = parseRequirements(texts.requirements)
   const tasks = parseTasks(texts.tasks)
   const defined = definedIds(requirements)
@@ -165,7 +201,7 @@ export function buildTrace({ texts, scan, run, lastChangeAt = 0, taskFiles = {} 
   const drift = []
   const add = (kind, ids, text, fix) => drift.push({ kind, ids, text, fix })
   for (const [id, places] of scan.refs) {
-    if (!defined.has(id)) add('unknown-id', [id], `${places[0].file}:${String(places[0].line)} names ${id}, which the requirements do not define.`, 'Retag the test with the criterion it checks, or add the requirement if the behaviour is wanted.')
+    if (!defined.has(id) && !otherIds.has(id)) add('unknown-id', [id], `${places[0].file}:${String(places[0].line)} names ${id}, which the requirements do not define.`, 'Retag the test with the criterion it checks, or add the requirement if the behaviour is wanted.')
   }
   for (const task of tasks) {
     for (const ref of task.refs) if (!defined.has(ref)) add('plan', [task.id, ref], `${task.id} names ${ref}, which the requirements no longer define.`, 'Update tasks.md to the current requirements.')

@@ -733,6 +733,12 @@ describe('release secrets stay behind an approval', () => {
     expect(intermediates?.run).toContain('https://www.apple.com/certificateauthority/$1')
     expect(intermediates?.run).toContain('DeveloperIDG2CA.cer f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a')
     expect(intermediates?.run).toContain('shasum -a 256 -c -')
+    // The certificate is checked by name before packaging; only public names are printed.
+    const check = steps.find((step) => step.name === 'Check the Developer ID certificate')
+    expect(steps.indexOf(check ?? {})).toBeLessThan(steps.indexOf(steps.find((step) => step.name === 'Package') ?? {}))
+    expect(check?.if).toBe("matrix.platform == 'darwin' && env.MAC_SIGNING == 'true'")
+    expect(check?.run).toContain('security delete-keychain')
+    expect(check?.run).not.toMatch(/echo "\$MAC_CSC|echo "\$p12|cat "\$p12/u)
     // Run the Package script with stand-ins: what does electron-builder see?
     const pkg = steps.find((step) => step.name === 'Package')
     const script = (pkg?.run ?? '')

@@ -146,6 +146,40 @@ jobs:
             echo "$2  $RUNNER_TEMP/$1" | shasum -a 256 -c -
             sudo security add-certificates -k /Library/Keychains/System.keychain "$RUNNER_TEMP/$1" || true
           done
+      - name: Check the Developer ID certificate
+        if: matrix.platform == 'darwin' && env.MAC_SIGNING == 'true'
+        shell: bash
+        # Import the .p12 into a throwaway keychain and say what it holds, so a
+        # wrong export (another certificate, no private key, not trusted)
+        # fails here by name instead of as "0 valid identities" while
+        # packaging. Prints certificate names and trust only, never the key.
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          kc="$RUNNER_TEMP/developer-id-check.keychain"
+          p12="$RUNNER_TEMP/developer-id-check.p12"
+          kcpw="$(openssl rand -hex 16)"
+          printf '%s' "$MAC_CSC_LINK" | base64 --decode > "$p12"
+          security create-keychain -p "$kcpw" "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          security import "$p12" -k "$kc" -P "$MAC_CSC_KEY_PASSWORD" -T /usr/bin/codesign >/dev/null
+          rm -f "$p12"
+          echo "Certificates in MAC_CSC_LINK:"
+          security find-certificate -a "$kc" | grep '"labl"' | sed 's/.*<blob>=/  /' || true
+          echo "Code signing identities (with the reason when not valid):"
+          identities="$(security find-identity -p codesigning "$kc")"
+          echo "$identities"
+          security delete-keychain "$kc"
+          if ! grep -q 'Developer ID Application' <<< "$identities"; then
+            echo "::error::MAC_CSC_LINK holds no 'Developer ID Application' identity. Export that certificate (with its private key) from Keychain Access › My Certificates as .p12."
+            exit 1
+          fi
+          if ! grep -A2 'Valid identities only' <<< "$identities" | grep -q 'Developer ID Application'; then
+            echo "::error::The Developer ID Application identity in MAC_CSC_LINK is not valid; the reason is in brackets above."
+            exit 1
+          fi
       - name: Prepare the Apple notarization key
         if: matrix.platform == 'darwin' && env.MAC_NOTARIZING == 'true'
         shell: bash

@@ -129,6 +129,23 @@ jobs:
         run: |
           base="$(node -p "require('./package.json').version")"
           npm version --no-git-tag-version --allow-same-version "$base-beta.${{ github.run_number }}"
+      - name: Install Apple's Developer ID intermediate certificates
+        if: matrix.platform == 'darwin' && env.MAC_SIGNING == 'true'
+        shell: bash
+        # electron-builder's bundled root keychain predates the G2 intermediate
+        # that issues today's Developer ID certificates; without it the runner
+        # finds the identity but counts it as invalid ("0 valid identities").
+        # Public certificates, pinned by fingerprint.
+        run: |
+          set -euo pipefail
+          for entry in \
+            "DeveloperIDG2CA.cer f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a" \
+            "DeveloperIDCA.cer 7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f"; do
+            set -- $entry
+            curl -fsSL -o "$RUNNER_TEMP/$1" "https://www.apple.com/certificateauthority/$1"
+            echo "$2  $RUNNER_TEMP/$1" | shasum -a 256 -c -
+            sudo security add-certificates -k /Library/Keychains/System.keychain "$RUNNER_TEMP/$1" || true
+          done
       - name: Prepare the Apple notarization key
         if: matrix.platform == 'darwin' && env.MAC_NOTARIZING == 'true'
         shell: bash

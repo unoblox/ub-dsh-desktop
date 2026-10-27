@@ -724,6 +724,15 @@ describe('release secrets stay behind an approval', () => {
       }
     }
     expect(steps.find((step) => step.name === 'Package')?.env?.MAC_CSC_LINK).toContain('secrets.MAC_CSC_LINK')
+    // Developer ID certificates chain to Apple's G2 intermediate, which the
+    // runner needs before packaging; it comes from Apple, pinned by fingerprint.
+    const intermediates = steps.find((step) => step.name === "Install Apple's Developer ID intermediate certificates")
+    expect(steps.indexOf(intermediates ?? {})).toBeGreaterThan(-1)
+    expect(steps.indexOf(intermediates ?? {})).toBeLessThan(steps.indexOf(steps.find((step) => step.name === 'Package') ?? {}))
+    expect(intermediates?.if).toBe("matrix.platform == 'darwin' && env.MAC_SIGNING == 'true'")
+    expect(intermediates?.run).toContain('https://www.apple.com/certificateauthority/$1')
+    expect(intermediates?.run).toContain('DeveloperIDG2CA.cer f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a')
+    expect(intermediates?.run).toContain('shasum -a 256 -c -')
     // Run the Package script with stand-ins: what does electron-builder see?
     const pkg = steps.find((step) => step.name === 'Package')
     const script = (pkg?.run ?? '')

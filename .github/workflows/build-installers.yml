@@ -186,7 +186,10 @@ jobs:
           # electron-builder reads an empty CSC_LINK as a path and fails, so
           # these are set only when the secrets exist.
           if [ "$MAC_SIGNING" = true ] && [ -n "$MAC_CSC_LINK" ]; then
-            export CSC_LINK="$MAC_CSC_LINK" CSC_KEY_PASSWORD="$MAC_CSC_KEY_PASSWORD"
+            # With discovery off and no CSC_NAME, electron-builder finds no
+            # identity and skips signing. On, it searches only the temporary
+            # keychain it builds from CSC_LINK: just the Developer ID.
+            export CSC_LINK="$MAC_CSC_LINK" CSC_KEY_PASSWORD="$MAC_CSC_KEY_PASSWORD" CSC_IDENTITY_AUTO_DISCOVERY=true
           fi
           if [ "$MAC_NOTARIZING" = true ] && [ -n "${APPLE_API_KEY_FILE:-}" ]; then
             export APPLE_API_KEY="$APPLE_API_KEY_FILE" APPLE_API_KEY_ID="$MAC_APPLE_API_KEY_ID" APPLE_API_ISSUER="$MAC_APPLE_API_ISSUER"

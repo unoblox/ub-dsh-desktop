@@ -724,6 +724,18 @@ describe('release secrets stay behind an approval', () => {
       }
     }
     expect(steps.find((step) => step.name === 'Package')?.env?.MAC_CSC_LINK).toContain('secrets.MAC_CSC_LINK')
+    // Run the Package script with stand-ins: what does electron-builder see?
+    const pkg = steps.find((step) => step.name === 'Package')
+    const script = (pkg?.run ?? '')
+      .replace(/\$\{\{ matrix\.platform \}\}/gu, 'darwin')
+      .replace(/\$\{\{ matrix\.arch \}\}/gu, 'arm64')
+      .replace(/\$\{\{ matrix\.builder \}\}/gu, 'printf "%s|%s|%s\\n" "${CSC_IDENTITY_AUTO_DISCOVERY}" "${CSC_LINK:-none}" "${MAC_CSC_LINK:-unset}" #')
+    const runPackage = (env: Record<string, string>) => execFileSync('bash', ['-c', `node() { :; }\n${script}`], { env: { PATH: process.env.PATH ?? '', MAC_NOTARIZING: 'false', CSC_IDENTITY_AUTO_DISCOVERY: pkg?.env?.CSC_IDENTITY_AUTO_DISCOVERY ?? '', ...env }, encoding: 'utf8' }).trim()
+    // Signed: discovery on (electron-builder skips signing without it), the
+    // certificate handed over, and the MAC_ copy gone before the build runs.
+    expect(runPackage({ MAC_SIGNING: 'true', MAC_CSC_LINK: 'cert-base64', MAC_CSC_KEY_PASSWORD: 'pw' })).toBe('true|cert-base64|unset')
+    // Ad-hoc: discovery stays off, no certificate.
+    expect(runPackage({ MAC_SIGNING: 'false', MAC_CSC_LINK: '' })).toBe('false|none|unset')
     // CodeSignTool needs Java 11+; it must be installed before signing starts.
     const javaIndex = steps.findIndex((step) => (step as { uses?: string }).uses?.startsWith('actions/setup-java@'))
     expect(javaIndex).toBeGreaterThan(-1)

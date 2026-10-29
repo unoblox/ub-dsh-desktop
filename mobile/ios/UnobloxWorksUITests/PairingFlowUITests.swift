@@ -24,10 +24,11 @@ final class PairingFlowUITests: XCTestCase {
     expectPairedPage(again, "the computer did not reopen paired")
   }
 
-  /// The composer only exists on the page for a paired phone. On failure the
-  /// message carries what was on screen, so a CI log shows why.
+  /// The session list only exists on the page for a paired phone; an
+  /// unpaired one gets the reconnect page. On failure the message carries
+  /// what was on screen, so a CI log shows why.
   private func expectPairedPage(_ app: XCUIApplication, _ message: String, file: StaticString = #filePath, line: UInt = #line) {
-    if app.webViews.textViews.firstMatch.waitForExistence(timeout: 45) { return }
+    if app.webViews.staticTexts["Recent sessions"].waitForExistence(timeout: 45) { return }
     XCTFail("\(message). On screen:\n\(app.debugDescription)", file: file, line: line)
   }
 

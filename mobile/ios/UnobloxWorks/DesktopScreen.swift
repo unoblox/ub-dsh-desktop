@@ -115,7 +115,7 @@ final class DesktopModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
   let webView: WKWebView
   private var onLoaded: ((String) -> Void)?
   private var started = false
-  private var observation: NSKeyValueObservation?
+  private var observations: [NSKeyValueObservation] = []
 
   override init() {
     let configuration = WKWebViewConfiguration()
@@ -132,12 +132,16 @@ final class DesktopModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
     super.init()
     webView.navigationDelegate = self
     webView.uiDelegate = self
-    observation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] view, _ in
-      Task { @MainActor in
-        self?.progress = view.estimatedProgress
-        self?.loading = view.isLoading
+    // Progress can stop changing before loading ends, so both are observed:
+    // otherwise the bar stays on screen at 100%.
+    observations = [
+      webView.observe(\.estimatedProgress, options: [.new]) { [weak self] view, _ in
+        Task { @MainActor in self?.progress = view.estimatedProgress }
+      },
+      webView.observe(\.isLoading, options: [.new]) { [weak self] view, _ in
+        Task { @MainActor in self?.loading = view.isLoading }
       }
-    }
+    ]
   }
 
   func start(origin: String, url: URL, onLoaded: @escaping (String) -> Void) {

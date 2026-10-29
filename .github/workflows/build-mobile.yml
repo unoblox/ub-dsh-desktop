@@ -137,7 +137,18 @@ jobs:
           xcodebuild build-for-testing -project UnobloxWorks.xcodeproj -scheme UnobloxWorks \
             -destination "id=${{ steps.simulator.outputs.id }}" -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
-      - name: Unit tests, then pair the simulator with the desktop bridge
+      # A cold simulator can take minutes to boot, longer than a pairing link
+      # lives (five minutes), so boot it and run the unit tests first.
+      - name: Boot the simulator
+        run: xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b
+      - name: Unit tests
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          xcodebuild test-without-building -project UnobloxWorks.xcodeproj -scheme UnobloxWorks \
+            -destination "id=${{ steps.simulator.outputs.id }}" -derivedDataPath build/sim \
+            -only-testing:UnobloxWorksTests -resultBundlePath build/unit.xcresult CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Pair the simulator with the desktop bridge
         shell: bash
         run: |
           # The simulator shares the Mac's network. A private alias on the
@@ -148,7 +159,7 @@ jobs:
           cd mobile/ios
           TEST_RUNNER_PAIRING_LINK="$link" xcodebuild test-without-building -project UnobloxWorks.xcodeproj \
             -scheme UnobloxWorks -destination "id=${{ steps.simulator.outputs.id }}" -derivedDataPath build/sim \
-            -resultBundlePath build/results.xcresult CODE_SIGNING_ALLOWED=NO | xcbeautify
+            -only-testing:UnobloxWorksUITests -resultBundlePath build/ui.xcresult CODE_SIGNING_ALLOWED=NO | xcbeautify
       - name: Device build (unsigned)
         working-directory: mobile/ios
         shell: bash
@@ -170,5 +181,5 @@ jobs:
           if-no-files-found: ignore
           path: |
             mobile/ios/build/UnobloxWorks-simulator.zip
-            mobile/ios/build/results.xcresult
+            mobile/ios/build/*.xcresult
             mobile/e2e/.out/bridge.log

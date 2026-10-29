@@ -15,14 +15,20 @@ final class PairingFlowUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["-pairingLink", link]
     app.launch()
-    // The composer only exists on the page for a paired phone.
-    XCTAssertTrue(app.webViews.textViews.firstMatch.waitForExistence(timeout: 45), "the paired page did not load")
+    expectPairedPage(app, "the paired page did not load")
 
     // A cold start goes back to that computer, still paired.
     app.terminate()
     let again = XCUIApplication()
     again.launch()
-    XCTAssertTrue(again.webViews.textViews.firstMatch.waitForExistence(timeout: 45), "the computer did not reopen paired")
+    expectPairedPage(again, "the computer did not reopen paired")
+  }
+
+  /// The composer only exists on the page for a paired phone. On failure the
+  /// message carries what was on screen, so a CI log shows why.
+  private func expectPairedPage(_ app: XCUIApplication, _ message: String, file: StaticString = #filePath, line: UInt = #line) {
+    if app.webViews.textViews.firstMatch.waitForExistence(timeout: 45) { return }
+    XCTFail("\(message). On screen:\n\(app.debugDescription)", file: file, line: line)
   }
 
   func testShowsPairingStepsWithoutAComputer() {

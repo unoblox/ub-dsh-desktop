@@ -100,6 +100,8 @@ Harness itself stays on a random loopback port. Phone access is provided by a se
 
 The public tunnel is optional and forwards only the paired mobile surface; it does not rebind the Harness service to a public interface.
 
+The iOS and Android apps in `mobile/` are clients of this same bridge: they scan the pairing QR code and open the bridge's own phone page in a web view, so they need no API of their own ([phone apps](mobile-apps.md)).
+
 ## Updates
 
 Installed macOS and Windows builds use `electron-updater`. The app checks shortly after startup, every six hours, and after a long system resume. A newly available version is offered before download. Download begins only after user consent, and installation begins only when the user chooses to restart and install. Users can skip one version without suppressing later releases.

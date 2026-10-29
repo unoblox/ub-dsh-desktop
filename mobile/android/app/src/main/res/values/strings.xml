@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- unoblox is always lower case, including the app name. -->
+  <string name="app_name" translatable="false">unoblox works</string>
+  <string name="home_subtitle">Use the agent on your computer from your phone.</string>
+  <string name="home_computers">Your computers</string>
+  <string name="home_empty_title">Pair with your computer</string>
+  <string name="home_empty_step1">On your computer, open unoblox works and choose Connect Phone.</string>
+  <string name="home_empty_step2">Tap Scan QR code and point your camera at the code.</string>
+  <string name="home_empty_note">Your phone talks to your computer directly. The agent and your files stay there.</string>
+  <string name="scan">Scan QR code</string>
+  <string name="paste_link">Paste a pairing link</string>
+  <string name="mode_lan">Same Wi-Fi</string>
+  <string name="mode_tunnel">Over the internet</string>
+  <string name="desktop_detail">%1$s · %2$s</string>
+  <string name="last_used">Last used %1$s</string>
+  <string name="more_options">More options for %1$s</string>
+  <string name="rename">Rename</string>
+  <string name="forget">Forget</string>
+  <string name="forget_title">Forget %1$s?</string>
+  <string name="forget_body">You will need to scan its QR code again to use it from this phone.</string>
+  <string name="cancel">Cancel</string>
+  <string name="save">Save</string>
+  <string name="open">Open</string>
+  <string name="paste_title">Paste a pairing link</string>
+  <string name="paste_hint">http://192.168.1.20:43127/pair?token=…</string>
+  <string name="paste_help">On your computer, Connect Phone shows the link under the QR code.</string>
+  <string name="invalid_link">This is not an unoblox works pairing code. On your computer, choose Connect Phone and scan the code it shows.</string>
+  <string name="scan_title">Scan the code on your computer</string>
+  <string name="scan_help">In unoblox works on your computer, choose Connect Phone.</string>
+  <string name="camera_denied">To scan the code, allow camera access in Settings. You can also paste the pairing link instead.</string>
+  <string name="camera_unavailable">The camera could not be started. You can paste the pairing link instead.</string>
+  <string name="open_settings">Open Settings</string>
+  <string name="close">Close</string>
+  <string name="unreachable_title">Can\'t reach %1$s</string>
+  <string name="unreachable_lan">Check that the computer is awake, unoblox works is open, and your phone is on the same Wi-Fi.</string>
+  <string name="unreachable_tunnel">Internet links stop working when the computer turns the link off or restarts it. On your computer, choose Connect Phone and scan the new code.</string>
+  <string name="retry">Try again</string>
+  <string name="scan_again">Scan again</string>
+  <string name="computers">Computers</string>
+  <string name="code_expired_title">This code has expired</string>
+  <string name="code_expired_body">Codes work once, for five minutes. On your computer, choose Connect Phone and scan the new code.</string>
+</resources>

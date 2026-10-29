@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  android:id="@+id/root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@color/paper">
+
+  <WebView
+    android:id="@+id/webView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/paper" />
+
+  <ProgressBar
+    android:id="@+id/progress"
+    style="?android:attr/progressBarStyleHorizontal"
+    android:layout_width="match_parent"
+    android:layout_height="3dp"
+    android:indeterminate="false"
+    android:max="100"
+    android:progressTint="@color/gold"
+    android:visibility="gone" />
+
+  <LinearLayout
+    android:id="@+id/errorView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/paper"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:visibility="gone">
+
+    <ImageView
+      android:layout_width="48dp"
+      android:layout_height="48dp"
+      android:contentDescription="@null"
+      android:src="@drawable/ic_computer"
+      app:tint="@color/muted" />
+
+    <TextView
+      android:id="@+id/errorTitle"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="16dp"
+      android:gravity="center"
+      android:textColor="@color/ink"
+      android:textSize="20sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/errorBody"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="8dp"
+      android:gravity="center"
+      android:maxWidth="420dp"
+      android:textColor="@color/muted"
+      android:textSize="16sp" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/retryButton"
+      android:layout_width="wrap_content"
+      android:layout_height="52dp"
+      android:layout_marginTop="24dp"
+      android:minWidth="200dp"
+      android:text="@string/retry" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/scanAgainButton"
+      style="@style/Widget.Material3.Button.TextButton"
+      android:layout_width="wrap_content"
+      android:layout_height="48dp"
+      android:layout_marginTop="4dp"
+      android:text="@string/scan_again"
+      android:textColor="@color/ink" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/listButton"
+      style="@style/Widget.Material3.Button.TextButton"
+      android:layout_width="wrap_content"
+      android:layout_height="48dp"
+      android:text="@string/computers"
+      android:textColor="@color/ink" />
+  </LinearLayout>
+</FrameLayout>

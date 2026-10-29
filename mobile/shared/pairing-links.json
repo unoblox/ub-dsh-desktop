@@ -1,0 +1,58 @@
+{
+  "comment": "Shared by the desktop bridge test (test/mobile-pairing-contract.test.ts), the Android unit tests and the iOS unit tests. A pairing link is what the desktop's Connect Phone QR code holds.",
+  "tokenPattern": "^[A-Za-z0-9_-]{16,128}$",
+  "tunnelHostSuffixes": [".trycloudflare.com", ".pinggy.link", ".pinggy-free.link", ".pinggy.online"],
+  "excludedTunnelHosts": ["api.trycloudflare.com"],
+  "accept": [
+    {
+      "link": "http://192.168.1.20:43127/pair?token=Zm9vYmFyYmF6cXV4cXV1eDEyMzQ1Njc4OTA",
+      "origin": "http://192.168.1.20:43127",
+      "token": "Zm9vYmFyYmF6cXV4cXV1eDEyMzQ1Njc4OTA",
+      "mode": "lan"
+    },
+    {
+      "link": "http://10.0.2.2:51234/pair?token=abcdefghijklmnop_-ABCDEFG",
+      "origin": "http://10.0.2.2:51234",
+      "token": "abcdefghijklmnop_-ABCDEFG",
+      "mode": "lan"
+    },
+    {
+      "link": "http://172.31.255.1:80/pair?token=abcdefghijklmnopqrstu",
+      "origin": "http://172.31.255.1",
+      "token": "abcdefghijklmnopqrstu",
+      "mode": "lan"
+    },
+    {
+      "link": "https://quiet-river-1234.trycloudflare.com/pair?token=abcdefghijklmnopqrstu",
+      "origin": "https://quiet-river-1234.trycloudflare.com",
+      "token": "abcdefghijklmnopqrstu",
+      "mode": "tunnel"
+    },
+    {
+      "link": "https://RNXYZ-1-2-3-4.a.free.pinggy.link/pair?token=abcdefghijklmnopqrstu",
+      "origin": "https://rnxyz-1-2-3-4.a.free.pinggy.link",
+      "token": "abcdefghijklmnopqrstu",
+      "mode": "tunnel"
+    }
+  ],
+  "reject": [
+    { "link": "", "why": "empty" },
+    { "link": "hello", "why": "not a URL" },
+    { "link": "http://8.8.8.8:43127/pair?token=abcdefghijklmnopqrstu", "why": "plain HTTP to a public address" },
+    { "link": "http://127.0.0.1:43127/pair?token=abcdefghijklmnopqrstu", "why": "loopback is the phone itself" },
+    { "link": "http://100.64.1.1:43127/pair?token=abcdefghijklmnopqrstu", "why": "the bridge refuses carrier-grade NAT addresses" },
+    { "link": "http://172.32.0.1:43127/pair?token=abcdefghijklmnopqrstu", "why": "outside 172.16.0.0/12" },
+    { "link": "http://192.168.1.20.evil.com:43127/pair?token=abcdefghijklmnopqrstu", "why": "a hostname, not an address" },
+    { "link": "http://quiet-river-1234.trycloudflare.com/pair?token=abcdefghijklmnopqrstu", "why": "a tunnel without HTTPS" },
+    { "link": "https://example.com/pair?token=abcdefghijklmnopqrstu", "why": "HTTPS host that is not a pairing tunnel" },
+    { "link": "https://trycloudflare.com.evil.com/pair?token=abcdefghijklmnopqrstu", "why": "suffix trick" },
+    { "link": "https://api.trycloudflare.com/pair?token=abcdefghijklmnopqrstu", "why": "Cloudflare's own API host" },
+    { "link": "https://user:pass@quiet-river-1234.trycloudflare.com/pair?token=abcdefghijklmnopqrstu", "why": "credentials in the URL" },
+    { "link": "http://192.168.1.20:43127/?token=abcdefghijklmnopqrstu", "why": "not the pairing path" },
+    { "link": "http://192.168.1.20:43127/pair", "why": "no token" },
+    { "link": "http://192.168.1.20:43127/pair?token=short", "why": "token too short" },
+    { "link": "http://192.168.1.20:43127/pair?token=abc%20defghijklmnopqrstu", "why": "token outside the base64url alphabet" },
+    { "link": "javascript:alert(1)//http://192.168.1.20/pair?token=abcdefghijklmnopqrstu", "why": "not http(s)" },
+    { "link": "file:///pair?token=abcdefghijklmnopqrstu", "why": "not http(s)" }
+  ]
+}

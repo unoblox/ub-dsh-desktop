@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "相机用于读取电脑上 unoblox works 显示的二维码，不会保存图像。";
+"NSLocalNetworkUsageDescription" = "unoblox works 通过当前 Wi-Fi 网络连接你的电脑。";

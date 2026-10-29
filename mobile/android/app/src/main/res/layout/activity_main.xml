@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@color/paper"
+  android:orientation="vertical">
+
+  <ScrollView
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:fillViewport="true">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="vertical"
+      android:paddingHorizontal="24dp"
+      android:paddingTop="40dp"
+      android:paddingBottom="16dp">
+
+      <ImageView
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:contentDescription="@null"
+        android:src="@drawable/mark" />
+
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/app_name"
+        android:textColor="@color/ink"
+        android:textSize="30sp"
+        android:textStyle="bold" />
+
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/home_subtitle"
+        android:textColor="@color/muted"
+        android:textSize="16sp" />
+
+      <LinearLayout
+        android:id="@+id/emptyState"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:background="@drawable/card"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="@string/home_empty_title"
+          android:textColor="@color/ink"
+          android:textSize="18sp"
+          android:textStyle="bold" />
+
+        <TextView
+          style="@style/Step"
+          android:layout_marginTop="14dp"
+          android:text="@string/home_empty_step1" />
+
+        <TextView
+          style="@style/Step"
+          android:layout_marginTop="10dp"
+          android:text="@string/home_empty_step2" />
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="16dp"
+          android:text="@string/home_empty_note"
+          android:textColor="@color/muted"
+          android:textSize="14sp" />
+      </LinearLayout>
+
+      <TextView
+        android:id="@+id/computersLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="@string/home_computers"
+        android:textAllCaps="true"
+        android:textColor="@color/muted"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+      <LinearLayout
+        android:id="@+id/desktopList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical" />
+    </LinearLayout>
+  </ScrollView>
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingBottom="16dp">
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/scanButton"
+      android:layout_width="match_parent"
+      android:layout_height="56dp"
+      android:text="@string/scan"
+      android:textSize="16sp"
+      app:icon="@drawable/ic_qr"
+      app:iconGravity="textStart"
+      xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/pasteButton"
+      style="@style/Widget.Material3.Button.TextButton"
+      android:layout_width="match_parent"
+      android:layout_height="48dp"
+      android:layout_marginTop="4dp"
+      android:text="@string/paste_link"
+      android:textColor="@color/ink" />
+  </LinearLayout>
+</LinearLayout>

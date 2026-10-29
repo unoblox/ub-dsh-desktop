@@ -19,6 +19,7 @@ DSH Desktop 是 Electron 宿主，复用 Harness runtime 和 Web UI。保持这�
 | `patches/` | 可重放的第三方兼容补丁；见该目录 `AGENTS.md` |
 | `build/` | 打包输入，包括 HTML 页面和运行时入口；见该目录 `AGENTS.md` |
 | `scripts/`、`test/` | 构建发布工具、行为与契约回归测试 |
+| `mobile/` | iOS / Android 配套 App（打开桌面手机桥接页面）；见该目录 `AGENTS.md` |
 
 先阅读受影响模块和测试；涉及架构时阅读 `docs/architecture.md`，开发和发布分别参考 `docs/development.md`、`docs/release-runbook.md`。实际依赖与命令以当前 `package.json`、锁文件、构建配置和 workflow 为准；发现文档过期时修正文档，不按旧版本描述修改代码。
 

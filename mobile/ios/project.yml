@@ -1,0 +1,90 @@
+# The Xcode project is generated from this file: `xcodegen generate` (see
+# docs/mobile-apps.md). The .xcodeproj is not committed.
+name: UnobloxWorks
+options:
+  bundleIdPrefix: ai.unoblox.works
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: WA3L43486P
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: NO
+targets:
+  UnobloxWorks:
+    type: application
+    platform: iOS
+    sources:
+      - path: UnobloxWorks
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.unoblox.works.mobile
+        PRODUCT_NAME: UnobloxWorks
+        INFOPLIST_KEY_CFBundleDisplayName: unoblox works
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: UnobloxWorks/Info.plist
+      properties:
+        CFBundleDisplayName: unoblox works
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: Paper
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        NSCameraUsageDescription: The camera reads the QR code that unoblox works shows on your computer. Pictures are not saved.
+        NSLocalNetworkUsageDescription: unoblox works connects to your computer on this Wi-Fi network.
+        # Plain HTTP only to the local network: the desktop's Wi-Fi address has
+        # no certificate. Internet links are HTTPS. Links.swift refuses any
+        # other address before it reaches the web view.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        ITSAppUsesNonExemptEncryption: false
+  UnobloxWorksTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: UnobloxWorksTests
+      - path: ../shared/pairing-links.json
+        buildPhase: resources
+    dependencies:
+      - target: UnobloxWorks
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.unoblox.works.mobile.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/UnobloxWorks.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/UnobloxWorks
+        BUNDLE_LOADER: $(TEST_HOST)
+  UnobloxWorksUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UnobloxWorksUITests
+    dependencies:
+      - target: UnobloxWorks
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.unoblox.works.mobile.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: UnobloxWorks
+schemes:
+  UnobloxWorks:
+    build:
+      targets:
+        UnobloxWorks: all
+    test:
+      config: Debug
+      targets:
+        - UnobloxWorksTests
+        - UnobloxWorksUITests

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain HTTP is needed for the desktop's Wi-Fi address (http://192.168.x.x:port),
+  which has no certificate. Android cannot scope cleartext to private address
+  ranges here, so Links.kt is the gate: the app only ever loads private IPv4
+  addresses over HTTP and the desktop's tunnel hosts over HTTPS.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+  <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

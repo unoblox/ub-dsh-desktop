@@ -1,0 +1,174 @@
+name: Build phone apps
+
+# The iOS and Android companion apps (mobile/, docs/mobile-apps.md). Each job
+# builds the app, runs its unit tests, then pairs a simulator or emulator with
+# the desktop's real phone bridge (mobile/e2e/bridge-server.ts) and checks the
+# paired page loads and stays paired after a restart.
+#
+# Android release signing turns on when its secrets exist:
+#   ANDROID_KEYSTORE_BASE64   upload keystore (.jks), base64
+#   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# Without them the release APK and bundle are left unsigned; the debug APK is
+# always built and can be installed directly for testing.
+# iOS builds here are for the simulator and an unsigned device build; TestFlight
+# needs the distribution signing described in docs/mobile-apps.md.
+# Steps that pipe xcodebuild through xcbeautify use `shell: bash`, which runs
+# with pipefail, so a failed build fails the step.
+
+on:
+  pull_request:
+    paths:
+      - mobile/**
+      - src/main/mobile/**
+      - test/mobile-pairing-contract.test.ts
+      - .github/workflows/build-mobile.yml
+  push:
+    paths:
+      - mobile/**
+      - src/main/mobile/**
+      - .github/workflows/build-mobile.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      MOBILE_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Only the bridge's own dependencies are needed; skip Electron's download.
+      - run: npm ci --ignore-scripts
+      - name: Desktop side of the pairing contract
+        run: npx vitest run test/mobile-pairing-contract.test.ts
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests, lint and debug build
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+      - name: Release build
+        working-directory: mobile/android
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "$ANDROID_SIGNING" = true ]; then
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          else
+            unset ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD
+            echo "::notice::No Android signing secrets: the release APK and bundle are unsigned"
+          fi
+          ./gradlew --no-daemon assembleRelease bundleRelease
+          rm -f "$RUNNER_TEMP/upload.jks"
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Pair the emulator with the desktop bridge
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: mobile/e2e/android-connected-test.sh
+      - name: Keep the apps
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ github.run_number }}
+          if-no-files-found: ignore
+          path: |
+            mobile/android/app/build/outputs/apk/debug/*.apk
+            mobile/android/app/build/outputs/apk/release/*.apk
+            mobile/android/app/build/outputs/bundle/release/*.aab
+            mobile/android/app/build/reports/
+            mobile/android/app/build/outputs/androidTest-results/
+            mobile/e2e/.out/bridge.log
+
+  ios:
+    name: iOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Generate the Xcode project
+        working-directory: mobile/ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Pick a simulator
+        id: simulator
+        run: |
+          id=$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | select(.key | test("iOS")) | .value[] | select(.name | test("^iPhone"))] | last | .udid')
+          test -n "$id" && test "$id" != null
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+      - name: Build for testing
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          xcodebuild build-for-testing -project UnobloxWorks.xcodeproj -scheme UnobloxWorks \
+            -destination "id=${{ steps.simulator.outputs.id }}" -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Unit tests, then pair the simulator with the desktop bridge
+        shell: bash
+        run: |
+          # The simulator shares the Mac's network. A private alias on the
+          # loopback interface gives the bridge a local-network address, so
+          # the test also covers App Transport Security's local exemption.
+          sudo ifconfig lo0 alias 10.123.0.1
+          link="$(mobile/e2e/start-bridge.sh 10.123.0.1)"
+          cd mobile/ios
+          TEST_RUNNER_PAIRING_LINK="$link" xcodebuild test-without-building -project UnobloxWorks.xcodeproj \
+            -scheme UnobloxWorks -destination "id=${{ steps.simulator.outputs.id }}" -derivedDataPath build/sim \
+            -resultBundlePath build/results.xcresult CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Device build (unsigned)
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          xcodebuild build -project UnobloxWorks.xcodeproj -scheme UnobloxWorks -configuration Release \
+            -destination generic/platform=iOS -derivedDataPath build/device \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Package the simulator app
+        if: always()
+        working-directory: mobile/ios
+        run: |
+          app=$(find build/sim/Build/Products -maxdepth 2 -name UnobloxWorks.app -path '*iphonesimulator*' | head -1)
+          if [ -n "$app" ]; then ditto -c -k --keepParent "$app" build/UnobloxWorks-simulator.zip; fi
+      - name: Keep the app and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ github.run_number }}
+          if-no-files-found: ignore
+          path: |
+            mobile/ios/build/UnobloxWorks-simulator.zip
+            mobile/ios/build/results.xcresult
+            mobile/e2e/.out/bridge.log

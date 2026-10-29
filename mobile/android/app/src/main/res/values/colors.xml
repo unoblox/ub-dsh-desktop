@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Match the phone page's theme-color so the system bars blend with it. -->
+  <color name="paper">#FFFFFF</color>
+  <color name="ink">#0C0C0C</color>
+  <color name="muted">#6B6B68</color>
+  <color name="line">#E6E2DA</color>
+  <color name="card">#F8F8F6</color>
+  <color name="gold">#D9A64A</color>
+  <color name="on_ink">#FFFFFF</color>
+  <color name="icon_background">#0C0C0C</color>
+</resources>

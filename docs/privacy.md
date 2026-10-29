@@ -59,6 +59,8 @@ These upstream (DeepSeek Harness / DSH Desktop) behaviours are disabled in `buil
 
 The phone bridge listens on the local network only while the user is pairing, while a phone paired this session, or when Keep Phone Connected is on (PIN-protected, inbound only, no advertising). It sends nothing out by itself.
 
+The iOS and Android apps (docs/mobile-apps.md) talk only to the computer they are paired with. They have no analytics, crash reporting or push service. On Android, WebView metrics and Safe Browsing lookups are turned off. Camera frames used to read the QR code are never stored, and the list of paired computers and the pairing cookie stay on the phone, outside backups.
+
 ## Chat widgets
 
 Widgets the agent shows in the chat (charts, forms, calculators) run in a sandboxed frame with no network access. The chart library is bundled with the app and served by the local Harness. Several layers enforce this, because a content security policy alone does not stop every route:

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="home_subtitle">在手机上使用你电脑上的智能体。</string>
+  <string name="home_computers">你的电脑</string>
+  <string name="home_empty_title">与电脑配对</string>
+  <string name="home_empty_step1">在电脑上打开 unoblox works，选择「连接手机」。</string>
+  <string name="home_empty_step2">点「扫描二维码」，用摄像头对准电脑上的二维码。</string>
+  <string name="home_empty_note">手机直接连接你的电脑。智能体和文件都留在电脑上。</string>
+  <string name="scan">扫描二维码</string>
+  <string name="paste_link">粘贴配对链接</string>
+  <string name="mode_lan">同一 Wi-Fi</string>
+  <string name="mode_tunnel">通过互联网</string>
+  <string name="desktop_detail">%1$s · %2$s</string>
+  <string name="last_used">上次使用：%1$s</string>
+  <string name="more_options">%1$s 的更多选项</string>
+  <string name="rename">重命名</string>
+  <string name="forget">移除</string>
+  <string name="forget_title">移除 %1$s？</string>
+  <string name="forget_body">之后要在这部手机上使用，需要重新扫描它的二维码。</string>
+  <string name="cancel">取消</string>
+  <string name="save">保存</string>
+  <string name="open">打开</string>
+  <string name="paste_title">粘贴配对链接</string>
+  <string name="paste_hint">http://192.168.1.20:43127/pair?token=…</string>
+  <string name="paste_help">电脑上的「连接手机」会在二维码下方显示这个链接。</string>
+  <string name="invalid_link">这不是 unoblox works 的配对二维码。请在电脑上选择「连接手机」，扫描显示的二维码。</string>
+  <string name="scan_title">扫描电脑上的二维码</string>
+  <string name="scan_help">在电脑上的 unoblox works 中选择「连接手机」。</string>
+  <string name="camera_denied">扫描二维码需要相机权限，请在设置中允许。也可以改为粘贴配对链接。</string>
+  <string name="camera_unavailable">无法启动相机。可以改为粘贴配对链接。</string>
+  <string name="open_settings">打开设置</string>
+  <string name="close">关闭</string>
+  <string name="unreachable_title">无法连接 %1$s</string>
+  <string name="unreachable_lan">请确认电脑未休眠、unoblox works 已打开，并且手机和电脑在同一 Wi-Fi。</string>
+  <string name="unreachable_tunnel">电脑关闭或重新开启互联网连接后，旧链接会失效。请在电脑上选择「连接手机」，扫描新的二维码。</string>
+  <string name="retry">重试</string>
+  <string name="scan_again">重新扫描</string>
+  <string name="computers">电脑列表</string>
+  <string name="code_expired_title">二维码已失效</string>
+  <string name="code_expired_body">每个二维码只能用一次，五分钟内有效。请在电脑上选择「连接手机」，扫描新的二维码。</string>
+</resources>

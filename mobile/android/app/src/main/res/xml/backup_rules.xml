@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pairing cookies and the saved computers are tied to this phone; never back them up. -->
+<full-backup-content>
+  <exclude domain="sharedpref" path="." />
+  <exclude domain="root" path="." />
+  <exclude domain="database" path="." />
+  <exclude domain="file" path="." />
+</full-backup-content>
